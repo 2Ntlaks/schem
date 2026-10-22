@@ -1,0 +1,215 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>*,*::before,*::after{box-sizing:border-box}body{margin:0}img{max-width:100%}</style>
+<title>Schematic Verification Stack</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@500;700&family=Newsreader:opsz,wght@6..72,400;6..72,500&family=Martian+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one drawing sheet. A title block, then the stack drawn as layers from "is it correct" (bottom of trust) to "is it good" (top), split into per-drawing gates and per-release tests. */
+:root {
+  --paper: #f4f7f6; --sheet: #fbfcfc; --ink: #15211c; --muted: #56655e; --rule: #c9d4cf;
+  --grid: rgba(21, 33, 28, 0.05);
+  --wire: #0b7357;      /* built */
+  --next: #2f5fa8;      /* tomorrow */
+  --loop: #b06d00;      /* needs your calibration */
+  --display: "Familjen Grotesk", "Segoe UI", sans-serif;
+  --body: "Newsreader", Georgia, serif;
+  --mono: "Martian Mono", Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #0d1411; --sheet: #121c18; --ink: #dbe7e1; --muted: #92a69c; --rule: #2a3a33;
+    --grid: rgba(219, 231, 225, 0.05); --wire: #43cf9c; --next: #7fa8f0; --loop: #f0b53c; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #0d1411; --sheet: #121c18; --ink: #dbe7e1; --muted: #92a69c; --rule: #2a3a33;
+  --grid: rgba(219, 231, 225, 0.05); --wire: #43cf9c; --next: #7fa8f0; --loop: #f0b53c; color-scheme: dark;
+}
+body {
+  background: var(--paper);
+  background-image: linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size: 20px 20px;
+  color: var(--ink);
+  font: 400 1.05rem/1.55 var(--body);
+}
+.page {
+  max-width: 980px; margin: 0 auto;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 40px 64px;
+  display: grid; gap: 40px;
+}
+h1, h2, h3 { font-family: var(--display); font-weight: 700; margin: 0; line-height: 1.12; text-wrap: balance; }
+h1 { font-size: clamp(1.9rem, 4.6vw, 2.9rem); letter-spacing: -0.02em; }
+h2 { font-size: 1.4rem; }
+h3 { font-size: 1.08rem; }
+p { margin: 0; max-width: 65ch; }
+.label { font: 500 0.66rem/1.4 var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+section { display: grid; gap: 14px; }
+
+.titleblock { border: 2px solid var(--ink); background: var(--sheet); display: grid; grid-template-columns: 1fr auto; }
+.titleblock .main { padding: 24px; display: grid; gap: 12px; border-right: 2px solid var(--ink); min-width: 0; }
+.titleblock .meta { display: grid; }
+.titleblock .meta div { padding: 10px 16px; border-bottom: 1px solid var(--ink); display: grid; gap: 2px; }
+.titleblock .meta div:last-child { border-bottom: 0; }
+.titleblock .meta b { font: 500 0.8rem var(--mono); }
+.thesis em { font-style: normal; font-weight: 500; color: var(--wire); }
+
+.legend { display: flex; flex-wrap: wrap; gap: 10px 18px; font: 500 0.72rem var(--mono); color: var(--muted); }
+.chip { display: inline-block; font: 500 0.64rem/1.3 var(--mono); padding: 3px 8px; border: 1px solid currentColor; border-radius: 2px; white-space: nowrap; letter-spacing: 0.03em; }
+.built { color: var(--wire); } .next { color: var(--next); } .cal { color: var(--loop); }
+
+.group { border: 1px solid var(--rule); background: var(--sheet); }
+.group > header { padding: 14px 18px; border-bottom: 1px solid var(--rule); display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: baseline; justify-content: space-between; }
+.group > header p { font-size: 0.95rem; color: var(--muted); }
+.layer { display: grid; grid-template-columns: 3.2rem minmax(0, 1fr) minmax(0, 15rem); border-bottom: 1px solid var(--rule); }
+.layer:last-child { border-bottom: 0; }
+.num { font: 500 1.4rem var(--display); color: var(--muted); padding: 16px 0 0 18px; }
+.what { padding: 16px 18px 16px 4px; display: grid; gap: 6px; min-width: 0; }
+.what p { font-size: 0.98rem; }
+.what .catches { font: 400 0.72rem/1.5 var(--mono); color: var(--muted); }
+.state { padding: 16px 18px; border-left: 1px dashed var(--rule); display: grid; gap: 8px; align-content: start; }
+.state small { font: 400 0.72rem/1.5 var(--mono); color: var(--muted); }
+.layer.gate { box-shadow: inset 4px 0 0 var(--wire); }
+
+.flow { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0; border: 1px solid var(--rule); background: var(--sheet); }
+.flow > div { padding: 16px 18px; display: grid; gap: 6px; align-content: start; border-right: 1px solid var(--rule); }
+.flow > div:last-child { border-right: 0; }
+.flow b { font-family: var(--display); font-size: 1.6rem; font-variant-numeric: tabular-nums; }
+
+.you { border-left: 3px solid var(--loop); padding: 4px 0 4px 18px; display: grid; gap: 10px; }
+
+@media (max-width: 720px) {
+  .titleblock { grid-template-columns: 1fr; }
+  .titleblock .main { border-right: 0; border-bottom: 2px solid var(--ink); }
+  .titleblock .meta { grid-template-columns: 1fr 1fr; }
+  .layer { grid-template-columns: 2.6rem minmax(0, 1fr); }
+  .state { grid-column: 2; border-left: 0; border-top: 1px dashed var(--rule); padding-left: 4px; }
+  .flow { grid-template-columns: 1fr; }
+  .flow > div { border-right: 0; border-bottom: 1px solid var(--rule); }
+}
+</style>
+</head>
+<body>
+
+<div class="page">
+  <header class="titleblock">
+    <div class="main">
+      <span class="label">schem · verification plan</span>
+      <h1>How we know a drawing is right, and good</h1>
+      <p class="thesis">Claude verifies its own work first: correctness is proven by the machine every time, and quality is measured and judged by independent AI reviewers. <em>You only see drawings once they pass all of that</em>, and then we iterate together.</p>
+    </div>
+    <div class="meta">
+      <div><span class="label">Sheet</span><b>2 of 2</b></div>
+      <div><span class="label">Date</span><b>2026-10-23</b></div>
+      <div><span class="label">Tests today</span><b>113 passing</b></div>
+    </div>
+  </header>
+
+  <div class="legend">
+    <span><span class="chip built">built</span> working now</span>
+    <span><span class="chip next">tomorrow</span> next session</span>
+    <span><span class="chip cal">checked by you later</span> automatic now, confirmed against your ratings once it is ready</span>
+  </div>
+
+  <section class="group" aria-labelledby="g1">
+    <header>
+      <h2 id="g1">Every drawing, every time</h2>
+      <p>A drawing that fails layer 1 or 2 is never shown as finished.</p>
+    </header>
+    <div class="layer gate">
+      <div class="num">1</div>
+      <div class="what">
+        <h3>The connections are exactly the netlist</h3>
+        <p>A separate checker ignores how the drawing was made, rebuilds what connects to what from the drawn lines, dots, pins and symbols, and compares it with the circuit.</p>
+        <span class="catches">catches: missing wire, accidental short, dotless T, wire through a pin, wrong supply label, hidden connected pin</span>
+      </div>
+      <div class="state"><span class="chip built">built</span><small>94 independent test cases; every deleted wire, dot or pin and every relabelled port caught</small></div>
+    </div>
+    <div class="layer gate">
+      <div class="num">2</div>
+      <div class="what">
+        <h3>Nothing overlaps, everything is on grid</h3>
+        <p>No wire through a part, label or symbol; no two parts or labels touching; every pin and corner on the 0.1 inch grid.</p>
+        <span class="catches">catches: label printed over a wire, symbols colliding, off-grid geometry</span>
+      </div>
+      <div class="state"><span class="chip built">built</span><span class="chip next">tomorrow</span><small>wires vs parts done; label vs label and text clipping still to add</small></div>
+    </div>
+    <div class="layer">
+      <div class="num">3</div>
+      <div class="what">
+        <h3>It follows drafting conventions</h3>
+        <p>Rule checks for what engineers expect: ground points down, supply up, signal flows left to right, rail-to-ground parts vertical, decoupling capacitor next to its pin.</p>
+        <span class="catches">catches: upside-down ground, signal flowing backwards, a pull-up drawn sideways</span>
+      </div>
+      <div class="state"><span class="chip next">tomorrow</span><small>each break becomes a finding with a tested fix</small></div>
+    </div>
+    <div class="layer">
+      <div class="num">4</div>
+      <div class="what">
+        <h3>It is easy to read</h3>
+        <p>Measured, with limits: crossings, bends, wire length, parallel wires squeezed together, junction dots too close, labels far from their part, wasted space, page shape.</p>
+        <span class="catches">catches: the two dots one step apart in case 3, the tight parallel wires in case 5</span>
+      </div>
+      <div class="state"><span class="chip next">tomorrow</span><small>limits set from drawings you rate well</small></div>
+    </div>
+  </section>
+
+  <section class="group" aria-labelledby="g2">
+    <header>
+      <h2 id="g2">Every release, on a whole test set</h2>
+      <p>These prove the engine is reliable, not just one drawing.</p>
+    </header>
+    <div class="layer">
+      <div class="num">5</div>
+      <div class="what">
+        <h3>Stress tests at scale</h3>
+        <p>Thousands of circuits generated from real patterns (dividers, pull-ups, op-amp stages, transistor drivers, boards with sensors). The same circuit written in a different order must give the same drawing. A small edit must only move nearby parts. Windows and Linux must produce identical files.</p>
+        <span class="catches">catches: crashes, rare layouts that break, drawings that jump around after one edit</span>
+      </div>
+      <div class="state"><span class="chip built">built</span><span class="chip next">tomorrow</span><small>determinism done; generator, reorder and edit-stability tests next</small></div>
+    </div>
+    <div class="layer">
+      <div class="num">6</div>
+      <div class="what">
+        <h3>A blind AI judge</h3>
+        <p>Fresh Claude agents, who never saw the code, get shuffled images from our engine and from SKiDL, netlistsvg and schemdraw, a written rubric, and one question per pair: which would you publish?</p>
+        <span class="catches">catches: drawings that pass every rule and still look wrong</span>
+      </div>
+      <div class="state"><span class="chip next">tomorrow</span><span class="chip cal">checked by you later</span><small>runs from day one with several independent judges that must agree; your ratings later confirm it matches your taste</small></div>
+    </div>
+    <div class="layer">
+      <div class="num">7</div>
+      <div class="what">
+        <h3>Real agents doing real tasks</h3>
+        <p>Claude Code and Codex get a plain request ("draw the 555 blinker"). Pass only if the final circuit equals the reference, every layer above passes, and it took 3 rounds or fewer.</p>
+        <span class="catches">catches: tools that confuse agents, agents changing the circuit to make a prettier picture</span>
+      </div>
+      <div class="state"><span class="chip next">phase 2</span><small>needs the MCP tools first</small></div>
+    </div>
+  </section>
+
+  <section>
+    <span class="label">What runs where</span>
+    <div class="flow">
+      <div><span class="label">On every drawing</span><b>Layers 1-4</b><p>Milliseconds. Built into the engine, so an agent can never be handed a broken drawing.</p></div>
+      <div><span class="label">On every change to the engine</span><b>Layers 1-5</b><p>Minutes. Runs with <code>npm test</code>; nothing merges if it fails.</p></div>
+      <div><span class="label">On every release</span><b>Layers 1-7</b><p>About an hour. Includes the AI judge and the agent tasks.</p></div>
+    </div>
+  </section>
+
+  <section class="you">
+    <span class="label">Order of work</span>
+    <h2>Claude first, you once it is confident</h2>
+    <p>1. Claude builds, then runs layers 1-6 on its own. Drawings that fail any rule or that the AI judges reject go back for fixing, without asking you.</p>
+    <p>2. Only when everything passes does Claude hand you the set, shuffled and blind, with the judges' verdicts hidden.</p>
+    <p>3. You rate them. Where you disagree with the judges, Claude tightens the rules and the rubric, so the next round needs you less.</p>
+  </section>
+</div>
+</body>
+</html>
