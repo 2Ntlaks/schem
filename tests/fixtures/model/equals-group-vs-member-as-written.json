@@ -1,0 +1,118 @@
+{
+  "name": "equals-group-vs-member-as-written",
+  "specRef": "6.9, 6.2",
+  "description": "U1 pins 14 and 29 are both named GND and share group GND (listed 29 first). A's ground net holds the group endpoint U1{GND}; circuitB's holds the physical member U1[14]. Electrically equivalent, but 6.9 compares nets 'on physical terminals and groups as written', and 6.2 keeps physical terminals as written (D1: the drawing shows pin 14). Not equal.",
+  "circuit": {
+    "parts": [
+      {
+        "id": "U1",
+        "type": "ic"
+      },
+      {
+        "id": "R1",
+        "type": "resistor",
+        "props": {
+          "value": "1k"
+        }
+      }
+    ],
+    "nets": [
+      {
+        "id": "n1",
+        "name": "GND",
+        "endpoints": [
+          "U1{GND}",
+          "R1[2]"
+        ]
+      }
+    ],
+    "nc": []
+  },
+  "pinDefs": {
+    "U1": [
+      {
+        "number": "1",
+        "name": "3V3",
+        "role": "power_in"
+      },
+      {
+        "number": "12",
+        "name": "EN",
+        "role": "input"
+      },
+      {
+        "number": "29",
+        "name": "GND",
+        "role": "ground",
+        "group": "GND"
+      },
+      {
+        "number": "14",
+        "name": "GND",
+        "role": "ground",
+        "group": "GND"
+      },
+      {
+        "number": "21",
+        "name": "GPIO21",
+        "role": "bidir",
+        "aliases": [
+          "SDA"
+        ]
+      },
+      {
+        "number": "22",
+        "name": "GPIO22",
+        "role": "bidir",
+        "aliases": [
+          "SCL"
+        ]
+      }
+    ],
+    "R1": [
+      {
+        "number": "1",
+        "name": "1",
+        "role": "passive"
+      },
+      {
+        "number": "2",
+        "name": "2",
+        "role": "passive"
+      }
+    ]
+  },
+  "expect": {
+    "ok": true,
+    "errors": [],
+    "equal": {
+      "circuitB": {
+        "parts": [
+          {
+            "id": "U1",
+            "type": "ic"
+          },
+          {
+            "id": "R1",
+            "type": "resistor",
+            "props": {
+              "value": "1k"
+            }
+          }
+        ],
+        "nets": [
+          {
+            "id": "n1",
+            "name": "GND",
+            "endpoints": [
+              "U1[14]",
+              "R1[2]"
+            ]
+          }
+        ],
+        "nc": []
+      },
+      "equal": false
+    }
+  }
+}

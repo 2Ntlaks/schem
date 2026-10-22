@@ -1,0 +1,109 @@
+{
+  "name": "connect-differently-named-signal-nets",
+  "specRef": "6.3 merge rule 4",
+  "description": "Signal nets SDA and SCL joined by connect R1[1] R3[1]. Rule 4: 'Two or more nets with different names otherwise: rejected unless mergeNets names the one to keep.' E233.",
+  "circuit": {
+    "parts": [
+      {
+        "id": "R1",
+        "type": "resistor"
+      },
+      {
+        "id": "R2",
+        "type": "resistor"
+      },
+      {
+        "id": "R3",
+        "type": "resistor"
+      },
+      {
+        "id": "R4",
+        "type": "resistor"
+      }
+    ],
+    "nets": [
+      {
+        "id": "n1",
+        "name": "SDA",
+        "endpoints": [
+          "R1[1]",
+          "R2[1]"
+        ]
+      },
+      {
+        "id": "n2",
+        "name": "SCL",
+        "endpoints": [
+          "R3[1]",
+          "R4[1]"
+        ]
+      }
+    ],
+    "nc": []
+  },
+  "pinDefs": {
+    "R1": [
+      {
+        "number": "1",
+        "name": "1",
+        "role": "passive"
+      },
+      {
+        "number": "2",
+        "name": "2",
+        "role": "passive"
+      }
+    ],
+    "R2": [
+      {
+        "number": "1",
+        "name": "1",
+        "role": "passive"
+      },
+      {
+        "number": "2",
+        "name": "2",
+        "role": "passive"
+      }
+    ],
+    "R3": [
+      {
+        "number": "1",
+        "name": "1",
+        "role": "passive"
+      },
+      {
+        "number": "2",
+        "name": "2",
+        "role": "passive"
+      }
+    ],
+    "R4": [
+      {
+        "number": "1",
+        "name": "1",
+        "role": "passive"
+      },
+      {
+        "number": "2",
+        "name": "2",
+        "role": "passive"
+      }
+    ]
+  },
+  "ops": [
+    {
+      "op": "connect",
+      "endpoints": [
+        "R1[1]",
+        "R3[1]"
+      ]
+    }
+  ],
+  "expect": {
+    "ok": false,
+    "errors": [
+      "E233"
+    ]
+  }
+}

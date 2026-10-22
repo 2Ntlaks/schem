@@ -1,0 +1,260 @@
+{
+  "name": "dotless-t-split",
+  "specRef": "9.7, 13 item 2",
+  "description": "Trunk from R1[2] (10,14) to R2[1] (24,14); branch from R3[2] (17,10) down to the trunk at (17,14). R1[1], R2[2], R3[1] go by 2 G stubs to GND ports. No dot. The trunk is split at the T point into (10,14)-(17,14) and (17,14)-(24,14). Normalisation must make this identical to dotless-t-unsplit: 3 directions, no dot, ambiguous T. Segmentation must not matter.",
+  "circuit": {
+    "parts": [
+      {
+        "id": "R1",
+        "type": "resistor"
+      },
+      {
+        "id": "R2",
+        "type": "resistor"
+      },
+      {
+        "id": "R3",
+        "type": "resistor"
+      }
+    ],
+    "nets": [
+      {
+        "id": "n1",
+        "endpoints": [
+          "R1[2]",
+          "R2[1]",
+          "R3[2]"
+        ]
+      },
+      {
+        "id": "n2",
+        "name": "GND",
+        "kind": "ground",
+        "endpoints": [
+          "R1[1]",
+          "R2[2]",
+          "R3[1]"
+        ]
+      }
+    ],
+    "nc": []
+  },
+  "pinDefs": {
+    "R1": [
+      {
+        "number": "1",
+        "name": "1",
+        "role": "passive"
+      },
+      {
+        "number": "2",
+        "name": "2",
+        "role": "passive"
+      }
+    ],
+    "R2": [
+      {
+        "number": "1",
+        "name": "1",
+        "role": "passive"
+      },
+      {
+        "number": "2",
+        "name": "2",
+        "role": "passive"
+      }
+    ],
+    "R3": [
+      {
+        "number": "1",
+        "name": "1",
+        "role": "passive"
+      },
+      {
+        "number": "2",
+        "name": "2",
+        "role": "passive"
+      }
+    ]
+  },
+  "render": {
+    "pins": [
+      {
+        "part": "R1",
+        "number": "1",
+        "at": [
+          4,
+          14
+        ],
+        "dir": "left"
+      },
+      {
+        "part": "R1",
+        "number": "2",
+        "at": [
+          10,
+          14
+        ],
+        "dir": "right"
+      },
+      {
+        "part": "R2",
+        "number": "1",
+        "at": [
+          24,
+          14
+        ],
+        "dir": "left"
+      },
+      {
+        "part": "R2",
+        "number": "2",
+        "at": [
+          30,
+          14
+        ],
+        "dir": "right"
+      },
+      {
+        "part": "R3",
+        "number": "1",
+        "at": [
+          17,
+          4
+        ],
+        "dir": "up"
+      },
+      {
+        "part": "R3",
+        "number": "2",
+        "at": [
+          17,
+          10
+        ],
+        "dir": "down"
+      }
+    ],
+    "wires": [
+      [
+        [
+          10,
+          14
+        ],
+        [
+          17,
+          14
+        ]
+      ],
+      [
+        [
+          17,
+          14
+        ],
+        [
+          24,
+          14
+        ]
+      ],
+      [
+        [
+          17,
+          10
+        ],
+        [
+          17,
+          14
+        ]
+      ],
+      [
+        [
+          4,
+          14
+        ],
+        [
+          2,
+          14
+        ]
+      ],
+      [
+        [
+          30,
+          14
+        ],
+        [
+          32,
+          14
+        ]
+      ],
+      [
+        [
+          17,
+          4
+        ],
+        [
+          17,
+          2
+        ]
+      ]
+    ],
+    "dots": [],
+    "ports": [
+      {
+        "at": [
+          2,
+          14
+        ],
+        "text": "GND",
+        "domain": null,
+        "kind": "ground"
+      },
+      {
+        "at": [
+          32,
+          14
+        ],
+        "text": "GND",
+        "domain": null,
+        "kind": "ground"
+      },
+      {
+        "at": [
+          17,
+          2
+        ],
+        "text": "GND",
+        "domain": null,
+        "kind": "ground"
+      }
+    ],
+    "ncMarks": [],
+    "keepouts": [
+      {
+        "part": "R1",
+        "x": 4,
+        "y": 13,
+        "w": 6,
+        "h": 2
+      },
+      {
+        "part": "R2",
+        "x": 24,
+        "y": 13,
+        "w": 6,
+        "h": 2
+      },
+      {
+        "part": "R3",
+        "x": 16,
+        "y": 4,
+        "w": 2,
+        "h": 6
+      }
+    ]
+  },
+  "expect": {
+    "valid": false,
+    "errors": [
+      "ambiguous-t"
+    ]
+  }
+}

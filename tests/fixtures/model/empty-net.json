@@ -1,0 +1,63 @@
+{
+  "name": "empty-net",
+  "specRef": "6.3 invariant 4",
+  "description": "Net n2 has an empty endpoint list. 6.3 invariant 4: 'Every net has at least one endpoint.'",
+  "circuit": {
+    "parts": [
+      {
+        "id": "R1",
+        "type": "resistor"
+      },
+      {
+        "id": "R2",
+        "type": "resistor"
+      }
+    ],
+    "nets": [
+      {
+        "id": "n1",
+        "endpoints": [
+          "R1[1]",
+          "R2[1]"
+        ]
+      },
+      {
+        "id": "n2",
+        "endpoints": []
+      }
+    ],
+    "nc": []
+  },
+  "pinDefs": {
+    "R1": [
+      {
+        "number": "1",
+        "name": "1",
+        "role": "passive"
+      },
+      {
+        "number": "2",
+        "name": "2",
+        "role": "passive"
+      }
+    ],
+    "R2": [
+      {
+        "number": "1",
+        "name": "1",
+        "role": "passive"
+      },
+      {
+        "number": "2",
+        "name": "2",
+        "role": "passive"
+      }
+    ]
+  },
+  "expect": {
+    "ok": false,
+    "errors": [
+      "E241"
+    ]
+  }
+}

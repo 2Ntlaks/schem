@@ -1,0 +1,97 @@
+{
+  "name": "set-no-connect-on-last-group-member",
+  "specRef": "6.2 (rev C.1), 6.3, 11.3",
+  "description": "U1 pins 14 and 29 are both named GND and share group GND (listed 29 first). U1{GND} is in net n1 and U1[14] is already no-connect (valid: representative is 29). The op setNoConnect {U1[29], nc true} would leave every member of the group no-connect while the group is still an endpoint. The validator runs on every edit (6.3), so the edit is rejected with E225.",
+  "circuit": {
+    "parts": [
+      {
+        "id": "U1",
+        "type": "ic"
+      },
+      {
+        "id": "R1",
+        "type": "resistor"
+      }
+    ],
+    "nets": [
+      {
+        "id": "n1",
+        "name": "GND",
+        "endpoints": [
+          "U1{GND}",
+          "R1[2]"
+        ]
+      }
+    ],
+    "nc": [
+      "U1[14]"
+    ]
+  },
+  "pinDefs": {
+    "U1": [
+      {
+        "number": "1",
+        "name": "3V3",
+        "role": "power_in"
+      },
+      {
+        "number": "12",
+        "name": "EN",
+        "role": "input"
+      },
+      {
+        "number": "29",
+        "name": "GND",
+        "role": "ground",
+        "group": "GND"
+      },
+      {
+        "number": "14",
+        "name": "GND",
+        "role": "ground",
+        "group": "GND"
+      },
+      {
+        "number": "21",
+        "name": "GPIO21",
+        "role": "bidir",
+        "aliases": [
+          "SDA"
+        ]
+      },
+      {
+        "number": "22",
+        "name": "GPIO22",
+        "role": "bidir",
+        "aliases": [
+          "SCL"
+        ]
+      }
+    ],
+    "R1": [
+      {
+        "number": "1",
+        "name": "1",
+        "role": "passive"
+      },
+      {
+        "number": "2",
+        "name": "2",
+        "role": "passive"
+      }
+    ]
+  },
+  "ops": [
+    {
+      "op": "setNoConnect",
+      "terminal": "U1[29]",
+      "nc": true
+    }
+  ],
+  "expect": {
+    "ok": false,
+    "errors": [
+      "E225"
+    ]
+  }
+}

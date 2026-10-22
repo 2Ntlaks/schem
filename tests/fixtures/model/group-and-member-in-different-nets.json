@@ -1,0 +1,111 @@
+{
+  "name": "group-and-member-in-different-nets",
+  "specRef": "6.2",
+  "description": "U1 pins 14 and 29 are both named GND and share group GND (listed 29 first). Net n1 holds the group U1{GND}; net n2 holds U1[14], a member of that group. 6.2: every endpoint expands to its equivalence class, a grouped terminal belongs to its group's class, and 'U1{GND} in net n1 and U1[14] in net n2 is an error'. Loading never merges (6.3).",
+  "circuit": {
+    "parts": [
+      {
+        "id": "U1",
+        "type": "ic"
+      },
+      {
+        "id": "R1",
+        "type": "resistor"
+      },
+      {
+        "id": "R2",
+        "type": "resistor"
+      }
+    ],
+    "nets": [
+      {
+        "id": "n1",
+        "name": "GND",
+        "endpoints": [
+          "U1{GND}",
+          "R1[2]"
+        ]
+      },
+      {
+        "id": "n2",
+        "endpoints": [
+          "U1[14]",
+          "R2[1]"
+        ]
+      }
+    ],
+    "nc": []
+  },
+  "pinDefs": {
+    "U1": [
+      {
+        "number": "1",
+        "name": "3V3",
+        "role": "power_in"
+      },
+      {
+        "number": "12",
+        "name": "EN",
+        "role": "input"
+      },
+      {
+        "number": "29",
+        "name": "GND",
+        "role": "ground",
+        "group": "GND"
+      },
+      {
+        "number": "14",
+        "name": "GND",
+        "role": "ground",
+        "group": "GND"
+      },
+      {
+        "number": "21",
+        "name": "GPIO21",
+        "role": "bidir",
+        "aliases": [
+          "SDA"
+        ]
+      },
+      {
+        "number": "22",
+        "name": "GPIO22",
+        "role": "bidir",
+        "aliases": [
+          "SCL"
+        ]
+      }
+    ],
+    "R1": [
+      {
+        "number": "1",
+        "name": "1",
+        "role": "passive"
+      },
+      {
+        "number": "2",
+        "name": "2",
+        "role": "passive"
+      }
+    ],
+    "R2": [
+      {
+        "number": "1",
+        "name": "1",
+        "role": "passive"
+      },
+      {
+        "number": "2",
+        "name": "2",
+        "role": "passive"
+      }
+    ]
+  },
+  "expect": {
+    "ok": false,
+    "errors": [
+      "E222"
+    ]
+  }
+}

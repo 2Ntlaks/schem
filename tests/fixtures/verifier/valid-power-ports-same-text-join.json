@@ -1,0 +1,322 @@
+{
+  "name": "valid-power-ports-same-text-join",
+  "specRef": "9.7",
+  "description": "Baseline. R1 at (4,14)-(10,14) and R2 at (24,14)-(30,14) horizontal; R3 at (17,4)-(17,10) and R4 at (17,18)-(17,24) vertical. Outer pins go by 2 G stubs to VCC ports (R1[1], R3[1]) and GND ports (R2[2], R4[2]). Wires (10,14)-(24,14) and (17,10)-(17,18) cross at (17,14) with no dot. The two VCC ports share visible text 'VCC' and no domain, so per 9.7 they join one virtual net, giving {R1[1], R3[1]}; likewise the two GND ports give {R2[2], R4[2]}. Every pin is approached along its dir from outside its keep-out. Valid.",
+  "circuit": {
+    "parts": [
+      {
+        "id": "R1",
+        "type": "resistor"
+      },
+      {
+        "id": "R2",
+        "type": "resistor"
+      },
+      {
+        "id": "R3",
+        "type": "resistor"
+      },
+      {
+        "id": "R4",
+        "type": "resistor"
+      }
+    ],
+    "nets": [
+      {
+        "id": "n1",
+        "endpoints": [
+          "R1[2]",
+          "R2[1]"
+        ]
+      },
+      {
+        "id": "n2",
+        "endpoints": [
+          "R3[2]",
+          "R4[1]"
+        ]
+      },
+      {
+        "id": "n3",
+        "name": "VCC",
+        "kind": "power",
+        "endpoints": [
+          "R1[1]",
+          "R3[1]"
+        ]
+      },
+      {
+        "id": "n4",
+        "name": "GND",
+        "kind": "ground",
+        "endpoints": [
+          "R2[2]",
+          "R4[2]"
+        ]
+      }
+    ],
+    "nc": []
+  },
+  "pinDefs": {
+    "R1": [
+      {
+        "number": "1",
+        "name": "1",
+        "role": "passive"
+      },
+      {
+        "number": "2",
+        "name": "2",
+        "role": "passive"
+      }
+    ],
+    "R2": [
+      {
+        "number": "1",
+        "name": "1",
+        "role": "passive"
+      },
+      {
+        "number": "2",
+        "name": "2",
+        "role": "passive"
+      }
+    ],
+    "R3": [
+      {
+        "number": "1",
+        "name": "1",
+        "role": "passive"
+      },
+      {
+        "number": "2",
+        "name": "2",
+        "role": "passive"
+      }
+    ],
+    "R4": [
+      {
+        "number": "1",
+        "name": "1",
+        "role": "passive"
+      },
+      {
+        "number": "2",
+        "name": "2",
+        "role": "passive"
+      }
+    ]
+  },
+  "render": {
+    "pins": [
+      {
+        "part": "R1",
+        "number": "1",
+        "at": [
+          4,
+          14
+        ],
+        "dir": "left"
+      },
+      {
+        "part": "R1",
+        "number": "2",
+        "at": [
+          10,
+          14
+        ],
+        "dir": "right"
+      },
+      {
+        "part": "R2",
+        "number": "1",
+        "at": [
+          24,
+          14
+        ],
+        "dir": "left"
+      },
+      {
+        "part": "R2",
+        "number": "2",
+        "at": [
+          30,
+          14
+        ],
+        "dir": "right"
+      },
+      {
+        "part": "R3",
+        "number": "1",
+        "at": [
+          17,
+          4
+        ],
+        "dir": "up"
+      },
+      {
+        "part": "R3",
+        "number": "2",
+        "at": [
+          17,
+          10
+        ],
+        "dir": "down"
+      },
+      {
+        "part": "R4",
+        "number": "1",
+        "at": [
+          17,
+          18
+        ],
+        "dir": "up"
+      },
+      {
+        "part": "R4",
+        "number": "2",
+        "at": [
+          17,
+          24
+        ],
+        "dir": "down"
+      }
+    ],
+    "wires": [
+      [
+        [
+          10,
+          14
+        ],
+        [
+          24,
+          14
+        ]
+      ],
+      [
+        [
+          17,
+          10
+        ],
+        [
+          17,
+          18
+        ]
+      ],
+      [
+        [
+          4,
+          14
+        ],
+        [
+          2,
+          14
+        ]
+      ],
+      [
+        [
+          17,
+          4
+        ],
+        [
+          17,
+          2
+        ]
+      ],
+      [
+        [
+          30,
+          14
+        ],
+        [
+          32,
+          14
+        ]
+      ],
+      [
+        [
+          17,
+          24
+        ],
+        [
+          17,
+          26
+        ]
+      ]
+    ],
+    "dots": [],
+    "ports": [
+      {
+        "at": [
+          2,
+          14
+        ],
+        "text": "VCC",
+        "domain": null,
+        "kind": "power"
+      },
+      {
+        "at": [
+          17,
+          2
+        ],
+        "text": "VCC",
+        "domain": null,
+        "kind": "power"
+      },
+      {
+        "at": [
+          32,
+          14
+        ],
+        "text": "GND",
+        "domain": null,
+        "kind": "ground"
+      },
+      {
+        "at": [
+          17,
+          26
+        ],
+        "text": "GND",
+        "domain": null,
+        "kind": "ground"
+      }
+    ],
+    "ncMarks": [],
+    "keepouts": [
+      {
+        "part": "R1",
+        "x": 4,
+        "y": 13,
+        "w": 6,
+        "h": 2
+      },
+      {
+        "part": "R2",
+        "x": 24,
+        "y": 13,
+        "w": 6,
+        "h": 2
+      },
+      {
+        "part": "R3",
+        "x": 16,
+        "y": 4,
+        "w": 2,
+        "h": 6
+      },
+      {
+        "part": "R4",
+        "x": 16,
+        "y": 18,
+        "w": 2,
+        "h": 6
+      }
+    ]
+  },
+  "expect": {
+    "valid": true,
+    "errors": []
+  }
+}

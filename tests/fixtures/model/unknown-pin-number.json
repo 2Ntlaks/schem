@@ -1,0 +1,59 @@
+{
+  "name": "unknown-pin-number",
+  "specRef": "6.2, 8.4, 9.3",
+  "description": "R1 is a resistor with pins 1 and 2 only; net n1 uses R1[3]. Unknown pin: E104 (8.4 example 'unknown pin \"R1.3\"').",
+  "circuit": {
+    "parts": [
+      {
+        "id": "R1",
+        "type": "resistor"
+      },
+      {
+        "id": "R2",
+        "type": "resistor"
+      }
+    ],
+    "nets": [
+      {
+        "id": "n1",
+        "endpoints": [
+          "R1[3]",
+          "R2[1]"
+        ]
+      }
+    ],
+    "nc": []
+  },
+  "pinDefs": {
+    "R1": [
+      {
+        "number": "1",
+        "name": "1",
+        "role": "passive"
+      },
+      {
+        "number": "2",
+        "name": "2",
+        "role": "passive"
+      }
+    ],
+    "R2": [
+      {
+        "number": "1",
+        "name": "1",
+        "role": "passive"
+      },
+      {
+        "number": "2",
+        "name": "2",
+        "role": "passive"
+      }
+    ]
+  },
+  "expect": {
+    "ok": false,
+    "errors": [
+      "E104"
+    ]
+  }
+}

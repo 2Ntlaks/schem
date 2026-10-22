@@ -1,0 +1,178 @@
+{
+  "name": "connect-three-way-merge",
+  "specRef": "6.3 merge rules 4, 5",
+  "description": "Three nets: n1 and n2 unnamed, n3 named BUS. One connect lists R2[1] (in n1), R3[1] (in n2), R6[1] (in n3) and R7[1] (in no net). This is an N-way merge (6.3 rules cover 'two or more nets'). Only one net is named, so the survivor is n3 BUS with all seven endpoints, and no other net remains.",
+  "circuit": {
+    "parts": [
+      {
+        "id": "R1",
+        "type": "resistor"
+      },
+      {
+        "id": "R2",
+        "type": "resistor"
+      },
+      {
+        "id": "R3",
+        "type": "resistor"
+      },
+      {
+        "id": "R4",
+        "type": "resistor"
+      },
+      {
+        "id": "R5",
+        "type": "resistor"
+      },
+      {
+        "id": "R6",
+        "type": "resistor"
+      },
+      {
+        "id": "R7",
+        "type": "resistor"
+      }
+    ],
+    "nets": [
+      {
+        "id": "n1",
+        "endpoints": [
+          "R1[1]",
+          "R2[1]"
+        ]
+      },
+      {
+        "id": "n2",
+        "endpoints": [
+          "R3[1]",
+          "R4[1]"
+        ]
+      },
+      {
+        "id": "n3",
+        "name": "BUS",
+        "endpoints": [
+          "R5[1]",
+          "R6[1]"
+        ]
+      }
+    ],
+    "nc": []
+  },
+  "pinDefs": {
+    "R1": [
+      {
+        "number": "1",
+        "name": "1",
+        "role": "passive"
+      },
+      {
+        "number": "2",
+        "name": "2",
+        "role": "passive"
+      }
+    ],
+    "R2": [
+      {
+        "number": "1",
+        "name": "1",
+        "role": "passive"
+      },
+      {
+        "number": "2",
+        "name": "2",
+        "role": "passive"
+      }
+    ],
+    "R3": [
+      {
+        "number": "1",
+        "name": "1",
+        "role": "passive"
+      },
+      {
+        "number": "2",
+        "name": "2",
+        "role": "passive"
+      }
+    ],
+    "R4": [
+      {
+        "number": "1",
+        "name": "1",
+        "role": "passive"
+      },
+      {
+        "number": "2",
+        "name": "2",
+        "role": "passive"
+      }
+    ],
+    "R5": [
+      {
+        "number": "1",
+        "name": "1",
+        "role": "passive"
+      },
+      {
+        "number": "2",
+        "name": "2",
+        "role": "passive"
+      }
+    ],
+    "R6": [
+      {
+        "number": "1",
+        "name": "1",
+        "role": "passive"
+      },
+      {
+        "number": "2",
+        "name": "2",
+        "role": "passive"
+      }
+    ],
+    "R7": [
+      {
+        "number": "1",
+        "name": "1",
+        "role": "passive"
+      },
+      {
+        "number": "2",
+        "name": "2",
+        "role": "passive"
+      }
+    ]
+  },
+  "ops": [
+    {
+      "op": "connect",
+      "endpoints": [
+        "R2[1]",
+        "R3[1]",
+        "R6[1]",
+        "R7[1]"
+      ]
+    }
+  ],
+  "expect": {
+    "ok": true,
+    "errors": [],
+    "nets": [
+      {
+        "id": "n3",
+        "name": "BUS",
+        "endpoints": [
+          "R1[1]",
+          "R2[1]",
+          "R3[1]",
+          "R4[1]",
+          "R5[1]",
+          "R6[1]",
+          "R7[1]"
+        ]
+      }
+    ]
+  }
+}

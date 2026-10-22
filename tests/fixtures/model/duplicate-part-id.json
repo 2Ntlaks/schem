@@ -1,0 +1,63 @@
+{
+  "name": "duplicate-part-id",
+  "specRef": "6.2, 9.3",
+  "description": "Two parts both have id R1. 6.2: the id is 'unique, the part's key'; 9.3 lists duplicate reference as an error (E250).",
+  "circuit": {
+    "parts": [
+      {
+        "id": "R1",
+        "type": "resistor"
+      },
+      {
+        "id": "R1",
+        "type": "resistor"
+      },
+      {
+        "id": "R2",
+        "type": "resistor"
+      }
+    ],
+    "nets": [
+      {
+        "id": "n1",
+        "endpoints": [
+          "R1[1]",
+          "R2[1]"
+        ]
+      }
+    ],
+    "nc": []
+  },
+  "pinDefs": {
+    "R1": [
+      {
+        "number": "1",
+        "name": "1",
+        "role": "passive"
+      },
+      {
+        "number": "2",
+        "name": "2",
+        "role": "passive"
+      }
+    ],
+    "R2": [
+      {
+        "number": "1",
+        "name": "1",
+        "role": "passive"
+      },
+      {
+        "number": "2",
+        "name": "2",
+        "role": "passive"
+      }
+    ]
+  },
+  "expect": {
+    "ok": false,
+    "errors": [
+      "E250"
+    ]
+  }
+}

@@ -1,0 +1,110 @@
+{
+  "name": "two-group-members-in-different-nets",
+  "specRef": "6.2",
+  "description": "U1 pins 14 and 29 are both named GND and share group GND (listed 29 first). U1[14] is in n1 and U1[29] is in n2. Both are in class U1{GND}. 6.2: 'Two members of one group may both appear, but only in the same net.'",
+  "circuit": {
+    "parts": [
+      {
+        "id": "U1",
+        "type": "ic"
+      },
+      {
+        "id": "R1",
+        "type": "resistor"
+      },
+      {
+        "id": "R2",
+        "type": "resistor"
+      }
+    ],
+    "nets": [
+      {
+        "id": "n1",
+        "endpoints": [
+          "U1[14]",
+          "R1[2]"
+        ]
+      },
+      {
+        "id": "n2",
+        "endpoints": [
+          "U1[29]",
+          "R2[1]"
+        ]
+      }
+    ],
+    "nc": []
+  },
+  "pinDefs": {
+    "U1": [
+      {
+        "number": "1",
+        "name": "3V3",
+        "role": "power_in"
+      },
+      {
+        "number": "12",
+        "name": "EN",
+        "role": "input"
+      },
+      {
+        "number": "29",
+        "name": "GND",
+        "role": "ground",
+        "group": "GND"
+      },
+      {
+        "number": "14",
+        "name": "GND",
+        "role": "ground",
+        "group": "GND"
+      },
+      {
+        "number": "21",
+        "name": "GPIO21",
+        "role": "bidir",
+        "aliases": [
+          "SDA"
+        ]
+      },
+      {
+        "number": "22",
+        "name": "GPIO22",
+        "role": "bidir",
+        "aliases": [
+          "SCL"
+        ]
+      }
+    ],
+    "R1": [
+      {
+        "number": "1",
+        "name": "1",
+        "role": "passive"
+      },
+      {
+        "number": "2",
+        "name": "2",
+        "role": "passive"
+      }
+    ],
+    "R2": [
+      {
+        "number": "1",
+        "name": "1",
+        "role": "passive"
+      },
+      {
+        "number": "2",
+        "name": "2",
+        "role": "passive"
+      }
+    ]
+  },
+  "expect": {
+    "ok": false,
+    "errors": [
+      "E222"
+    ]
+  }
+}

@@ -1,0 +1,349 @@
+{
+  "name": "collinear-overlap-two-nets",
+  "specRef": "9.7, 9.1 rule 5",
+  "description": "R1 (4,2)-(4,8) and R2 (10,2)-(10,8) vertical at top; R3 (14,16)-(14,22) and R4 (20,16)-(20,22) vertical below. Net A {R1[2],R3[1]} is drawn (4,8)-(4,12)-(14,12)-(14,16); net B {R2[2],R4[1]} is drawn (10,8)-(10,12)-(20,12)-(20,16). Their horizontal runs on y=12 overlap from x=10 to x=14. 9.7: 'Collinear overlap of conductors therefore always means connection, so a wrong overlap shows up as a short.' After merging, y=12 is one conductor x 4..20 with Ts at (10,12) and (14,12); dots are drawn there so the junctions themselves are well formed. The drawing joins nets A and B: topology mismatch.",
+  "circuit": {
+    "parts": [
+      {
+        "id": "R1",
+        "type": "resistor"
+      },
+      {
+        "id": "R2",
+        "type": "resistor"
+      },
+      {
+        "id": "R3",
+        "type": "resistor"
+      },
+      {
+        "id": "R4",
+        "type": "resistor"
+      }
+    ],
+    "nets": [
+      {
+        "id": "n1",
+        "endpoints": [
+          "R1[2]",
+          "R3[1]"
+        ]
+      },
+      {
+        "id": "n2",
+        "endpoints": [
+          "R2[2]",
+          "R4[1]"
+        ]
+      },
+      {
+        "id": "n3",
+        "name": "VCC",
+        "kind": "power",
+        "endpoints": [
+          "R1[1]",
+          "R2[1]"
+        ]
+      },
+      {
+        "id": "n4",
+        "name": "GND",
+        "kind": "ground",
+        "endpoints": [
+          "R3[2]",
+          "R4[2]"
+        ]
+      }
+    ],
+    "nc": []
+  },
+  "pinDefs": {
+    "R1": [
+      {
+        "number": "1",
+        "name": "1",
+        "role": "passive"
+      },
+      {
+        "number": "2",
+        "name": "2",
+        "role": "passive"
+      }
+    ],
+    "R2": [
+      {
+        "number": "1",
+        "name": "1",
+        "role": "passive"
+      },
+      {
+        "number": "2",
+        "name": "2",
+        "role": "passive"
+      }
+    ],
+    "R3": [
+      {
+        "number": "1",
+        "name": "1",
+        "role": "passive"
+      },
+      {
+        "number": "2",
+        "name": "2",
+        "role": "passive"
+      }
+    ],
+    "R4": [
+      {
+        "number": "1",
+        "name": "1",
+        "role": "passive"
+      },
+      {
+        "number": "2",
+        "name": "2",
+        "role": "passive"
+      }
+    ]
+  },
+  "render": {
+    "pins": [
+      {
+        "part": "R1",
+        "number": "1",
+        "at": [
+          4,
+          2
+        ],
+        "dir": "up"
+      },
+      {
+        "part": "R1",
+        "number": "2",
+        "at": [
+          4,
+          8
+        ],
+        "dir": "down"
+      },
+      {
+        "part": "R2",
+        "number": "1",
+        "at": [
+          10,
+          2
+        ],
+        "dir": "up"
+      },
+      {
+        "part": "R2",
+        "number": "2",
+        "at": [
+          10,
+          8
+        ],
+        "dir": "down"
+      },
+      {
+        "part": "R3",
+        "number": "1",
+        "at": [
+          14,
+          16
+        ],
+        "dir": "up"
+      },
+      {
+        "part": "R3",
+        "number": "2",
+        "at": [
+          14,
+          22
+        ],
+        "dir": "down"
+      },
+      {
+        "part": "R4",
+        "number": "1",
+        "at": [
+          20,
+          16
+        ],
+        "dir": "up"
+      },
+      {
+        "part": "R4",
+        "number": "2",
+        "at": [
+          20,
+          22
+        ],
+        "dir": "down"
+      }
+    ],
+    "wires": [
+      [
+        [
+          4,
+          8
+        ],
+        [
+          4,
+          12
+        ],
+        [
+          14,
+          12
+        ],
+        [
+          14,
+          16
+        ]
+      ],
+      [
+        [
+          10,
+          8
+        ],
+        [
+          10,
+          12
+        ],
+        [
+          20,
+          12
+        ],
+        [
+          20,
+          16
+        ]
+      ],
+      [
+        [
+          4,
+          2
+        ],
+        [
+          4,
+          0
+        ]
+      ],
+      [
+        [
+          10,
+          2
+        ],
+        [
+          10,
+          0
+        ]
+      ],
+      [
+        [
+          14,
+          22
+        ],
+        [
+          14,
+          24
+        ]
+      ],
+      [
+        [
+          20,
+          22
+        ],
+        [
+          20,
+          24
+        ]
+      ]
+    ],
+    "dots": [
+      [
+        10,
+        12
+      ],
+      [
+        14,
+        12
+      ]
+    ],
+    "ports": [
+      {
+        "at": [
+          4,
+          0
+        ],
+        "text": "VCC",
+        "domain": null,
+        "kind": "power"
+      },
+      {
+        "at": [
+          10,
+          0
+        ],
+        "text": "VCC",
+        "domain": null,
+        "kind": "power"
+      },
+      {
+        "at": [
+          14,
+          24
+        ],
+        "text": "GND",
+        "domain": null,
+        "kind": "ground"
+      },
+      {
+        "at": [
+          20,
+          24
+        ],
+        "text": "GND",
+        "domain": null,
+        "kind": "ground"
+      }
+    ],
+    "ncMarks": [],
+    "keepouts": [
+      {
+        "part": "R1",
+        "x": 3,
+        "y": 2,
+        "w": 2,
+        "h": 6
+      },
+      {
+        "part": "R2",
+        "x": 9,
+        "y": 2,
+        "w": 2,
+        "h": 6
+      },
+      {
+        "part": "R3",
+        "x": 13,
+        "y": 16,
+        "w": 2,
+        "h": 6
+      },
+      {
+        "part": "R4",
+        "x": 19,
+        "y": 16,
+        "w": 2,
+        "h": 6
+      }
+    ]
+  },
+  "expect": {
+    "valid": false,
+    "errors": [
+      "topology-mismatch"
+    ]
+  }
+}

@@ -1,0 +1,187 @@
+{
+  "name": "port-off-wire",
+  "specRef": "9.7, 13 item 2",
+  "description": "R1 at (4,14)-(10,14), R2 at (24,14)-(30,14); wire (10,14)-(24,14); R1[1] and R2[2] by 2 G stubs to GND ports. An extra GND port is placed at (17,24), where there is no conductor and no pin anchor. 9.7: 'port or label anchor anywhere else: invalid'. It carries the same text as the real GND ports, so it adds no terminal to any group; the only fault is the floating anchor.",
+  "circuit": {
+    "parts": [
+      {
+        "id": "R1",
+        "type": "resistor"
+      },
+      {
+        "id": "R2",
+        "type": "resistor"
+      }
+    ],
+    "nets": [
+      {
+        "id": "n1",
+        "endpoints": [
+          "R1[2]",
+          "R2[1]"
+        ]
+      },
+      {
+        "id": "n2",
+        "name": "GND",
+        "kind": "ground",
+        "endpoints": [
+          "R1[1]",
+          "R2[2]"
+        ]
+      }
+    ],
+    "nc": []
+  },
+  "pinDefs": {
+    "R1": [
+      {
+        "number": "1",
+        "name": "1",
+        "role": "passive"
+      },
+      {
+        "number": "2",
+        "name": "2",
+        "role": "passive"
+      }
+    ],
+    "R2": [
+      {
+        "number": "1",
+        "name": "1",
+        "role": "passive"
+      },
+      {
+        "number": "2",
+        "name": "2",
+        "role": "passive"
+      }
+    ]
+  },
+  "render": {
+    "pins": [
+      {
+        "part": "R1",
+        "number": "1",
+        "at": [
+          4,
+          14
+        ],
+        "dir": "left"
+      },
+      {
+        "part": "R1",
+        "number": "2",
+        "at": [
+          10,
+          14
+        ],
+        "dir": "right"
+      },
+      {
+        "part": "R2",
+        "number": "1",
+        "at": [
+          24,
+          14
+        ],
+        "dir": "left"
+      },
+      {
+        "part": "R2",
+        "number": "2",
+        "at": [
+          30,
+          14
+        ],
+        "dir": "right"
+      }
+    ],
+    "wires": [
+      [
+        [
+          10,
+          14
+        ],
+        [
+          24,
+          14
+        ]
+      ],
+      [
+        [
+          4,
+          14
+        ],
+        [
+          2,
+          14
+        ]
+      ],
+      [
+        [
+          30,
+          14
+        ],
+        [
+          32,
+          14
+        ]
+      ]
+    ],
+    "dots": [],
+    "ports": [
+      {
+        "at": [
+          2,
+          14
+        ],
+        "text": "GND",
+        "domain": null,
+        "kind": "ground"
+      },
+      {
+        "at": [
+          32,
+          14
+        ],
+        "text": "GND",
+        "domain": null,
+        "kind": "ground"
+      },
+      {
+        "at": [
+          17,
+          24
+        ],
+        "text": "GND",
+        "domain": null,
+        "kind": "ground"
+      }
+    ],
+    "ncMarks": [],
+    "keepouts": [
+      {
+        "part": "R1",
+        "x": 4,
+        "y": 13,
+        "w": 6,
+        "h": 2
+      },
+      {
+        "part": "R2",
+        "x": 24,
+        "y": 13,
+        "w": 6,
+        "h": 2
+      }
+    ]
+  },
+  "expect": {
+    "valid": false,
+    "errors": [
+      "port-off-wire"
+    ]
+  }
+}

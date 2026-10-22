@@ -1,0 +1,170 @@
+{
+  "name": "pin-side-entry",
+  "specRef": "9.7, 9.2 step 7",
+  "description": "R1 (4,14)-(10,14) with R1[2] at (10,14) dir right; R3 vertical (17,4)-(17,10). Wire (17,10)-(17,11)-(10,11)-(10,14) ends at R1[2] arriving from ABOVE (the last segment runs vertically into the anchor), not along R1[2]'s dir (right). 9.7: 'conductor ends at a pin anchor from another direction: invalid'. No keep-outs are given, so keep-out rules are not tested here (the last segment would otherwise run on R1's keep-out boundary).",
+  "circuit": {
+    "parts": [
+      {
+        "id": "R1",
+        "type": "resistor"
+      },
+      {
+        "id": "R3",
+        "type": "resistor"
+      }
+    ],
+    "nets": [
+      {
+        "id": "n1",
+        "endpoints": [
+          "R1[2]",
+          "R3[2]"
+        ]
+      },
+      {
+        "id": "n2",
+        "name": "GND",
+        "kind": "ground",
+        "endpoints": [
+          "R1[1]",
+          "R3[1]"
+        ]
+      }
+    ],
+    "nc": []
+  },
+  "pinDefs": {
+    "R1": [
+      {
+        "number": "1",
+        "name": "1",
+        "role": "passive"
+      },
+      {
+        "number": "2",
+        "name": "2",
+        "role": "passive"
+      }
+    ],
+    "R3": [
+      {
+        "number": "1",
+        "name": "1",
+        "role": "passive"
+      },
+      {
+        "number": "2",
+        "name": "2",
+        "role": "passive"
+      }
+    ]
+  },
+  "render": {
+    "pins": [
+      {
+        "part": "R1",
+        "number": "1",
+        "at": [
+          4,
+          14
+        ],
+        "dir": "left"
+      },
+      {
+        "part": "R1",
+        "number": "2",
+        "at": [
+          10,
+          14
+        ],
+        "dir": "right"
+      },
+      {
+        "part": "R3",
+        "number": "1",
+        "at": [
+          17,
+          4
+        ],
+        "dir": "up"
+      },
+      {
+        "part": "R3",
+        "number": "2",
+        "at": [
+          17,
+          10
+        ],
+        "dir": "down"
+      }
+    ],
+    "wires": [
+      [
+        [
+          17,
+          10
+        ],
+        [
+          17,
+          11
+        ],
+        [
+          10,
+          11
+        ],
+        [
+          10,
+          14
+        ]
+      ],
+      [
+        [
+          4,
+          14
+        ],
+        [
+          2,
+          14
+        ]
+      ],
+      [
+        [
+          17,
+          4
+        ],
+        [
+          17,
+          2
+        ]
+      ]
+    ],
+    "dots": [],
+    "ports": [
+      {
+        "at": [
+          2,
+          14
+        ],
+        "text": "GND",
+        "domain": null,
+        "kind": "ground"
+      },
+      {
+        "at": [
+          17,
+          2
+        ],
+        "text": "GND",
+        "domain": null,
+        "kind": "ground"
+      }
+    ],
+    "ncMarks": []
+  },
+  "expect": {
+    "valid": false,
+    "errors": [
+      "pin-side-entry"
+    ]
+  }
+}

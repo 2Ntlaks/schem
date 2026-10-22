@@ -1,0 +1,74 @@
+{
+  "name": "name-resolves-to-group-named-differently",
+  "specRef": "6.2, 7.3",
+  "description": "U4 pins 7 and 8 are named GND and share group 'gnd' (lower case, like the SPEC 7.3 example 14:GND/ground@gnd). U4.GND matches by pin NAME only terminals of one group, so it resolves to the group endpoint U4{gnd}.",
+  "circuit": {
+    "parts": [
+      {
+        "id": "U4",
+        "type": "ic"
+      },
+      {
+        "id": "R1",
+        "type": "resistor"
+      }
+    ],
+    "nets": [
+      {
+        "id": "n1",
+        "name": "GND",
+        "endpoints": [
+          "U4.GND",
+          "R1[2]"
+        ]
+      }
+    ],
+    "nc": []
+  },
+  "pinDefs": {
+    "U4": [
+      {
+        "number": "1",
+        "name": "VCC",
+        "role": "power_in"
+      },
+      {
+        "number": "7",
+        "name": "GND",
+        "role": "ground",
+        "group": "gnd"
+      },
+      {
+        "number": "8",
+        "name": "GND",
+        "role": "ground",
+        "group": "gnd"
+      }
+    ],
+    "R1": [
+      {
+        "number": "1",
+        "name": "1",
+        "role": "passive"
+      },
+      {
+        "number": "2",
+        "name": "2",
+        "role": "passive"
+      }
+    ]
+  },
+  "expect": {
+    "ok": true,
+    "errors": [],
+    "nets": [
+      {
+        "id": "n1",
+        "endpoints": [
+          "U4{gnd}",
+          "R1[2]"
+        ]
+      }
+    ]
+  }
+}

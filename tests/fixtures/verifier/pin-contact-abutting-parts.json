@@ -1,0 +1,168 @@
+{
+  "name": "pin-contact-abutting-parts",
+  "specRef": "9.7 (rev C.1)",
+  "description": "R1 (4,14)-(10,14) and R2 (10,14)-(16,14) abut: R1[2] and R2[1] are both anchored at (10,14), with no wire. The circuit does want R1[2] and R2[1] joined, but rev C.1: 'two pin anchors at the same point: invalid (pin contact)'. Outer pins go to GND ports by 2 G stubs.",
+  "circuit": {
+    "parts": [
+      {
+        "id": "R1",
+        "type": "resistor"
+      },
+      {
+        "id": "R2",
+        "type": "resistor"
+      }
+    ],
+    "nets": [
+      {
+        "id": "n1",
+        "endpoints": [
+          "R1[2]",
+          "R2[1]"
+        ]
+      },
+      {
+        "id": "n2",
+        "name": "GND",
+        "kind": "ground",
+        "endpoints": [
+          "R1[1]",
+          "R2[2]"
+        ]
+      }
+    ],
+    "nc": []
+  },
+  "pinDefs": {
+    "R1": [
+      {
+        "number": "1",
+        "name": "1",
+        "role": "passive"
+      },
+      {
+        "number": "2",
+        "name": "2",
+        "role": "passive"
+      }
+    ],
+    "R2": [
+      {
+        "number": "1",
+        "name": "1",
+        "role": "passive"
+      },
+      {
+        "number": "2",
+        "name": "2",
+        "role": "passive"
+      }
+    ]
+  },
+  "render": {
+    "pins": [
+      {
+        "part": "R1",
+        "number": "1",
+        "at": [
+          4,
+          14
+        ],
+        "dir": "left"
+      },
+      {
+        "part": "R1",
+        "number": "2",
+        "at": [
+          10,
+          14
+        ],
+        "dir": "right"
+      },
+      {
+        "part": "R2",
+        "number": "1",
+        "at": [
+          10,
+          14
+        ],
+        "dir": "left"
+      },
+      {
+        "part": "R2",
+        "number": "2",
+        "at": [
+          16,
+          14
+        ],
+        "dir": "right"
+      }
+    ],
+    "wires": [
+      [
+        [
+          4,
+          14
+        ],
+        [
+          2,
+          14
+        ]
+      ],
+      [
+        [
+          16,
+          14
+        ],
+        [
+          18,
+          14
+        ]
+      ]
+    ],
+    "dots": [],
+    "ports": [
+      {
+        "at": [
+          2,
+          14
+        ],
+        "text": "GND",
+        "domain": null,
+        "kind": "ground"
+      },
+      {
+        "at": [
+          18,
+          14
+        ],
+        "text": "GND",
+        "domain": null,
+        "kind": "ground"
+      }
+    ],
+    "ncMarks": [],
+    "keepouts": [
+      {
+        "part": "R1",
+        "x": 4,
+        "y": 13,
+        "w": 6,
+        "h": 2
+      },
+      {
+        "part": "R2",
+        "x": 10,
+        "y": 13,
+        "w": 6,
+        "h": 2
+      }
+    ]
+  },
+  "expect": {
+    "valid": false,
+    "errors": [
+      "pin-contact"
+    ]
+  }
+}

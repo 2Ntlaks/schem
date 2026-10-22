@@ -1,0 +1,66 @@
+{
+  "name": "set-no-connect-on-connected-terminal",
+  "specRef": "6.3 invariant 2, 11.3",
+  "description": "R1[1] is in net n1. The op setNoConnect {terminal R1[1], nc true} would make a no-connect terminal that is in a net. 6.3: the same validator runs on every edit, so the edit is rejected with E223.",
+  "circuit": {
+    "parts": [
+      {
+        "id": "R1",
+        "type": "resistor"
+      },
+      {
+        "id": "R2",
+        "type": "resistor"
+      }
+    ],
+    "nets": [
+      {
+        "id": "n1",
+        "endpoints": [
+          "R1[1]",
+          "R2[1]"
+        ]
+      }
+    ],
+    "nc": []
+  },
+  "pinDefs": {
+    "R1": [
+      {
+        "number": "1",
+        "name": "1",
+        "role": "passive"
+      },
+      {
+        "number": "2",
+        "name": "2",
+        "role": "passive"
+      }
+    ],
+    "R2": [
+      {
+        "number": "1",
+        "name": "1",
+        "role": "passive"
+      },
+      {
+        "number": "2",
+        "name": "2",
+        "role": "passive"
+      }
+    ]
+  },
+  "ops": [
+    {
+      "op": "setNoConnect",
+      "terminal": "R1[1]",
+      "nc": true
+    }
+  ],
+  "expect": {
+    "ok": false,
+    "errors": [
+      "E223"
+    ]
+  }
+}

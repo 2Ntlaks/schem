@@ -1,0 +1,303 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>*,*::before,*::after{box-sizing:border-box}body{margin:0}img{max-width:100%}</style>
+<title>Agent-Drawn Schematics</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@500;700&family=Newsreader:opsz,wght@6..72,400;6..72,500&family=Martian+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one engineering drawing sheet. Title block on top, then the sample, the system diagram, the gap, the build order. */
+:root {
+  --paper: #f4f7f6;
+  --sheet: #fbfcfc;
+  --ink: #15211c;
+  --muted: #56655e;
+  --rule: #c9d4cf;
+  --grid: rgba(21, 33, 28, 0.05);
+  --wire: #0b7357;
+  --loop: #b06d00;
+  --display: "Familjen Grotesk", "Segoe UI", sans-serif;
+  --body: "Newsreader", Georgia, serif;
+  --mono: "Martian Mono", Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #0d1411; --sheet: #121c18; --ink: #dbe7e1; --muted: #92a69c;
+    --rule: #2a3a33; --grid: rgba(219, 231, 225, 0.05); --wire: #43cf9c; --loop: #f0b53c;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #0d1411; --sheet: #121c18; --ink: #dbe7e1; --muted: #92a69c;
+  --rule: #2a3a33; --grid: rgba(219, 231, 225, 0.05); --wire: #43cf9c; --loop: #f0b53c;
+  color-scheme: dark;
+}
+body {
+  background: var(--paper);
+  background-image: linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size: 20px 20px;
+  color: var(--ink);
+  font: 400 1.08rem/1.6 var(--body);
+}
+.page {
+  max-width: 1000px; margin: 0 auto;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 40px 64px;
+  display: grid; gap: 48px;
+}
+h1, h2 { font-family: var(--display); font-weight: 700; text-wrap: balance; margin: 0; line-height: 1.1; }
+h1 { font-size: clamp(2rem, 5vw, 3.2rem); letter-spacing: -0.02em; }
+h2 { font-size: 1.55rem; }
+p { margin: 0; max-width: 65ch; }
+.label { font: 500 0.68rem/1.4 var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+code, pre { font-family: var(--mono); font-size: 0.8rem; }
+section { display: grid; gap: 16px; }
+
+/* title block */
+.titleblock { border: 2px solid var(--ink); background: var(--sheet); display: grid; grid-template-columns: 1fr auto; }
+.titleblock .main { padding: 24px; display: grid; gap: 12px; border-right: 2px solid var(--ink); min-width: 0; }
+.titleblock .meta { display: grid; grid-template-rows: repeat(4, auto); }
+.titleblock .meta div { padding: 10px 16px; border-bottom: 1px solid var(--ink); display: grid; gap: 2px; }
+.titleblock .meta div:last-child { border-bottom: 0; }
+.titleblock .meta b { font: 500 0.82rem var(--mono); }
+.thesis { font-size: 1.2rem; }
+.thesis em { font-style: normal; color: var(--wire); font-weight: 500; }
+
+/* sample */
+.sample { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); border: 1px solid var(--rule); background: var(--sheet); }
+.sample > div { padding: 20px; display: grid; gap: 12px; align-content: start; min-width: 0; }
+.sample > div + div { border-left: 1px solid var(--rule); }
+.sample pre { margin: 0; overflow-x: auto; line-height: 1.7; }
+.sample pre .k { color: var(--wire); }
+.sample pre .c { color: var(--muted); }
+.arrowcap { font: 500 0.75rem var(--mono); color: var(--wire); }
+
+/* svgs */
+.fig { overflow-x: auto; border: 1px solid var(--rule); background: var(--sheet); }
+.fig svg { display: block; width: 100%; min-width: 760px; height: auto; }
+.sample svg { width: 100%; height: auto; max-width: 420px; }
+svg .w { stroke: var(--ink); stroke-width: 2; fill: none; stroke-linecap: square; }
+svg .wa { stroke: var(--wire); stroke-width: 2; fill: none; }
+svg .wl { stroke: var(--loop); stroke-width: 2; fill: none; stroke-dasharray: 6 5; }
+svg .dot { fill: var(--wire); }
+svg .box { fill: var(--sheet); stroke: var(--ink); stroke-width: 1.5; }
+svg .hot { fill: var(--sheet); stroke: var(--wire); stroke-width: 2.5; }
+svg .frame { fill: none; stroke: var(--muted); stroke-width: 1; stroke-dasharray: 3 4; }
+svg .t { fill: var(--ink); font: 700 15px var(--display); }
+svg .s { fill: var(--muted); font: 400 11px var(--mono); }
+svg .tl { fill: var(--loop); font: 500 11px var(--mono); }
+svg .tw { fill: var(--wire); font: 500 11px var(--mono); }
+svg .n { fill: var(--wire); font: 500 11px var(--mono); }
+svg .fillink { fill: var(--ink); }
+
+/* comparison table */
+.tablewrap { overflow-x: auto; border: 1px solid var(--rule); background: var(--sheet); }
+table { border-collapse: collapse; width: 100%; min-width: 640px; font-size: 0.95rem; }
+th, td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+th { font: 500 0.68rem var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+tr:last-child td { border-bottom: 0; }
+tr.ours td { background: color-mix(in srgb, var(--wire) 10%, transparent); font-weight: 500; }
+td:first-child { font-family: var(--display); font-weight: 700; white-space: nowrap; }
+.chip { display: inline-block; font: 500 0.66rem var(--mono); padding: 2px 8px; border-radius: 2px; border: 1px solid currentColor; white-space: nowrap; }
+.yes { color: var(--wire); } .no { color: var(--muted); } .half { color: var(--loop); }
+
+/* phases */
+.phases { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border: 1px solid var(--rule); background: var(--sheet); }
+.phase { padding: 18px; display: grid; gap: 8px; align-content: start; border-right: 1px solid var(--rule); }
+.phase:last-child { border-right: 0; }
+.phase h3 { font: 700 1.05rem var(--display); margin: 0; }
+.phase ul { margin: 0; padding-left: 18px; font-size: 0.95rem; display: grid; gap: 4px; }
+.phase.first { box-shadow: inset 0 4px 0 var(--wire); }
+
+.hard { border-left: 3px solid var(--loop); padding: 4px 0 4px 18px; display: grid; gap: 10px; }
+
+@media (max-width: 760px) {
+  .titleblock, .sample { grid-template-columns: 1fr; }
+  .titleblock .main { border-right: 0; border-bottom: 2px solid var(--ink); }
+  .titleblock .meta { grid-template-columns: 1fr 1fr; grid-template-rows: none; }
+  .titleblock .meta div { border-right: 1px solid var(--ink); }
+  .sample > div + div { border-left: 0; border-top: 1px solid var(--rule); }
+  .phases { grid-template-columns: 1fr 1fr; }
+  .phase { border-bottom: 1px solid var(--rule); }
+}
+@media (max-width: 460px) { .phases { grid-template-columns: 1fr; } .phase { border-right: 0; } }
+</style>
+</head>
+<body>
+
+<div class="page">
+
+  <header class="titleblock">
+    <div class="main">
+      <span class="label">Project proposal</span>
+      <h1>Schematics an AI agent can draw</h1>
+      <p class="thesis">Agents are good at knowing <em>what connects to what</em>. They are bad at deciding <em>where each part goes on a page</em>. This project lets the agent describe the circuit, and the engine places, wires and draws it at circuit-diagram.org quality, then shows the agent the result so it can fix it.</p>
+    </div>
+    <div class="meta">
+      <div><span class="label">Sheet</span><b>1 of 1</b></div>
+      <div><span class="label">Rev</span><b>A, draft</b></div>
+      <div><span class="label">Date</span><b>2026-10-22</b></div>
+      <div><span class="label">Status</span><b>Idea, pre-MVP</b></div>
+    </div>
+  </header>
+
+  <section>
+    <span class="label">What it should feel like</span>
+    <h2>The agent writes the left side. The engine draws the right side.</h2>
+    <div class="sample">
+      <div>
+        <span class="label">Agent input: a netlist, no coordinates</span>
+<pre><span class="k">circuit</span> "LED indicator"
+
+<span class="k">part</span> B1 battery  9V
+<span class="k">part</span> R1 resistor 470Ω
+<span class="k">part</span> D1 led       red
+
+<span class="k">net</span> PWR  B1.+     R1.1
+<span class="k">net</span> A    R1.2     D1.anode
+<span class="k">net</span> GND  D1.cathode B1.-
+
+<span class="c"># optional hints, never required</span>
+<span class="k">hint</span> D1 right-of R1</pre>
+        <span class="arrowcap">→ render, preview, lint</span>
+      </div>
+      <div>
+        <span class="label">Engine output: SVG / PNG</span>
+        <svg viewBox="0 0 380 220" role="img" aria-label="Rendered schematic: a 9 volt battery, a 470 ohm resistor and a red LED in a single loop">
+          <path class="w" d="M60 103 V40 H150 M210 40 H300 V98 M300 120 V180 H60 V117"/>
+          <polyline class="w" points="150,40 155,32 165,48 175,32 185,48 195,32 205,48 210,40"/>
+          <line class="w" x1="42" y1="103" x2="78" y2="103"/>
+          <line class="w" x1="51" y1="117" x2="69" y2="117" style="stroke-width:4"/>
+          <polygon class="fillink" points="288,98 312,98 300,120"/>
+          <line class="w" x1="288" y1="120" x2="312" y2="120"/>
+          <path class="w" d="M316 108 L330 96 M324 96 H330 V102 M316 118 L330 106 M324 106 H330 V112" style="stroke-width:1.5"/>
+          <text class="s" x="84" y="100">+</text>
+          <text class="t" x="10" y="140" style="font-size:13px">B1</text>
+          <text class="s" x="10" y="155">9 V</text>
+          <text class="t" x="164" y="22" style="font-size:13px">R1</text>
+          <text class="s" x="188" y="22">470 Ω</text>
+          <text class="t" x="318" y="134" style="font-size:13px">D1</text>
+          <text class="s" x="318" y="149">red</text>
+        </svg>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <span class="label">How it works</span>
+    <h2>One engine, three doors in, a feedback loop out</h2>
+    <p>The agent never handles x and y. It sends parts and connections, plus hints if it wants. The engine does the drawing work a human does by hand on circuit-diagram.org, then returns a picture and a list of problems. The agent looks, sends small edits, and repeats until the sheet is clean.</p>
+    <div class="fig">
+      <svg viewBox="0 0 970 520" role="img" aria-label="Architecture: an AI agent talks to an MCP server, CLI or API, which feeds a core engine of five stages. Outputs go to image files, a project file and a web editor. A critic sends a preview and warnings back to the agent.">
+        <!-- agent -->
+        <rect class="hot" x="20" y="200" width="170" height="110"/>
+        <text class="t" x="36" y="232">AI agent</text>
+        <text class="s" x="36" y="254">Claude Code</text>
+        <text class="s" x="36" y="270">Codex, Cursor</text>
+        <text class="s" x="36" y="286">or a person typing</text>
+        <!-- interface -->
+        <rect class="box" x="240" y="185" width="150" height="140"/>
+        <text class="t" x="254" y="215">Doors in</text>
+        <text class="s" x="254" y="240">MCP server</text>
+        <text class="s" x="254" y="258">CLI</text>
+        <text class="s" x="254" y="276">HTTP API</text>
+        <text class="s" x="254" y="300">same file format</text>
+        <path class="wa" d="M190 255 H232"/><polygon class="dot" points="232,249 240,255 232,261"/>
+        <path class="wa" d="M390 255 H432"/><polygon class="dot" points="432,249 440,255 432,261"/>
+        <!-- engine -->
+        <rect class="frame" x="440" y="30" width="320" height="430"/>
+        <text class="s" x="452" y="50">CORE ENGINE</text>
+        <rect class="box" x="460" y="65" width="280" height="55"/>
+        <text class="t" x="476" y="90">1  Read the netlist</text><text class="s" x="476" y="108">text DSL or JSON, validate pins</text>
+        <rect class="box" x="460" y="140" width="280" height="55"/>
+        <text class="t" x="476" y="165">2  Symbol library</text><text class="s" x="476" y="183">R, C, LED, BJT, op-amp, ESP32...</text>
+        <rect class="hot" x="460" y="215" width="280" height="55"/>
+        <text class="t" x="476" y="240">3  Place parts</text><text class="s" x="476" y="258">power up, ground down, signal L→R</text>
+        <rect class="hot" x="460" y="290" width="280" height="55"/>
+        <text class="t" x="476" y="315">4  Route wires</text><text class="s" x="476" y="333">orthogonal, few crossings, junctions</text>
+        <rect class="box" x="460" y="365" width="280" height="55"/>
+        <text class="t" x="476" y="390">5  Render</text><text class="s" x="476" y="408">themes, fonts, labels, values</text>
+        <path class="wa" d="M600 120 V140 M600 195 V215 M600 270 V290 M600 345 V365"/>
+        <text class="tw" x="612" y="208">the hard part</text>
+        <!-- outputs -->
+        <path class="wa" d="M740 392 H775 V125 H792 M775 235 H792 M775 345 H792"/>
+        <circle class="dot" cx="775" cy="235" r="4"/><circle class="dot" cx="775" cy="345" r="4"/>
+        <polygon class="dot" points="792,119 800,125 792,131"/><polygon class="dot" points="792,229 800,235 792,241"/><polygon class="dot" points="792,339 800,345 792,351"/>
+        <rect class="box" x="800" y="90" width="155" height="70"/>
+        <text class="t" x="814" y="118">Images</text><text class="s" x="814" y="140">SVG, PNG, PDF</text>
+        <rect class="box" x="800" y="200" width="155" height="70"/>
+        <text class="t" x="814" y="228">Project file</text><text class="s" x="814" y="250">.json, versionable</text>
+        <rect class="box" x="800" y="310" width="155" height="70"/>
+        <text class="t" x="814" y="338">Web editor</text><text class="s" x="814" y="360">human drags to tweak</text>
+        <!-- critic loop -->
+        <rect class="box" x="240" y="375" width="150" height="85" style="stroke:var(--loop)"/>
+        <text class="t" x="254" y="403">Critic</text>
+        <text class="s" x="254" y="424">PNG preview</text>
+        <text class="s" x="254" y="442">overlaps, crossings</text>
+        <path class="wl" d="M460 400 H398"/><polygon points="398,394 390,400 398,406" style="fill:var(--loop)"/>
+        <path class="wl" d="M240 430 H105 V318"/><polygon points="99,318 105,310 111,318" style="fill:var(--loop)"/>
+        <text class="tl" x="20" y="480">agent sees the drawing, then sends</text>
+        <text class="tl" x="20" y="497">"flip Q1", "move R3 above C2", "align"</text>
+      </svg>
+    </div>
+  </section>
+
+  <section>
+    <span class="label">Where the gap is</span>
+    <h2>Tools exist on both sides. None join them.</h2>
+    <p>You are right that the existing code-based tools are not the answer, though the reason is more specific than looks. With schemdraw or CircuiTikZ the agent must decide every direction and position blind, so its drawings come out cramped or tangled, and it never sees the result. The missing piece is automatic layout with the agent in the loop.</p>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>Tool</th><th>Who places parts</th><th>Look</th><th>Agent can use it</th></tr></thead>
+        <tbody>
+          <tr><td>circuit-diagram.org</td><td>A person, drag and drop</td><td><span class="chip yes">clean</span></td><td><span class="chip no">no</span></td></tr>
+          <tr><td>KiCad, EasyEDA, Fritzing</td><td>A person</td><td><span class="chip half">engineering / breadboard</span></td><td><span class="chip half">files only</span></td></tr>
+          <tr><td>schemdraw, CircuiTikZ</td><td>The agent, coordinate by coordinate</td><td><span class="chip half">depends on the layout</span></td><td><span class="chip half">yes, blind</span></td></tr>
+          <tr><td>netlistsvg</td><td>Automatic (ELK layout)</td><td><span class="chip half">built for digital logic</span></td><td><span class="chip half">yes</span></td></tr>
+          <tr><td>SKiDL</td><td>Nobody, it makes netlists</td><td><span class="chip no">no drawing</span></td><td><span class="chip yes">yes</span></td></tr>
+          <tr class="ours"><td>This project</td><td>Engine, steered by hints</td><td><span class="chip yes">clean</span></td><td><span class="chip yes">yes, with a preview</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <span class="label">Build order</span>
+    <h2>Four phases, each one usable on its own</h2>
+    <div class="phases">
+      <div class="phase first">
+        <span class="label">Phase 1 · start here</span>
+        <h3>Engine + CLI</h3>
+        <ul><li>Netlist format (text and JSON)</li><li>About 25 core symbols</li><li>Auto-layout for up to ~30 parts</li><li>SVG and PNG export</li></ul>
+      </div>
+      <div class="phase">
+        <span class="label">Phase 2</span>
+        <h3>Agent loop</h3>
+        <ul><li>MCP server for Claude Code and Codex</li><li>Preview image returned to the agent</li><li>Lint warnings</li><li>Edit commands: move, flip, align</li></ul>
+      </div>
+      <div class="phase">
+        <span class="label">Phase 3</span>
+        <h3>Web editor</h3>
+        <ul><li>Open any agent drawing</li><li>Drag to adjust, wires follow</li><li>Saves the same project file</li></ul>
+      </div>
+      <div class="phase">
+        <span class="label">Phase 4</span>
+        <h3>From real hardware</h3>
+        <ul><li>Modules: Arduino, ESP32, sensors</li><li>Read pin wiring from firmware code</li><li>Import KiCad netlists</li></ul>
+      </div>
+    </div>
+  </section>
+
+  <section class="hard">
+    <span class="label">Where it gets difficult</span>
+    <h2>Stages 3 and 4 decide whether this succeeds</h2>
+    <p>Drawing symbols nicely is a solved problem. Placing them the way an engineer would is not: power at the top, ground at the bottom, signal flowing left to right, feedback loops around op-amps, no wire crossing a label. The plan is to combine known schematic rules with a graph layout library (ELK, the one netlistsvg uses), let the agent add hints, and use the critic to catch what the rules miss. We should test this on real circuits early, before building the editor.</p>
+  </section>
+
+</div>
+</body>
+</html>

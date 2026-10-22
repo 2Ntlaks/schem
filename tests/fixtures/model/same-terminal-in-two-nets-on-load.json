@@ -1,0 +1,82 @@
+{
+  "name": "same-terminal-in-two-nets-on-load",
+  "specRef": "6.3",
+  "description": "R1[1] appears in both n1 and n2 of a loaded file. 6.3: 'Loading never merges. A loaded file in which one class appears in two nets is invalid (E220 ...)'. No group is involved, so the code is E220, not E222.",
+  "circuit": {
+    "parts": [
+      {
+        "id": "R1",
+        "type": "resistor"
+      },
+      {
+        "id": "R2",
+        "type": "resistor"
+      },
+      {
+        "id": "R3",
+        "type": "resistor"
+      }
+    ],
+    "nets": [
+      {
+        "id": "n1",
+        "endpoints": [
+          "R1[1]",
+          "R2[1]"
+        ]
+      },
+      {
+        "id": "n2",
+        "endpoints": [
+          "R1[1]",
+          "R3[1]"
+        ]
+      }
+    ],
+    "nc": []
+  },
+  "pinDefs": {
+    "R1": [
+      {
+        "number": "1",
+        "name": "1",
+        "role": "passive"
+      },
+      {
+        "number": "2",
+        "name": "2",
+        "role": "passive"
+      }
+    ],
+    "R2": [
+      {
+        "number": "1",
+        "name": "1",
+        "role": "passive"
+      },
+      {
+        "number": "2",
+        "name": "2",
+        "role": "passive"
+      }
+    ],
+    "R3": [
+      {
+        "number": "1",
+        "name": "1",
+        "role": "passive"
+      },
+      {
+        "number": "2",
+        "name": "2",
+        "role": "passive"
+      }
+    ]
+  },
+  "expect": {
+    "ok": false,
+    "errors": [
+      "E220"
+    ]
+  }
+}

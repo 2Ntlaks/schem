@@ -1,0 +1,70 @@
+{
+  "name": "ambiguous-name-ungrouped",
+  "specRef": "6.2, 8.4",
+  "description": "U2 has two terminals named GND (pins 2 and 3) with no group. U2.GND matches more than one terminal and they are not one group, so 6.2: 'An ambiguous name is an error listing the candidates by number' (E106, as in the 8.4 example).",
+  "circuit": {
+    "parts": [
+      {
+        "id": "U2",
+        "type": "ic"
+      },
+      {
+        "id": "R1",
+        "type": "resistor"
+      }
+    ],
+    "nets": [
+      {
+        "id": "n1",
+        "name": "GND",
+        "endpoints": [
+          "U2.GND",
+          "R1[2]"
+        ]
+      }
+    ],
+    "nc": []
+  },
+  "pinDefs": {
+    "U2": [
+      {
+        "number": "1",
+        "name": "VIN",
+        "role": "power_in"
+      },
+      {
+        "number": "2",
+        "name": "GND",
+        "role": "ground"
+      },
+      {
+        "number": "3",
+        "name": "GND",
+        "role": "ground"
+      },
+      {
+        "number": "4",
+        "name": "SDA",
+        "role": "bidir"
+      }
+    ],
+    "R1": [
+      {
+        "number": "1",
+        "name": "1",
+        "role": "passive"
+      },
+      {
+        "number": "2",
+        "name": "2",
+        "role": "passive"
+      }
+    ]
+  },
+  "expect": {
+    "ok": false,
+    "errors": [
+      "E106"
+    ]
+  }
+}

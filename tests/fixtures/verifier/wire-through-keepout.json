@@ -1,0 +1,266 @@
+{
+  "name": "wire-through-keepout",
+  "specRef": "9.1 rule 4, 9.2 step 7, 7.1",
+  "description": "R3 vertical (17,2)-(17,8), R4 vertical (17,20)-(17,26), R5 horizontal (14,14)-(20,14) with keep-out x 14..20, y 13..15 sitting between them. R3[1], R5[1] go to VCC ports; R4[2], R5[2] to GND ports. Net n1 is drawn as the straight wire (17,8)-(17,20), which runs through the INSIDE of R5's keep-out (x=17 is strictly between 14 and 20, crossing y 13..15) without touching R5's pins at (14,14) and (20,14). It is not R5's own pin approach, so 9.1 rule 4 is broken. Connectivity is otherwise correct.",
+  "circuit": {
+    "parts": [
+      {
+        "id": "R3",
+        "type": "resistor"
+      },
+      {
+        "id": "R4",
+        "type": "resistor"
+      },
+      {
+        "id": "R5",
+        "type": "resistor"
+      }
+    ],
+    "nets": [
+      {
+        "id": "n1",
+        "endpoints": [
+          "R3[2]",
+          "R4[1]"
+        ]
+      },
+      {
+        "id": "n2",
+        "name": "VCC",
+        "kind": "power",
+        "endpoints": [
+          "R3[1]",
+          "R5[1]"
+        ]
+      },
+      {
+        "id": "n3",
+        "name": "GND",
+        "kind": "ground",
+        "endpoints": [
+          "R4[2]",
+          "R5[2]"
+        ]
+      }
+    ],
+    "nc": []
+  },
+  "pinDefs": {
+    "R3": [
+      {
+        "number": "1",
+        "name": "1",
+        "role": "passive"
+      },
+      {
+        "number": "2",
+        "name": "2",
+        "role": "passive"
+      }
+    ],
+    "R4": [
+      {
+        "number": "1",
+        "name": "1",
+        "role": "passive"
+      },
+      {
+        "number": "2",
+        "name": "2",
+        "role": "passive"
+      }
+    ],
+    "R5": [
+      {
+        "number": "1",
+        "name": "1",
+        "role": "passive"
+      },
+      {
+        "number": "2",
+        "name": "2",
+        "role": "passive"
+      }
+    ]
+  },
+  "render": {
+    "pins": [
+      {
+        "part": "R3",
+        "number": "1",
+        "at": [
+          17,
+          2
+        ],
+        "dir": "up"
+      },
+      {
+        "part": "R3",
+        "number": "2",
+        "at": [
+          17,
+          8
+        ],
+        "dir": "down"
+      },
+      {
+        "part": "R4",
+        "number": "1",
+        "at": [
+          17,
+          20
+        ],
+        "dir": "up"
+      },
+      {
+        "part": "R4",
+        "number": "2",
+        "at": [
+          17,
+          26
+        ],
+        "dir": "down"
+      },
+      {
+        "part": "R5",
+        "number": "1",
+        "at": [
+          14,
+          14
+        ],
+        "dir": "left"
+      },
+      {
+        "part": "R5",
+        "number": "2",
+        "at": [
+          20,
+          14
+        ],
+        "dir": "right"
+      }
+    ],
+    "wires": [
+      [
+        [
+          17,
+          2
+        ],
+        [
+          17,
+          0
+        ]
+      ],
+      [
+        [
+          14,
+          14
+        ],
+        [
+          12,
+          14
+        ]
+      ],
+      [
+        [
+          17,
+          26
+        ],
+        [
+          17,
+          28
+        ]
+      ],
+      [
+        [
+          20,
+          14
+        ],
+        [
+          22,
+          14
+        ]
+      ],
+      [
+        [
+          17,
+          8
+        ],
+        [
+          17,
+          20
+        ]
+      ]
+    ],
+    "dots": [],
+    "ports": [
+      {
+        "at": [
+          17,
+          0
+        ],
+        "text": "VCC",
+        "domain": null,
+        "kind": "power"
+      },
+      {
+        "at": [
+          12,
+          14
+        ],
+        "text": "VCC",
+        "domain": null,
+        "kind": "power"
+      },
+      {
+        "at": [
+          17,
+          28
+        ],
+        "text": "GND",
+        "domain": null,
+        "kind": "ground"
+      },
+      {
+        "at": [
+          22,
+          14
+        ],
+        "text": "GND",
+        "domain": null,
+        "kind": "ground"
+      }
+    ],
+    "ncMarks": [],
+    "keepouts": [
+      {
+        "part": "R3",
+        "x": 16,
+        "y": 2,
+        "w": 2,
+        "h": 6
+      },
+      {
+        "part": "R4",
+        "x": 16,
+        "y": 20,
+        "w": 2,
+        "h": 6
+      },
+      {
+        "part": "R5",
+        "x": 14,
+        "y": 13,
+        "w": 6,
+        "h": 2
+      }
+    ]
+  },
+  "expect": {
+    "valid": false,
+    "errors": [
+      "wire-in-keepout"
+    ]
+  }
+}

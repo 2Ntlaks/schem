@@ -1,0 +1,99 @@
+{
+  "name": "equals-domain-differs",
+  "specRef": "6.9",
+  "description": "Same parts and the same ground net endpoints, but circuitB's net has domain analog and A's has none. 6.9: 'names and ids ignored, kind and domain compared'. Not equal.",
+  "circuit": {
+    "parts": [
+      {
+        "id": "R1",
+        "type": "resistor",
+        "props": {
+          "value": "1k"
+        }
+      },
+      {
+        "id": "R2",
+        "type": "resistor",
+        "props": {
+          "value": "1k"
+        }
+      }
+    ],
+    "nets": [
+      {
+        "id": "n1",
+        "name": "GND",
+        "kind": "ground",
+        "endpoints": [
+          "R1[1]",
+          "R2[1]"
+        ]
+      }
+    ],
+    "nc": []
+  },
+  "pinDefs": {
+    "R1": [
+      {
+        "number": "1",
+        "name": "1",
+        "role": "passive"
+      },
+      {
+        "number": "2",
+        "name": "2",
+        "role": "passive"
+      }
+    ],
+    "R2": [
+      {
+        "number": "1",
+        "name": "1",
+        "role": "passive"
+      },
+      {
+        "number": "2",
+        "name": "2",
+        "role": "passive"
+      }
+    ]
+  },
+  "expect": {
+    "ok": true,
+    "errors": [],
+    "equal": {
+      "circuitB": {
+        "parts": [
+          {
+            "id": "R1",
+            "type": "resistor",
+            "props": {
+              "value": "1k"
+            }
+          },
+          {
+            "id": "R2",
+            "type": "resistor",
+            "props": {
+              "value": "1k"
+            }
+          }
+        ],
+        "nets": [
+          {
+            "id": "n1",
+            "name": "GND",
+            "kind": "ground",
+            "domain": "analog",
+            "endpoints": [
+              "R1[1]",
+              "R2[1]"
+            ]
+          }
+        ],
+        "nc": []
+      },
+      "equal": false
+    }
+  }
+}

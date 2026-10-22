@@ -1,0 +1,218 @@
+{
+  "name": "redundant-collinear-segments",
+  "specRef": "9.7",
+  "description": "R1 (4,14)-(10,14) and R2 (24,14)-(30,14); the one net between them is drawn as a polyline with collinear vertices at x=13,16,20 plus three redundant segments of the same net overlapping it ((12,14)-(18,14), reversed (16,14)-(13,14), and a duplicate (20,14)-(24,14)). 9.7 normalisation merges all of them into one maximal conductor (10,14)-(24,14): no T, no dangling end, only straight-through points. Same net, so the overlap is harmless. Valid.",
+  "circuit": {
+    "parts": [
+      {
+        "id": "R1",
+        "type": "resistor"
+      },
+      {
+        "id": "R2",
+        "type": "resistor"
+      }
+    ],
+    "nets": [
+      {
+        "id": "n1",
+        "endpoints": [
+          "R1[2]",
+          "R2[1]"
+        ]
+      },
+      {
+        "id": "n2",
+        "name": "GND",
+        "kind": "ground",
+        "endpoints": [
+          "R1[1]",
+          "R2[2]"
+        ]
+      }
+    ],
+    "nc": []
+  },
+  "pinDefs": {
+    "R1": [
+      {
+        "number": "1",
+        "name": "1",
+        "role": "passive"
+      },
+      {
+        "number": "2",
+        "name": "2",
+        "role": "passive"
+      }
+    ],
+    "R2": [
+      {
+        "number": "1",
+        "name": "1",
+        "role": "passive"
+      },
+      {
+        "number": "2",
+        "name": "2",
+        "role": "passive"
+      }
+    ]
+  },
+  "render": {
+    "pins": [
+      {
+        "part": "R1",
+        "number": "1",
+        "at": [
+          4,
+          14
+        ],
+        "dir": "left"
+      },
+      {
+        "part": "R1",
+        "number": "2",
+        "at": [
+          10,
+          14
+        ],
+        "dir": "right"
+      },
+      {
+        "part": "R2",
+        "number": "1",
+        "at": [
+          24,
+          14
+        ],
+        "dir": "left"
+      },
+      {
+        "part": "R2",
+        "number": "2",
+        "at": [
+          30,
+          14
+        ],
+        "dir": "right"
+      }
+    ],
+    "wires": [
+      [
+        [
+          10,
+          14
+        ],
+        [
+          13,
+          14
+        ],
+        [
+          16,
+          14
+        ],
+        [
+          20,
+          14
+        ],
+        [
+          24,
+          14
+        ]
+      ],
+      [
+        [
+          12,
+          14
+        ],
+        [
+          18,
+          14
+        ]
+      ],
+      [
+        [
+          16,
+          14
+        ],
+        [
+          13,
+          14
+        ]
+      ],
+      [
+        [
+          20,
+          14
+        ],
+        [
+          24,
+          14
+        ]
+      ],
+      [
+        [
+          4,
+          14
+        ],
+        [
+          2,
+          14
+        ]
+      ],
+      [
+        [
+          30,
+          14
+        ],
+        [
+          32,
+          14
+        ]
+      ]
+    ],
+    "dots": [],
+    "ports": [
+      {
+        "at": [
+          2,
+          14
+        ],
+        "text": "GND",
+        "domain": null,
+        "kind": "ground"
+      },
+      {
+        "at": [
+          32,
+          14
+        ],
+        "text": "GND",
+        "domain": null,
+        "kind": "ground"
+      }
+    ],
+    "ncMarks": [],
+    "keepouts": [
+      {
+        "part": "R1",
+        "x": 4,
+        "y": 13,
+        "w": 6,
+        "h": 2
+      },
+      {
+        "part": "R2",
+        "x": 24,
+        "y": 13,
+        "w": 6,
+        "h": 2
+      }
+    ]
+  },
+  "expect": {
+    "valid": true,
+    "errors": []
+  }
+}

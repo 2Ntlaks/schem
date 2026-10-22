@@ -1,0 +1,72 @@
+{
+  "name": "ambiguous-name-group-plus-ungrouped",
+  "specRef": "6.2",
+  "description": "U3 has three terminals named GND: 14 and 29 in group GND, 40 in no group. U3.GND resolves to a group only 'when the name matches only terminals of one group'; here it also matches pin 40, so it is ambiguous: E106.",
+  "circuit": {
+    "parts": [
+      {
+        "id": "U3",
+        "type": "ic"
+      },
+      {
+        "id": "R1",
+        "type": "resistor"
+      }
+    ],
+    "nets": [
+      {
+        "id": "n1",
+        "name": "GND",
+        "endpoints": [
+          "U3.GND",
+          "R1[2]"
+        ]
+      }
+    ],
+    "nc": []
+  },
+  "pinDefs": {
+    "U3": [
+      {
+        "number": "1",
+        "name": "VCC",
+        "role": "power_in"
+      },
+      {
+        "number": "14",
+        "name": "GND",
+        "role": "ground",
+        "group": "GND"
+      },
+      {
+        "number": "29",
+        "name": "GND",
+        "role": "ground",
+        "group": "GND"
+      },
+      {
+        "number": "40",
+        "name": "GND",
+        "role": "ground"
+      }
+    ],
+    "R1": [
+      {
+        "number": "1",
+        "name": "1",
+        "role": "passive"
+      },
+      {
+        "number": "2",
+        "name": "2",
+        "role": "passive"
+      }
+    ]
+  },
+  "expect": {
+    "ok": false,
+    "errors": [
+      "E106"
+    ]
+  }
+}

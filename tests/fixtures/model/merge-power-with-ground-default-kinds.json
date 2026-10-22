@@ -1,0 +1,109 @@
+{
+  "name": "merge-power-with-ground-default-kinds",
+  "specRef": "6.3 kind defaults, merge rule 1",
+  "description": "n1 is named 3V3 and n2 GND, neither with an explicit kind. 6.3: such names default to power / ground. connect R2[1] R3[1] joins endpoints already in different nets, so it is a merge, and rule 1 rejects power + ground: E230.",
+  "circuit": {
+    "parts": [
+      {
+        "id": "R1",
+        "type": "resistor"
+      },
+      {
+        "id": "R2",
+        "type": "resistor"
+      },
+      {
+        "id": "R3",
+        "type": "resistor"
+      },
+      {
+        "id": "R4",
+        "type": "resistor"
+      }
+    ],
+    "nets": [
+      {
+        "id": "n1",
+        "name": "3V3",
+        "endpoints": [
+          "R1[1]",
+          "R2[1]"
+        ]
+      },
+      {
+        "id": "n2",
+        "name": "GND",
+        "endpoints": [
+          "R3[1]",
+          "R4[1]"
+        ]
+      }
+    ],
+    "nc": []
+  },
+  "pinDefs": {
+    "R1": [
+      {
+        "number": "1",
+        "name": "1",
+        "role": "passive"
+      },
+      {
+        "number": "2",
+        "name": "2",
+        "role": "passive"
+      }
+    ],
+    "R2": [
+      {
+        "number": "1",
+        "name": "1",
+        "role": "passive"
+      },
+      {
+        "number": "2",
+        "name": "2",
+        "role": "passive"
+      }
+    ],
+    "R3": [
+      {
+        "number": "1",
+        "name": "1",
+        "role": "passive"
+      },
+      {
+        "number": "2",
+        "name": "2",
+        "role": "passive"
+      }
+    ],
+    "R4": [
+      {
+        "number": "1",
+        "name": "1",
+        "role": "passive"
+      },
+      {
+        "number": "2",
+        "name": "2",
+        "role": "passive"
+      }
+    ]
+  },
+  "ops": [
+    {
+      "op": "connect",
+      "endpoints": [
+        "R2[1]",
+        "R3[1]"
+      ]
+    }
+  ],
+  "expect": {
+    "ok": false,
+    "errors": [
+      "E230"
+    ]
+  }
+}

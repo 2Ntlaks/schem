@@ -1,0 +1,91 @@
+{
+  "name": "group-endpoint-all-members-nc",
+  "specRef": "6.2 (rev C.1), 6.3",
+  "description": "U1 pins 14 and 29 are both named GND and share group GND (listed 29 first). U1{GND} is in net n1 and BOTH members, U1[14] and U1[29], are listed in circuit.nc. No-connect on a member of a connected group is allowed one pin at a time (6.3), but rev C.1 6.2: 'a group whose members are all no-connect cannot be used as an endpoint (E225)' - there is no representative left to draw it at.",
+  "circuit": {
+    "parts": [
+      {
+        "id": "U1",
+        "type": "ic"
+      },
+      {
+        "id": "R1",
+        "type": "resistor"
+      }
+    ],
+    "nets": [
+      {
+        "id": "n1",
+        "name": "GND",
+        "endpoints": [
+          "U1{GND}",
+          "R1[2]"
+        ]
+      }
+    ],
+    "nc": [
+      "U1[14]",
+      "U1[29]"
+    ]
+  },
+  "pinDefs": {
+    "U1": [
+      {
+        "number": "1",
+        "name": "3V3",
+        "role": "power_in"
+      },
+      {
+        "number": "12",
+        "name": "EN",
+        "role": "input"
+      },
+      {
+        "number": "29",
+        "name": "GND",
+        "role": "ground",
+        "group": "GND"
+      },
+      {
+        "number": "14",
+        "name": "GND",
+        "role": "ground",
+        "group": "GND"
+      },
+      {
+        "number": "21",
+        "name": "GPIO21",
+        "role": "bidir",
+        "aliases": [
+          "SDA"
+        ]
+      },
+      {
+        "number": "22",
+        "name": "GPIO22",
+        "role": "bidir",
+        "aliases": [
+          "SCL"
+        ]
+      }
+    ],
+    "R1": [
+      {
+        "number": "1",
+        "name": "1",
+        "role": "passive"
+      },
+      {
+        "number": "2",
+        "name": "2",
+        "role": "passive"
+      }
+    ]
+  },
+  "expect": {
+    "ok": false,
+    "errors": [
+      "E225"
+    ]
+  }
+}

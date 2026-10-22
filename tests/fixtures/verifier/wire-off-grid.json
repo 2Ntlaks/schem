@@ -1,0 +1,178 @@
+{
+  "name": "wire-off-grid",
+  "specRef": "9.7 (rev C.1), 6.1, 9.1 rule 6",
+  "description": "R1 at (4,14)-(10,14), R2 at (24,14)-(30,14); wire (10,14)-(24,14); R1[1] and R2[2] by 2 G stubs to GND ports. Except that the wire between R1[2] and R2[1] is drawn (10,14)-(12,14)-(12,14.5)-(22,14.5)-(22,14)-(24,14): every segment is horizontal or vertical, but four vertices and the middle run lie half a grid unit off the grid. 6.1: wire vertices are integer grid points; rev C.1: 'a non-orthogonal or off-grid conductor: invalid'. Keep-outs are omitted (the half-unit run would otherwise sit in R1's and R2's y 13..15 boxes).",
+  "circuit": {
+    "parts": [
+      {
+        "id": "R1",
+        "type": "resistor"
+      },
+      {
+        "id": "R2",
+        "type": "resistor"
+      }
+    ],
+    "nets": [
+      {
+        "id": "n1",
+        "endpoints": [
+          "R1[2]",
+          "R2[1]"
+        ]
+      },
+      {
+        "id": "n2",
+        "name": "GND",
+        "kind": "ground",
+        "endpoints": [
+          "R1[1]",
+          "R2[2]"
+        ]
+      }
+    ],
+    "nc": []
+  },
+  "pinDefs": {
+    "R1": [
+      {
+        "number": "1",
+        "name": "1",
+        "role": "passive"
+      },
+      {
+        "number": "2",
+        "name": "2",
+        "role": "passive"
+      }
+    ],
+    "R2": [
+      {
+        "number": "1",
+        "name": "1",
+        "role": "passive"
+      },
+      {
+        "number": "2",
+        "name": "2",
+        "role": "passive"
+      }
+    ]
+  },
+  "render": {
+    "pins": [
+      {
+        "part": "R1",
+        "number": "1",
+        "at": [
+          4,
+          14
+        ],
+        "dir": "left"
+      },
+      {
+        "part": "R1",
+        "number": "2",
+        "at": [
+          10,
+          14
+        ],
+        "dir": "right"
+      },
+      {
+        "part": "R2",
+        "number": "1",
+        "at": [
+          24,
+          14
+        ],
+        "dir": "left"
+      },
+      {
+        "part": "R2",
+        "number": "2",
+        "at": [
+          30,
+          14
+        ],
+        "dir": "right"
+      }
+    ],
+    "wires": [
+      [
+        [
+          10,
+          14
+        ],
+        [
+          12,
+          14
+        ],
+        [
+          12,
+          14.5
+        ],
+        [
+          22,
+          14.5
+        ],
+        [
+          22,
+          14
+        ],
+        [
+          24,
+          14
+        ]
+      ],
+      [
+        [
+          4,
+          14
+        ],
+        [
+          2,
+          14
+        ]
+      ],
+      [
+        [
+          30,
+          14
+        ],
+        [
+          32,
+          14
+        ]
+      ]
+    ],
+    "dots": [],
+    "ports": [
+      {
+        "at": [
+          2,
+          14
+        ],
+        "text": "GND",
+        "domain": null,
+        "kind": "ground"
+      },
+      {
+        "at": [
+          32,
+          14
+        ],
+        "text": "GND",
+        "domain": null,
+        "kind": "ground"
+      }
+    ],
+    "ncMarks": []
+  },
+  "expect": {
+    "valid": false,
+    "errors": [
+      "non-orthogonal"
+    ]
+  }
+}

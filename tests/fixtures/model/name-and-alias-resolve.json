@@ -1,0 +1,124 @@
+{
+  "name": "name-and-alias-resolve",
+  "specRef": "6.2",
+  "description": "U1 pin 21 is named GPIO21 (alias SDA), pin 22 is named GPIO22 (alias SCL). n1 uses the name form U1.GPIO21 and n2 the alias form U1.SCL. Each matches exactly one terminal, so they resolve to the canonical U1[21] and U1[22].",
+  "circuit": {
+    "parts": [
+      {
+        "id": "U1",
+        "type": "ic"
+      },
+      {
+        "id": "R1",
+        "type": "resistor"
+      },
+      {
+        "id": "R2",
+        "type": "resistor"
+      }
+    ],
+    "nets": [
+      {
+        "id": "n1",
+        "endpoints": [
+          "U1.GPIO21",
+          "R1[2]"
+        ]
+      },
+      {
+        "id": "n2",
+        "endpoints": [
+          "U1.SCL",
+          "R2[2]"
+        ]
+      }
+    ],
+    "nc": []
+  },
+  "pinDefs": {
+    "U1": [
+      {
+        "number": "1",
+        "name": "3V3",
+        "role": "power_in"
+      },
+      {
+        "number": "12",
+        "name": "EN",
+        "role": "input"
+      },
+      {
+        "number": "29",
+        "name": "GND",
+        "role": "ground",
+        "group": "GND"
+      },
+      {
+        "number": "14",
+        "name": "GND",
+        "role": "ground",
+        "group": "GND"
+      },
+      {
+        "number": "21",
+        "name": "GPIO21",
+        "role": "bidir",
+        "aliases": [
+          "SDA"
+        ]
+      },
+      {
+        "number": "22",
+        "name": "GPIO22",
+        "role": "bidir",
+        "aliases": [
+          "SCL"
+        ]
+      }
+    ],
+    "R1": [
+      {
+        "number": "1",
+        "name": "1",
+        "role": "passive"
+      },
+      {
+        "number": "2",
+        "name": "2",
+        "role": "passive"
+      }
+    ],
+    "R2": [
+      {
+        "number": "1",
+        "name": "1",
+        "role": "passive"
+      },
+      {
+        "number": "2",
+        "name": "2",
+        "role": "passive"
+      }
+    ]
+  },
+  "expect": {
+    "ok": true,
+    "errors": [],
+    "nets": [
+      {
+        "id": "n1",
+        "endpoints": [
+          "U1[21]",
+          "R1[2]"
+        ]
+      },
+      {
+        "id": "n2",
+        "endpoints": [
+          "U1[22]",
+          "R2[2]"
+        ]
+      }
+    ]
+  }
+}

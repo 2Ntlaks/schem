@@ -1,0 +1,96 @@
+{
+  "name": "equals-different-net-ids-and-names",
+  "specRef": "6.9",
+  "description": "A has net n1 'SIG' {R1[2], R2[1]}; circuitB has net n5 'NODE' {R2[1], R1[2]} (other id, other name, endpoints in another order). 6.9: nets compared as sets of endpoints, 'names and ids ignored'. Both names default to kind signal, so kind also matches. Equal.",
+  "circuit": {
+    "parts": [
+      {
+        "id": "R1",
+        "type": "resistor",
+        "props": {
+          "value": "1k"
+        }
+      },
+      {
+        "id": "R2",
+        "type": "resistor",
+        "props": {
+          "value": "1k"
+        }
+      }
+    ],
+    "nets": [
+      {
+        "id": "n1",
+        "name": "SIG",
+        "endpoints": [
+          "R1[2]",
+          "R2[1]"
+        ]
+      }
+    ],
+    "nc": []
+  },
+  "pinDefs": {
+    "R1": [
+      {
+        "number": "1",
+        "name": "1",
+        "role": "passive"
+      },
+      {
+        "number": "2",
+        "name": "2",
+        "role": "passive"
+      }
+    ],
+    "R2": [
+      {
+        "number": "1",
+        "name": "1",
+        "role": "passive"
+      },
+      {
+        "number": "2",
+        "name": "2",
+        "role": "passive"
+      }
+    ]
+  },
+  "expect": {
+    "ok": true,
+    "errors": [],
+    "equal": {
+      "circuitB": {
+        "parts": [
+          {
+            "id": "R1",
+            "type": "resistor",
+            "props": {
+              "value": "1k"
+            }
+          },
+          {
+            "id": "R2",
+            "type": "resistor",
+            "props": {
+              "value": "1k"
+            }
+          }
+        ],
+        "nets": [
+          {
+            "id": "n5",
+            "name": "NODE",
+            "endpoints": [
+              "R2[1]",
+              "R1[2]"
+            ]
+          }
+        ],
+        "nc": []
+      },
+      "equal": true
+    }
+  }
+}

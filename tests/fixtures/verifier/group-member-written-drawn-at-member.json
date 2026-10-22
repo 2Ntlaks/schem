@@ -1,0 +1,317 @@
+{
+  "name": "group-member-written-drawn-at-member",
+  "specRef": "6.2, 9.7",
+  "description": "U1 is a box with keep-out x 20..30, y 10..20: pin 1 VIN (20,12) left, pin 2 OUT (30,12) right, pin 4 EN (30,16) right, pin 5 AUX (20,16) left, GND group pins 9 (22,20), 14 (25,20), 29 (28,20) down. R1 vertical (36,2)-(36,8), R2 vertical (36,18)-(36,24). OUT wire (30,12)-(36,12) meets the vertical wire (36,8)-(36,18) at a dotted T at (36,12). U1[1] and R1[1] go to VCC ports, R2[2] to a GND port. Net n3 names the physical terminal U1[29] (a member of group GND), not the group. 6.2: 'Physical terminals stay recorded as written. If the agent connected U1[29], the drawing shows pin 29, not the representative.' Pin 29 is drawn with a stub to a GND port; pins 9 and 14 (members of the same group but not written in any net) are hidden. Valid.",
+  "circuit": {
+    "parts": [
+      {
+        "id": "U1",
+        "type": "ic"
+      },
+      {
+        "id": "R1",
+        "type": "resistor"
+      },
+      {
+        "id": "R2",
+        "type": "resistor"
+      }
+    ],
+    "nets": [
+      {
+        "id": "n1",
+        "name": "VCC",
+        "kind": "power",
+        "endpoints": [
+          "U1[1]",
+          "R1[1]"
+        ]
+      },
+      {
+        "id": "n2",
+        "endpoints": [
+          "U1[2]",
+          "R1[2]",
+          "R2[1]"
+        ]
+      },
+      {
+        "id": "n3",
+        "name": "GND",
+        "kind": "ground",
+        "endpoints": [
+          "U1[29]",
+          "R2[2]"
+        ]
+      }
+    ],
+    "nc": []
+  },
+  "pinDefs": {
+    "U1": [
+      {
+        "number": "1",
+        "name": "VIN",
+        "role": "power_in"
+      },
+      {
+        "number": "2",
+        "name": "OUT",
+        "role": "output"
+      },
+      {
+        "number": "4",
+        "name": "EN",
+        "role": "input"
+      },
+      {
+        "number": "5",
+        "name": "AUX",
+        "role": "bidir"
+      },
+      {
+        "number": "14",
+        "name": "GND",
+        "role": "ground",
+        "group": "GND"
+      },
+      {
+        "number": "29",
+        "name": "GND",
+        "role": "ground",
+        "group": "GND"
+      },
+      {
+        "number": "9",
+        "name": "GND",
+        "role": "ground",
+        "group": "GND"
+      }
+    ],
+    "R1": [
+      {
+        "number": "1",
+        "name": "1",
+        "role": "passive"
+      },
+      {
+        "number": "2",
+        "name": "2",
+        "role": "passive"
+      }
+    ],
+    "R2": [
+      {
+        "number": "1",
+        "name": "1",
+        "role": "passive"
+      },
+      {
+        "number": "2",
+        "name": "2",
+        "role": "passive"
+      }
+    ]
+  },
+  "render": {
+    "pins": [
+      {
+        "part": "U1",
+        "number": "1",
+        "at": [
+          20,
+          12
+        ],
+        "dir": "left"
+      },
+      {
+        "part": "U1",
+        "number": "2",
+        "at": [
+          30,
+          12
+        ],
+        "dir": "right"
+      },
+      {
+        "part": "U1",
+        "number": "29",
+        "at": [
+          28,
+          20
+        ],
+        "dir": "down"
+      },
+      {
+        "part": "R1",
+        "number": "1",
+        "at": [
+          36,
+          2
+        ],
+        "dir": "up"
+      },
+      {
+        "part": "R1",
+        "number": "2",
+        "at": [
+          36,
+          8
+        ],
+        "dir": "down"
+      },
+      {
+        "part": "R2",
+        "number": "1",
+        "at": [
+          36,
+          18
+        ],
+        "dir": "up"
+      },
+      {
+        "part": "R2",
+        "number": "2",
+        "at": [
+          36,
+          24
+        ],
+        "dir": "down"
+      }
+    ],
+    "wires": [
+      [
+        [
+          30,
+          12
+        ],
+        [
+          36,
+          12
+        ]
+      ],
+      [
+        [
+          36,
+          8
+        ],
+        [
+          36,
+          18
+        ]
+      ],
+      [
+        [
+          36,
+          2
+        ],
+        [
+          36,
+          0
+        ]
+      ],
+      [
+        [
+          36,
+          24
+        ],
+        [
+          36,
+          26
+        ]
+      ],
+      [
+        [
+          20,
+          12
+        ],
+        [
+          16,
+          12
+        ]
+      ],
+      [
+        [
+          28,
+          20
+        ],
+        [
+          28,
+          24
+        ]
+      ]
+    ],
+    "dots": [
+      [
+        36,
+        12
+      ]
+    ],
+    "ports": [
+      {
+        "at": [
+          36,
+          0
+        ],
+        "text": "VCC",
+        "domain": null,
+        "kind": "power"
+      },
+      {
+        "at": [
+          36,
+          26
+        ],
+        "text": "GND",
+        "domain": null,
+        "kind": "ground"
+      },
+      {
+        "at": [
+          16,
+          12
+        ],
+        "text": "VCC",
+        "domain": null,
+        "kind": "power"
+      },
+      {
+        "at": [
+          28,
+          24
+        ],
+        "text": "GND",
+        "domain": null,
+        "kind": "ground"
+      }
+    ],
+    "ncMarks": [],
+    "keepouts": [
+      {
+        "part": "U1",
+        "x": 20,
+        "y": 10,
+        "w": 10,
+        "h": 10
+      },
+      {
+        "part": "R1",
+        "x": 35,
+        "y": 2,
+        "w": 2,
+        "h": 6
+      },
+      {
+        "part": "R2",
+        "x": 35,
+        "y": 18,
+        "w": 2,
+        "h": 6
+      }
+    ]
+  },
+  "expect": {
+    "valid": true,
+    "errors": []
+  }
+}

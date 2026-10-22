@@ -1,0 +1,124 @@
+{
+  "name": "merge-named-power-same-supply-keep",
+  "specRef": "6.3 merge rules 3, 5",
+  "description": "Same nets as merge-named-power-without-same-supply, now with sameSupply: true and keep n2. Rule 3 allows it; the survivor is the kept net n2 '+5V' (its id is kept, rule 5), with all four endpoints, kind power. n2 is deliberately the HIGHER id, so a 'lowest id' survivor would be wrong.",
+  "circuit": {
+    "parts": [
+      {
+        "id": "R1",
+        "type": "resistor"
+      },
+      {
+        "id": "R2",
+        "type": "resistor"
+      },
+      {
+        "id": "R3",
+        "type": "resistor"
+      },
+      {
+        "id": "R4",
+        "type": "resistor"
+      }
+    ],
+    "nets": [
+      {
+        "id": "n1",
+        "name": "5V",
+        "kind": "power",
+        "endpoints": [
+          "R1[1]",
+          "R2[1]"
+        ]
+      },
+      {
+        "id": "n2",
+        "name": "+5V",
+        "kind": "power",
+        "endpoints": [
+          "R3[1]",
+          "R4[1]"
+        ]
+      }
+    ],
+    "nc": []
+  },
+  "pinDefs": {
+    "R1": [
+      {
+        "number": "1",
+        "name": "1",
+        "role": "passive"
+      },
+      {
+        "number": "2",
+        "name": "2",
+        "role": "passive"
+      }
+    ],
+    "R2": [
+      {
+        "number": "1",
+        "name": "1",
+        "role": "passive"
+      },
+      {
+        "number": "2",
+        "name": "2",
+        "role": "passive"
+      }
+    ],
+    "R3": [
+      {
+        "number": "1",
+        "name": "1",
+        "role": "passive"
+      },
+      {
+        "number": "2",
+        "name": "2",
+        "role": "passive"
+      }
+    ],
+    "R4": [
+      {
+        "number": "1",
+        "name": "1",
+        "role": "passive"
+      },
+      {
+        "number": "2",
+        "name": "2",
+        "role": "passive"
+      }
+    ]
+  },
+  "ops": [
+    {
+      "op": "mergeNets",
+      "nets": [
+        "n1",
+        "n2"
+      ],
+      "keep": "n2",
+      "sameSupply": true
+    }
+  ],
+  "expect": {
+    "ok": true,
+    "errors": [],
+    "nets": [
+      {
+        "id": "n2",
+        "name": "+5V",
+        "kind": "power",
+        "endpoints": [
+          "R1[1]",
+          "R2[1]",
+          "R3[1]",
+          "R4[1]"
+        ]
+      }
+    ]
+  }
+}

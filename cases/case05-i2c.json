@@ -1,0 +1,36 @@
+{
+  "meta": { "title": "Case 5: ESP32 with two I2C sensors" },
+  "circuit": {
+    "parts": [
+      { "id": "U1", "type": "ic", "props": { "label": "ESP32-DevKitC", "controller": "true" },
+        "pins": [
+          { "number": "1", "name": "3V3", "role": "power_in" },
+          { "number": "2", "name": "GND", "role": "ground" },
+          { "number": "3", "name": "GPIO21", "role": "bidir", "iface": ["i2c.sda"] },
+          { "number": "4", "name": "GPIO22", "role": "bidir", "iface": ["i2c.scl"] }
+        ] },
+      { "id": "U2", "type": "ic", "props": { "label": "BME280" },
+        "pins": [
+          { "number": "1", "name": "VIN", "role": "power_in" },
+          { "number": "2", "name": "GND", "role": "ground" },
+          { "number": "3", "name": "SCL", "role": "bidir", "iface": ["i2c.scl"] },
+          { "number": "4", "name": "SDA", "role": "bidir", "iface": ["i2c.sda"] }
+        ] },
+      { "id": "U3", "type": "ic", "props": { "label": "SHT31" },
+        "pins": [
+          { "number": "1", "name": "VIN", "role": "power_in" },
+          { "number": "2", "name": "GND", "role": "ground" },
+          { "number": "3", "name": "SCL", "role": "bidir", "iface": ["i2c.scl"] },
+          { "number": "4", "name": "SDA", "role": "bidir", "iface": ["i2c.sda"] }
+        ] },
+      { "id": "R1", "type": "resistor", "props": { "value": "4.7k" } },
+      { "id": "R2", "type": "resistor", "props": { "value": "4.7k" } }
+    ],
+    "nets": [
+      { "id": "n1", "name": "3V3", "endpoints": ["U1.3V3", "U2.VIN", "U3.VIN", "R1.1", "R2.1"] },
+      { "id": "n2", "name": "GND", "endpoints": ["U1.GND", "U2.GND", "U3.GND"] },
+      { "id": "n3", "name": "SDA", "endpoints": ["U1.GPIO21", "U2.SDA", "U3.SDA", "R1.2"] },
+      { "id": "n4", "name": "SCL", "endpoints": ["U1.GPIO22", "U2.SCL", "U3.SCL", "R2.2"] }
+    ]
+  }
+}

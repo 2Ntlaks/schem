@@ -1,0 +1,187 @@
+{
+  "name": "dot-on-bend",
+  "specRef": "9.7",
+  "description": "R1 (4,14)-(10,14) and R3 vertical (17,4)-(17,10). Wire (10,14)-(17,14)-(17,10) bends at (17,14), reaching R3[2] from below along its dir (down). A junction dot is drawn at the bend. Only 2 conductor directions meet there: 'dot with fewer than 3 directions: invalid'. Connectivity is otherwise correct.",
+  "circuit": {
+    "parts": [
+      {
+        "id": "R1",
+        "type": "resistor"
+      },
+      {
+        "id": "R3",
+        "type": "resistor"
+      }
+    ],
+    "nets": [
+      {
+        "id": "n1",
+        "endpoints": [
+          "R1[2]",
+          "R3[2]"
+        ]
+      },
+      {
+        "id": "n2",
+        "name": "GND",
+        "kind": "ground",
+        "endpoints": [
+          "R1[1]",
+          "R3[1]"
+        ]
+      }
+    ],
+    "nc": []
+  },
+  "pinDefs": {
+    "R1": [
+      {
+        "number": "1",
+        "name": "1",
+        "role": "passive"
+      },
+      {
+        "number": "2",
+        "name": "2",
+        "role": "passive"
+      }
+    ],
+    "R3": [
+      {
+        "number": "1",
+        "name": "1",
+        "role": "passive"
+      },
+      {
+        "number": "2",
+        "name": "2",
+        "role": "passive"
+      }
+    ]
+  },
+  "render": {
+    "pins": [
+      {
+        "part": "R1",
+        "number": "1",
+        "at": [
+          4,
+          14
+        ],
+        "dir": "left"
+      },
+      {
+        "part": "R1",
+        "number": "2",
+        "at": [
+          10,
+          14
+        ],
+        "dir": "right"
+      },
+      {
+        "part": "R3",
+        "number": "1",
+        "at": [
+          17,
+          4
+        ],
+        "dir": "up"
+      },
+      {
+        "part": "R3",
+        "number": "2",
+        "at": [
+          17,
+          10
+        ],
+        "dir": "down"
+      }
+    ],
+    "wires": [
+      [
+        [
+          10,
+          14
+        ],
+        [
+          17,
+          14
+        ],
+        [
+          17,
+          10
+        ]
+      ],
+      [
+        [
+          4,
+          14
+        ],
+        [
+          2,
+          14
+        ]
+      ],
+      [
+        [
+          17,
+          4
+        ],
+        [
+          17,
+          2
+        ]
+      ]
+    ],
+    "dots": [
+      [
+        17,
+        14
+      ]
+    ],
+    "ports": [
+      {
+        "at": [
+          2,
+          14
+        ],
+        "text": "GND",
+        "domain": null,
+        "kind": "ground"
+      },
+      {
+        "at": [
+          17,
+          2
+        ],
+        "text": "GND",
+        "domain": null,
+        "kind": "ground"
+      }
+    ],
+    "ncMarks": [],
+    "keepouts": [
+      {
+        "part": "R1",
+        "x": 4,
+        "y": 13,
+        "w": 6,
+        "h": 2
+      },
+      {
+        "part": "R3",
+        "x": 16,
+        "y": 4,
+        "w": 2,
+        "h": 6
+      }
+    ]
+  },
+  "expect": {
+    "valid": false,
+    "errors": [
+      "dot-degree"
+    ]
+  }
+}

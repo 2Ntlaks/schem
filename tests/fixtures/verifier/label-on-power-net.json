@@ -1,0 +1,179 @@
+{
+  "name": "label-on-power-net",
+  "specRef": "9.7 (rev C.1)",
+  "description": "R1 (4,14)-(10,14) and R2 (24,14)-(30,14) wired together. Net VCC (power) is {R1[1], R2[2]}. R1[1]'s stub ends at a POWER port 'VCC'; R2[2]'s stub ends at a net LABEL 'VCC'. Rev C.1: virtual nets join on (symbol class, visible text, domain), so the supply symbol and the label are different virtual nets and R1[1], R2[2] are not joined (topology-mismatch); and a label's class must match the net kind (power net needs a supply symbol), so the label is a port-mismatch. (Before rev C.1 the author had this as valid; see AUTHOR-NOTES.)",
+  "circuit": {
+    "parts": [
+      {
+        "id": "R1",
+        "type": "resistor"
+      },
+      {
+        "id": "R2",
+        "type": "resistor"
+      }
+    ],
+    "nets": [
+      {
+        "id": "n1",
+        "endpoints": [
+          "R1[2]",
+          "R2[1]"
+        ]
+      },
+      {
+        "id": "n2",
+        "name": "VCC",
+        "kind": "power",
+        "endpoints": [
+          "R1[1]",
+          "R2[2]"
+        ]
+      }
+    ],
+    "nc": []
+  },
+  "pinDefs": {
+    "R1": [
+      {
+        "number": "1",
+        "name": "1",
+        "role": "passive"
+      },
+      {
+        "number": "2",
+        "name": "2",
+        "role": "passive"
+      }
+    ],
+    "R2": [
+      {
+        "number": "1",
+        "name": "1",
+        "role": "passive"
+      },
+      {
+        "number": "2",
+        "name": "2",
+        "role": "passive"
+      }
+    ]
+  },
+  "render": {
+    "pins": [
+      {
+        "part": "R1",
+        "number": "1",
+        "at": [
+          4,
+          14
+        ],
+        "dir": "left"
+      },
+      {
+        "part": "R1",
+        "number": "2",
+        "at": [
+          10,
+          14
+        ],
+        "dir": "right"
+      },
+      {
+        "part": "R2",
+        "number": "1",
+        "at": [
+          24,
+          14
+        ],
+        "dir": "left"
+      },
+      {
+        "part": "R2",
+        "number": "2",
+        "at": [
+          30,
+          14
+        ],
+        "dir": "right"
+      }
+    ],
+    "wires": [
+      [
+        [
+          10,
+          14
+        ],
+        [
+          24,
+          14
+        ]
+      ],
+      [
+        [
+          4,
+          14
+        ],
+        [
+          2,
+          14
+        ]
+      ],
+      [
+        [
+          30,
+          14
+        ],
+        [
+          32,
+          14
+        ]
+      ]
+    ],
+    "dots": [],
+    "ports": [
+      {
+        "at": [
+          2,
+          14
+        ],
+        "text": "VCC",
+        "domain": null,
+        "kind": "power"
+      },
+      {
+        "at": [
+          32,
+          14
+        ],
+        "text": "VCC",
+        "domain": null,
+        "kind": "label"
+      }
+    ],
+    "ncMarks": [],
+    "keepouts": [
+      {
+        "part": "R1",
+        "x": 4,
+        "y": 13,
+        "w": 6,
+        "h": 2
+      },
+      {
+        "part": "R2",
+        "x": 24,
+        "y": 13,
+        "w": 6,
+        "h": 2
+      }
+    ]
+  },
+  "expect": {
+    "valid": false,
+    "errors": [
+      "port-mismatch",
+      "topology-mismatch"
+    ]
+  }
+}

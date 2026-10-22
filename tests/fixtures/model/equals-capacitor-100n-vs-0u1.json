@@ -1,0 +1,94 @@
+{
+  "name": "equals-capacitor-100n-vs-0u1",
+  "specRef": "6.9, 6.7",
+  "description": "C1 is 100n in A and 0.1u in circuitB: both 1e-7 F, so equal. Trap: naive float arithmetic gives 100*1e-9 = 1.0000000000000001e-07 but 0.1*1e-6 = 1e-07, so a plain === comparison of computed doubles says 'different'. 6.9 asks for equal quantities, so the comparison must be exact (decimal) or tolerance-based.",
+  "circuit": {
+    "parts": [
+      {
+        "id": "C1",
+        "type": "capacitor",
+        "props": {
+          "value": "100n"
+        }
+      },
+      {
+        "id": "R1",
+        "type": "resistor",
+        "props": {
+          "value": "1k"
+        }
+      }
+    ],
+    "nets": [
+      {
+        "id": "n1",
+        "endpoints": [
+          "C1[1]",
+          "R1[1]"
+        ]
+      }
+    ],
+    "nc": []
+  },
+  "pinDefs": {
+    "C1": [
+      {
+        "number": "1",
+        "name": "1",
+        "role": "passive"
+      },
+      {
+        "number": "2",
+        "name": "2",
+        "role": "passive"
+      }
+    ],
+    "R1": [
+      {
+        "number": "1",
+        "name": "1",
+        "role": "passive"
+      },
+      {
+        "number": "2",
+        "name": "2",
+        "role": "passive"
+      }
+    ]
+  },
+  "expect": {
+    "ok": true,
+    "errors": [],
+    "equal": {
+      "circuitB": {
+        "parts": [
+          {
+            "id": "C1",
+            "type": "capacitor",
+            "props": {
+              "value": "0.1u"
+            }
+          },
+          {
+            "id": "R1",
+            "type": "resistor",
+            "props": {
+              "value": "1k"
+            }
+          }
+        ],
+        "nets": [
+          {
+            "id": "n1",
+            "endpoints": [
+              "C1[1]",
+              "R1[1]"
+            ]
+          }
+        ],
+        "nc": []
+      },
+      "equal": true
+    }
+  }
+}

@@ -1,0 +1,217 @@
+{
+  "name": "pin-pass-through",
+  "specRef": "9.7, 9.2 step 7",
+  "description": "R2 vertical (17,2)-(17,8), R3 vertical (17,20)-(17,26), R1 horizontal (17,14)-(23,14) with R1[1] at (17,14) dir left. One straight wire (17,8)-(17,20) joins R2[2] and R3[1] and passes straight THROUGH R1[1]'s anchor (17,14). The circuit does put R1[1] in that net, but 9.7: 'conductor ... passes through it [a pin anchor]: invalid'. No keep-outs given (the wire would otherwise run along R1's keep-out edge).",
+  "circuit": {
+    "parts": [
+      {
+        "id": "R1",
+        "type": "resistor"
+      },
+      {
+        "id": "R2",
+        "type": "resistor"
+      },
+      {
+        "id": "R3",
+        "type": "resistor"
+      }
+    ],
+    "nets": [
+      {
+        "id": "n1",
+        "endpoints": [
+          "R1[1]",
+          "R2[2]",
+          "R3[1]"
+        ]
+      },
+      {
+        "id": "n2",
+        "name": "GND",
+        "kind": "ground",
+        "endpoints": [
+          "R1[2]",
+          "R2[1]",
+          "R3[2]"
+        ]
+      }
+    ],
+    "nc": []
+  },
+  "pinDefs": {
+    "R1": [
+      {
+        "number": "1",
+        "name": "1",
+        "role": "passive"
+      },
+      {
+        "number": "2",
+        "name": "2",
+        "role": "passive"
+      }
+    ],
+    "R2": [
+      {
+        "number": "1",
+        "name": "1",
+        "role": "passive"
+      },
+      {
+        "number": "2",
+        "name": "2",
+        "role": "passive"
+      }
+    ],
+    "R3": [
+      {
+        "number": "1",
+        "name": "1",
+        "role": "passive"
+      },
+      {
+        "number": "2",
+        "name": "2",
+        "role": "passive"
+      }
+    ]
+  },
+  "render": {
+    "pins": [
+      {
+        "part": "R1",
+        "number": "1",
+        "at": [
+          17,
+          14
+        ],
+        "dir": "left"
+      },
+      {
+        "part": "R1",
+        "number": "2",
+        "at": [
+          23,
+          14
+        ],
+        "dir": "right"
+      },
+      {
+        "part": "R2",
+        "number": "1",
+        "at": [
+          17,
+          2
+        ],
+        "dir": "up"
+      },
+      {
+        "part": "R2",
+        "number": "2",
+        "at": [
+          17,
+          8
+        ],
+        "dir": "down"
+      },
+      {
+        "part": "R3",
+        "number": "1",
+        "at": [
+          17,
+          20
+        ],
+        "dir": "up"
+      },
+      {
+        "part": "R3",
+        "number": "2",
+        "at": [
+          17,
+          26
+        ],
+        "dir": "down"
+      }
+    ],
+    "wires": [
+      [
+        [
+          17,
+          8
+        ],
+        [
+          17,
+          20
+        ]
+      ],
+      [
+        [
+          23,
+          14
+        ],
+        [
+          25,
+          14
+        ]
+      ],
+      [
+        [
+          17,
+          2
+        ],
+        [
+          17,
+          0
+        ]
+      ],
+      [
+        [
+          17,
+          26
+        ],
+        [
+          17,
+          28
+        ]
+      ]
+    ],
+    "dots": [],
+    "ports": [
+      {
+        "at": [
+          25,
+          14
+        ],
+        "text": "GND",
+        "domain": null,
+        "kind": "ground"
+      },
+      {
+        "at": [
+          17,
+          0
+        ],
+        "text": "GND",
+        "domain": null,
+        "kind": "ground"
+      },
+      {
+        "at": [
+          17,
+          28
+        ],
+        "text": "GND",
+        "domain": null,
+        "kind": "ground"
+      }
+    ],
+    "ncMarks": []
+  },
+  "expect": {
+    "valid": false,
+    "errors": [
+      "pin-pass-through"
+    ]
+  }
+}
