@@ -1,12 +1,12 @@
 # Phase 0a: build notes
 
-Status on 2026-10-23: Phase 0a gates 1 and 2 pass; gate 3 (owner's look) is pending.
+Status on 2026-10-23: Phase 0a is complete. Gates 1 and 2 pass, and the owner passed gate 3 ("promising").
 
 | Gate (SPEC 15) | Result |
 |---|---|
 | 1. Verifier counterexample suite passes | 94 of 94 black-box fixtures pass (53 verifier, 41 model), written independently from SPEC.md |
 | 2. Cases 1, 3, 5 lay out `valid` and pass the verifier | All three `valid`; verifier finds no errors |
-| 3. Owner looks at the drawings | Pending: `out/case01-led.png`, `out/case03-summing.png`, `out/case05-i2c.png` |
+| 3. Owner looks at the drawings | Passed 2026-10-23: owner's verdict "promising" on `out/case01-led.png`, `out/case03-summing.png`, `out/case05-i2c.png` |
 
 ## How the output is verified
 
