@@ -129,20 +129,23 @@ export const BUILTIN: Record<string, SymbolDef> = Object.fromEntries(
   [RESISTOR, CAPACITOR, LED, BATTERY, VSOURCE, OPAMP, GROUND, SUPPLY].map((s) => [s.id, s]),
 );
 
-/** Generated box for chips and modules (SPEC 7.3). Pins on each side, 2 G apart. */
-export function icSymbol(sides: { left: PinDef[]; right: PinDef[]; top: PinDef[]; bottom: PinDef[] }, innerWidth: number): SymbolDef {
+/**
+ * Generated box for chips and modules (SPEC 7.3). Side pins are 2 G apart; top and bottom
+ * pins are `pitch` G apart, wide enough that their horizontal names do not run together.
+ */
+export function icSymbol(sides: { left: PinDef[]; right: PinDef[]; top: PinDef[]; bottom: PinDef[] }, innerWidth: number, pitch = 2): SymbolDef {
   const rows = Math.max(sides.left.length, sides.right.length, 1);
   const cols = Math.max(sides.top.length, sides.bottom.length, 0);
-  const W = Math.max(innerWidth, cols * 2 + 2, 6) + 2; // +2 for the 1 G leads on each side
+  const W = Math.max(innerWidth, (cols - 1) * pitch + 4, 6) + 2; // +2 for the 1 G leads on each side
   const y0 = sides.top.length ? 4 : 2;                 // room for top pin names inside the box
   const H = y0 + (rows - 1) * 2 + (sides.bottom.length ? 4 : 2);
   const pins: SymPin[] = [];
   sides.left.forEach((p, i) => pins.push({ ...p, at: [0, y0 + 2 * i], dir: "left" }));
   sides.right.forEach((p, i) => pins.push({ ...p, at: [W, y0 + 2 * i], dir: "right" }));
-  const topStart = Math.round((W - (sides.top.length - 1) * 2) / 2);
-  const botStart = Math.round((W - (sides.bottom.length - 1) * 2) / 2);
-  sides.top.forEach((p, i) => pins.push({ ...p, at: [topStart + 2 * i, 0], dir: "up" }));
-  sides.bottom.forEach((p, i) => pins.push({ ...p, at: [botStart + 2 * i, H], dir: "down" }));
+  const topStart = Math.round((W - (sides.top.length - 1) * pitch) / 2);
+  const botStart = Math.round((W - (sides.bottom.length - 1) * pitch) / 2);
+  sides.top.forEach((p, i) => pins.push({ ...p, at: [topStart + pitch * i, 0], dir: "up" }));
+  sides.bottom.forEach((p, i) => pins.push({ ...p, at: [botStart + pitch * i, H], dir: "down" }));
   const leads = pins.map((p) => {
     const [x, y] = p.at;
     return p.dir === "left" ? `M${x} ${y} H${x + 1}` : p.dir === "right" ? `M${x} ${y} H${x - 1}` : p.dir === "up" ? `M${x} ${y} V${y + 1}` : `M${x} ${y} V${y - 1}`;

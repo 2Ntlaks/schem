@@ -1,7 +1,7 @@
 // Phase 0a layout pipeline (SPEC 9.2, scope as in SPEC 15 Phase 0a).
 
 import {
-  cmpNatural, cmpStr, edgeKey, gridBox, isHorizontal, key, step, unionBox, xformBox, xformDir, xformPt,
+  cmpNatural, cmpStr, edgeKey, gridBox, isHorizontal, key, step, unionBox, unitEdges, xformBox, xformDir, xformPt,
   boxesOverlap, type Box, type Dir, type Orient, type Pt,
 } from "../geom/geom.js";
 import { obstacleFromLabel, type Obstacle } from "../geom/forbidden.js";
@@ -17,6 +17,14 @@ import type { Art, DrawnPin, DrawnPort, Electrical, RenderModel } from "../rende
 export interface Project { meta?: { title?: string }; circuit: Circuit }
 
 export type Status = "valid" | "valid_low_confidence" | "infeasible" | "budget_exhausted" | "invalid_input";
+
+/**
+ * Fixed placement for every part (test hook, and the shape of a 0b template's output):
+ * the part's origin, optional orientation, and optional pin sides for generated IC boxes.
+ * Positions become lock constraints, so the normal solve, routing and rendering still run.
+ */
+export type Side = "left" | "right" | "top" | "bottom";
+export type Placement = Record<string, { at: Pt; orient?: Orient; sides?: Partial<Record<Side, string[]>> }>;
 
 export interface LayoutResult {
   status: Status;
@@ -63,10 +71,14 @@ interface Placed {
   pins: Array<{ number: string; at: Pt; dir: Dir }>;
 }
 
-export function layout(project: Project, opts: { spacing?: number } = {}): LayoutResult {
+/** Fixed conductor runs of a net (by net id), handed to the router as part of its tree (SPEC 9.2 step 7). */
+export type Prewire = Record<string, Pt[][]>;
+
+export function layout(project: Project, opts: { spacing?: number; place?: Placement; prewire?: Prewire } = {}): LayoutResult {
   const notes: string[] = [];
   const circuit = project.circuit;
   const defs = pinDefsOf(circuit);
+  if (!circuit.parts.length) return { status: "invalid_input", pinDefs: defs, issues: ["the circuit has no parts, so there is nothing to draw."], notes };
   for (const p of circuit.parts) if (!defs[p.id]) return { status: "invalid_input", pinDefs: defs, issues: [`E201 unknown part type "${p.type}" (${p.id}).`], notes };
   for (const s of Object.values(BUILTIN)) checkSymbol(s);
   const v = validate(circuit, defs);
@@ -146,8 +158,9 @@ export function layout(project: Project, opts: { spacing?: number } = {}): Layou
       if (sym.kind === "source") orient = { rot: 90, flip: false }; // "+" (left pin) up
       else if (sym.kind === "two-pin") orient = twoPinOrient(sym, id, drawnNet, netById, portNet, netCol);
     } else {
-      sym = icFor(id, defs[id]!, drawnNet, netById, ncSet, col, netCol);
+      sym = icFor(id, defs[id]!, drawnNet, netById, ncSet, col, netCol, opts.place?.[id]?.sides);
     }
+    if (opts.place?.[id]?.orient) orient = opts.place[id]!.orient!;
     const ko = xformBox(keepOut(sym), [0, 0], orient);
     const pins = sym.pins
       .filter((p) => drawnNet.has(`${id}[${p.number}]`) || ncSet.has(`${id}[${p.number}]`) || sym.kind !== "ic")
@@ -159,7 +172,10 @@ export function layout(project: Project, opts: { spacing?: number } = {}): Layou
       const net = netById.get(netId)!;
       const kind = netKind(net) === "ground" ? "ground" : "power";
       const want: Dir = kind === "ground" ? "down" : "up";
-      const stub: Pt[] = p.dir === want ? [] : [p.at, step(p.at, p.dir), step(step(p.at, p.dir), want)];
+      // A side pin's stub runs out far enough that the symbol and its text clear the part.
+      const half = Math.max(1, (portText(kind, net) ? measure(portText(kind, net)!, LABEL_SIZE).width / 10 : 0) / 2);
+      const out = isHorizontal(p.dir) ? Math.max(1, Math.ceil(half)) : 1;
+      const stub: Pt[] = p.dir === want ? [] : [p.at, step(p.at, p.dir, out), step(step(p.at, p.dir, out), want)];
       const anchor = stub.length ? stub[stub.length - 1]! : p.at;
       ports.push({ pin: p.number, net, anchor, stub, kind, box: portBox(kind, net, anchor) });
     }
@@ -229,6 +245,13 @@ export function layout(project: Project, opts: { spacing?: number } = {}): Layou
     }
   }
   const vars = ids.flatMap((id) => [vx(id), vy(id)]);
+  const place = opts.place;
+  if (place) {
+    const missing = ids.filter((id) => !place[id]);
+    if (missing.length) return { status: "invalid_input", pinDefs: defs, issues: [`placement must cover every part; missing ${missing.join(", ")}`], notes };
+    cons.length = 0;
+    for (const id of ids) cons.push(...eq(vx(id), X0, place[id]!.at[0], "lock", `lock ${id}`), ...eq(vy(id), X0, place[id]!.at[1], "lock", `lock ${id}`));
+  }
   let sol = solveWithDrops(vars, cons);
   if (!sol.ok) return { status: sol.reason, pinDefs: defs, issues: [`placement constraints conflict: ${sol.cycle.map((k) => k.why).join("; ")}`], notes };
 
@@ -307,15 +330,16 @@ export function layout(project: Project, opts: { spacing?: number } = {}): Layou
         for (let i = 0; i + 1 < s.length; i++) prewired.push([s[i]!, s[i + 1]!]);
       }
       requests.push({ net: n.id, terminals: terms, prewired, noRoute: true });
-    } else requests.push({ net: n.id, terminals: terms });
+    } else requests.push({ net: n.id, terminals: terms, ...(opts.prewire?.[n.id] ? { prewired: opts.prewire[n.id]!.flatMap((w) => unitEdges(w)) } : {}) });
   }
   requests.sort((a, b) => Number(!a.noRoute) - Number(!b.noRoute) || a.terminals.length - b.terminals.length || cmpStr(netKey(netById.get(a.net)!, vc), netKey(netById.get(b.net)!, vc)));
-  let bounds: Box = { x: 0, y: 0, w: 0, h: 0 };
+  // Sheet bounds start from the first part, not from the origin (an origin start left a blank band).
+  let bounds: Box = shift(placed.get(ids[0]!)!.env, at(ids[0]!));
   for (const id of ids) bounds = unionBox(bounds, shift(placed.get(id)!.env, at(id)));
   const routeBounds = { x: bounds.x - 4, y: bounds.y - 4, w: bounds.w + 8, h: bounds.h + 8 };
   const routed = route(requests, obstacles, routeBounds);
   const failed = routed.flatMap((r) => r.failed.map((f) => `${f} (net ${r.net})`));
-  if (failed.length && spacing < 6) {
+  if (failed.length && spacing < 6 && !place) {
     notes.push(`routing failed for ${failed.join(", ")}; retrying with spacing +2 G`);
     const again = layout(project, { spacing: spacing + 2 });
     again.notes.unshift(...notes);
@@ -340,17 +364,17 @@ export function layout(project: Project, opts: { spacing?: number } = {}): Layou
         const name = defs[id]!.find((d) => d.number === p.number)!.name;
         const a: Pt = [o[0] + p.at[0], o[1] + p.at[1]];
         const inset = 1.5;
-        if (p.dir === "left") art.push({ t: "text", x: a[0] + inset, y: a[1], text: name, size: PIN_SIZE, anchor: "start", baseline: "middle" });
-        else if (p.dir === "right") art.push({ t: "text", x: a[0] - inset, y: a[1], text: name, size: PIN_SIZE, anchor: "end", baseline: "middle" });
-        else if (p.dir === "up") art.push({ t: "text", x: a[0], y: a[1] + inset, text: name, size: PIN_SIZE, anchor: "middle", baseline: "top" });
-        else art.push({ t: "text", x: a[0], y: a[1] - inset, text: name, size: PIN_SIZE, anchor: "middle", baseline: "bottom" });
+        if (p.dir === "left") art.push({ t: "text", x: a[0] + inset, y: a[1], text: name, size: PIN_SIZE, anchor: "start", baseline: "middle", owner: `pin:${id}[${p.number}]` });
+        else if (p.dir === "right") art.push({ t: "text", x: a[0] - inset, y: a[1], text: name, size: PIN_SIZE, anchor: "end", baseline: "middle", owner: `pin:${id}[${p.number}]` });
+        else if (p.dir === "up") art.push({ t: "text", x: a[0], y: a[1] + inset, text: name, size: PIN_SIZE, anchor: "middle", baseline: "top", owner: `pin:${id}[${p.number}]` });
+        else art.push({ t: "text", x: a[0], y: a[1] - inset, text: name, size: PIN_SIZE, anchor: "middle", baseline: "bottom", owner: `pin:${id}[${p.number}]` });
       }
     }
     for (const l of P.labels) {
       const b = shift(l.box, o);
       l.lines.forEach((line, i) => {
         const x = l.align === "start" ? b.x : l.align === "end" ? b.x + b.w : b.x + b.w / 2;
-        art.push({ t: "text", x, y: b.y + i * LINE, text: line, size: LABEL_SIZE, anchor: l.align, baseline: "top" });
+        art.push({ t: "text", x, y: b.y + i * LINE, text: line, size: LABEL_SIZE, anchor: l.align, baseline: "top", owner: `label:${id}` });
       });
     }
     for (const q of P.ports) {
@@ -359,8 +383,8 @@ export function layout(project: Project, opts: { spacing?: number } = {}): Layou
       for (const g of sym.graphics) art.push({ t: "path", d: xformPath(g.d, a, { rot: 0, flip: false }), fill: "none" });
       const text = portText(q.kind, q.net);
       if (text) {
-        if (q.kind === "power") art.push({ t: "text", x: a[0], y: a[1] - 1.3, text, size: LABEL_SIZE, anchor: "middle", baseline: "bottom" });
-        else art.push({ t: "text", x: a[0] + 1.4, y: a[1] + 1.4, text, size: LABEL_SIZE, anchor: "start", baseline: "middle" });
+        if (q.kind === "power") art.push({ t: "text", x: a[0], y: a[1] - 1.3, text, size: LABEL_SIZE, anchor: "middle", baseline: "bottom", owner: `port:${id}[${q.pin}]` });
+        else art.push({ t: "text", x: a[0] + 1.4, y: a[1] + 1.4, text, size: LABEL_SIZE, anchor: "start", baseline: "middle", owner: `port:${id}[${q.pin}]` });
       }
     }
     for (const p of P.pins) if (ncSet.has(`${id}[${p.number}]`)) {
@@ -416,12 +440,14 @@ function twoPinOrient(
 function icFor(
   id: string, pins: PinDef[], drawnNet: Map<string, string>, netById: Map<string, Net>, ncSet: Set<string>, col: number,
   netCol: (net: string, self: string) => number | undefined,
+  forced?: Partial<Record<Side, string[]>>,
 ): SymbolDef {
   const visible = pins.filter((p) => drawnNet.has(`${id}[${p.number}]`) || ncSet.has(`${id}[${p.number}]`));
   const sides = { left: [] as PinDef[], right: [] as PinDef[], top: [] as PinDef[], bottom: [] as PinDef[] };
   for (const p of visible) {
     const netId = drawnNet.get(`${id}[${p.number}]`);
     const kind = netId ? netKind(netById.get(netId)!) : undefined;
+    if (Object.values(forced ?? {}).some((ns) => ns.includes(p.number))) continue;
     if (p.role === "ground" || kind === "ground") sides.bottom.push(p);
     else if (p.role === "power_in" || kind === "power") sides.top.push(p);
     else {
@@ -431,9 +457,14 @@ function icFor(
   }
   const sortKey = (p: PinDef) => { const n = drawnNet.get(`${id}[${p.number}]`); const net = n ? netById.get(n) : undefined; return net?.name ?? `~${p.number}`; };
   for (const s of Object.values(sides)) s.sort((a, b) => cmpStr(sortKey(a), sortKey(b)) || cmpNatural(a.number, b.number));
+  // Forced sides (SPEC 11.3 setPinSides): listed pins first, in the given order.
+  for (const [side, ns] of Object.entries(forced ?? {}) as Array<[Side, string[]]>) {
+    sides[side].unshift(...ns.map((n) => visible.find((p) => p.number === n)).filter((p): p is PinDef => p !== undefined));
+  }
   const textW = (ps: PinDef[]) => Math.max(0, ...ps.map((p) => measure(p.name, PIN_SIZE).width / 10));
   const inner = Math.ceil(textW(sides.left) + textW(sides.right) + 3);
-  return icSymbol(sides, inner);
+  const pitch = Math.max(2, Math.ceil(textW([...sides.top, ...sides.bottom]) + 1));
+  return icSymbol(sides, inner, pitch);
 }
 
 function portText(kind: "ground" | "power", net: Net): string | undefined {

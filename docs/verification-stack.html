@@ -107,13 +107,13 @@ section { display: grid; gap: 14px; }
     <div class="meta">
       <div><span class="label">Sheet</span><b>2 of 2</b></div>
       <div><span class="label">Date</span><b>2026-10-23</b></div>
-      <div><span class="label">Tests today</span><b>113 passing</b></div>
+      <div><span class="label">Tests</span><b>203 passing</b></div>
     </div>
   </header>
 
   <div class="legend">
     <span><span class="chip built">built</span> working now</span>
-    <span><span class="chip next">tomorrow</span> next session</span>
+    <span><span class="chip next">next</span> in progress or next</span>
     <span><span class="chip cal">checked by you later</span> automatic now, confirmed against your ratings once it is ready</span>
   </div>
 
@@ -129,7 +129,7 @@ section { display: grid; gap: 14px; }
         <p>A separate checker ignores how the drawing was made, rebuilds what connects to what from the drawn lines, dots, pins and symbols, and compares it with the circuit.</p>
         <span class="catches">catches: missing wire, accidental short, dotless T, wire through a pin, wrong supply label, hidden connected pin</span>
       </div>
-      <div class="state"><span class="chip built">built</span><small>94 independent test cases; every deleted wire, dot or pin and every relabelled port caught</small></div>
+      <div class="state"><span class="chip built">built</span><small>94 independent test cases; every deleted wire, dot or pin and every relabelled port caught; Appendix A examples pass</small></div>
     </div>
     <div class="layer gate">
       <div class="num">2</div>
@@ -138,7 +138,7 @@ section { display: grid; gap: 14px; }
         <p>No wire through a part, label or symbol; no two parts or labels touching; every pin and corner on the 0.1 inch grid.</p>
         <span class="catches">catches: label printed over a wire, symbols colliding, off-grid geometry</span>
       </div>
-      <div class="state"><span class="chip built">built</span><span class="chip next">tomorrow</span><small>wires vs parts done; label vs label and text clipping still to add</small></div>
+      <div class="state"><span class="chip built">built</span><small>parts, symbols, labels and pin names against each other and against wires; grid; sheet edges. Each check catches a deliberate break. Found two engine bugs on the first run</small></div>
     </div>
     <div class="layer">
       <div class="num">3</div>
@@ -147,7 +147,7 @@ section { display: grid; gap: 14px; }
         <p>Rule checks for what engineers expect: ground points down, supply up, signal flows left to right, rail-to-ground parts vertical, decoupling capacitor next to its pin.</p>
         <span class="catches">catches: upside-down ground, signal flowing backwards, a pull-up drawn sideways</span>
       </div>
-      <div class="state"><span class="chip next">tomorrow</span><small>each break becomes a finding with a tested fix</small></div>
+      <div class="state"><span class="chip built">built</span><span class="chip next">next</span><small>supply and ground direction, flow, vertical rails, pull-ups, series lines, decoupling: each break is a finding. Tested fixes come with the Phase 0b findings harness</small></div>
     </div>
     <div class="layer">
       <div class="num">4</div>
@@ -156,7 +156,7 @@ section { display: grid; gap: 14px; }
         <p>Measured, with limits: crossings, bends, wire length, parallel wires squeezed together, junction dots too close, labels far from their part, wasted space, page shape.</p>
         <span class="catches">catches: the two dots one step apart in case 3, the tight parallel wires in case 5</span>
       </div>
-      <div class="state"><span class="chip next">tomorrow</span><small>limits set from drawings you rate well</small></div>
+      <div class="state"><span class="chip built">built</span><span class="chip cal">checked by you later</span><small>limits flag exactly the weaknesses you saw in cases 3 and 5, and the margin bug in all three; provisional until calibrated on your ratings</small></div>
     </div>
   </section>
 
@@ -172,7 +172,7 @@ section { display: grid; gap: 14px; }
         <p>Thousands of circuits generated from real patterns (dividers, pull-ups, op-amp stages, transistor drivers, boards with sensors). The same circuit written in a different order must give the same drawing. A small edit must only move nearby parts. Windows and Linux must produce identical files.</p>
         <span class="catches">catches: crashes, rare layouts that break, drawings that jump around after one edit</span>
       </div>
-      <div class="state"><span class="chip built">built</span><span class="chip next">tomorrow</span><small>determinism done; generator, reorder and edit-stability tests next</small></div>
+      <div class="state"><span class="chip built">built</span><span class="chip next">next</span><small>300 generated circuits per test run (1,000 checked once); reorder and respelling give identical drawings; Windows/Linux check in CI. Edit stability waits for incremental mode (Phase 0b)</small></div>
     </div>
     <div class="layer">
       <div class="num">6</div>
@@ -181,7 +181,7 @@ section { display: grid; gap: 14px; }
         <p>Fresh Claude agents, who never saw the code, get shuffled images from our engine and from SKiDL, netlistsvg and schemdraw, a written rubric, and one question per pair: which would you publish?</p>
         <span class="catches">catches: drawings that pass every rule and still look wrong</span>
       </div>
-      <div class="state"><span class="chip next">tomorrow</span><span class="chip cal">checked by you later</span><small>runs from day one with several independent judges that must agree; your ratings later confirm it matches your taste</small></div>
+      <div class="state"><span class="chip next">next</span><span class="chip cal">checked by you later</span><small>kit being built by a second agent (rubric, blind packs, tally); several independent judges must agree; your ratings later confirm it matches your taste</small></div>
     </div>
     <div class="layer">
       <div class="num">7</div>

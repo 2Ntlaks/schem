@@ -1,0 +1,43 @@
+# Verification layers 1-5 on every push: tests on Windows and Linux, then a check that both
+# produce byte-identical drawings (SPEC 9.6, 13 item 8).
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run draw
+      - name: Hash the drawings
+        shell: bash
+        run: cd out && sha256sum *.svg *.png | sort -k2 > ../hashes-${{ runner.os }}.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: hashes-${{ runner.os }}
+          path: hashes-${{ runner.os }}.txt
+
+  same-output:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: hashes-*
+          merge-multiple: true
+      - name: Windows and Linux drawings are byte-identical
+        run: diff hashes-Windows.txt hashes-Linux.txt
