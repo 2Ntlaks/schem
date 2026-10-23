@@ -25,7 +25,8 @@ jobs:
       - run: npm run draw
       - name: Hash the drawings
         shell: bash
-        run: cd out && sha256sum *.svg *.png | sort -k2 > ../hashes-${{ runner.os }}.txt
+        # --tag prints "SHA256 (name) = hash" on both systems; plain output marks binary files on Windows.
+        run: cd out && sha256sum --tag *.svg *.png | sort > ../hashes-${{ runner.os }}.txt
       - uses: actions/upload-artifact@v4
         with:
           name: hashes-${{ runner.os }}
