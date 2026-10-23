@@ -1,0 +1,324 @@
+{
+  "seed": 101,
+  "maxPatterns": 5,
+  "editSeed": 3131,
+  "kind": "longer value",
+  "originalBreaks": [
+    "routes changed on 2 nets the edit did not involve (at most 1): n2, n4"
+  ],
+  "project": {
+    "circuit": {
+      "parts": [
+        {
+          "id": "U1",
+          "type": "ic",
+          "props": {
+            "label": "MCU",
+            "controller": "true"
+          },
+          "pins": [
+            {
+              "number": "1",
+              "name": "VCC",
+              "role": "power_in"
+            },
+            {
+              "number": "2",
+              "name": "GND",
+              "role": "ground"
+            },
+            {
+              "number": "3",
+              "name": "SDA",
+              "role": "bidir",
+              "iface": [
+                "i2c.sda"
+              ]
+            },
+            {
+              "number": "4",
+              "name": "SCL",
+              "role": "bidir",
+              "iface": [
+                "i2c.scl"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "R1",
+          "type": "resistor",
+          "props": {
+            "value": "4.7k"
+          }
+        },
+        {
+          "id": "R2",
+          "type": "resistor",
+          "props": {
+            "value": "4.7k"
+          }
+        },
+        {
+          "id": "U2",
+          "type": "ic",
+          "props": {
+            "label": "MPU6050"
+          },
+          "pins": [
+            {
+              "number": "1",
+              "name": "VCC",
+              "role": "power_in"
+            },
+            {
+              "number": "2",
+              "name": "GND",
+              "role": "ground"
+            },
+            {
+              "number": "3",
+              "name": "SDA",
+              "role": "bidir",
+              "iface": [
+                "i2c.sda"
+              ]
+            },
+            {
+              "number": "4",
+              "name": "SCL",
+              "role": "bidir",
+              "iface": [
+                "i2c.scl"
+              ]
+            }
+          ]
+        }
+      ],
+      "nets": [
+        {
+          "id": "n1",
+          "name": "VCC",
+          "endpoints": [
+            "U1.VCC",
+            "R1.1",
+            "R2.1",
+            "U2.VCC"
+          ]
+        },
+        {
+          "id": "n2",
+          "name": "GND",
+          "endpoints": [
+            "U1.GND",
+            "U2.GND"
+          ]
+        },
+        {
+          "id": "n3",
+          "endpoints": [
+            "U1.SDA",
+            "R1.2",
+            "U2.SDA"
+          ]
+        },
+        {
+          "id": "n4",
+          "endpoints": [
+            "U1.SCL",
+            "R2.2",
+            "U2.SCL"
+          ]
+        }
+      ]
+    }
+  },
+  "previous": {
+    "parts": {
+      "R1": {
+        "at": [
+          20,
+          6
+        ],
+        "orient": {
+          "rot": 90,
+          "flip": false
+        }
+      },
+      "R2": {
+        "at": [
+          20,
+          20
+        ],
+        "orient": {
+          "rot": 90,
+          "flip": false
+        }
+      },
+      "U1": {
+        "at": [
+          5,
+          10
+        ],
+        "orient": {
+          "rot": 0,
+          "flip": false
+        },
+        "sides": {
+          "top": [
+            "1"
+          ],
+          "right": [
+            "3",
+            "4"
+          ],
+          "bottom": [
+            "2"
+          ]
+        }
+      },
+      "U2": {
+        "at": [
+          36,
+          10
+        ],
+        "orient": {
+          "rot": 0,
+          "flip": false
+        },
+        "sides": {
+          "top": [
+            "1"
+          ],
+          "left": [
+            "3",
+            "4"
+          ],
+          "bottom": [
+            "2"
+          ]
+        }
+      }
+    },
+    "routes": {
+      "n1": {
+        "terminals": "R1[1]@20,6,up;R2[1]@20,20,up;U1[1]@9,10,up;U2[1]@40,10,up",
+        "runs": [],
+        "ports": true
+      },
+      "n2": {
+        "terminals": "U1[2]@9,20,down;U2[2]@40,20,down",
+        "runs": [
+          [
+            [
+              9,
+              28
+            ],
+            [
+              40,
+              28
+            ]
+          ],
+          [
+            [
+              40,
+              20
+            ],
+            [
+              40,
+              28
+            ]
+          ],
+          [
+            [
+              9,
+              20
+            ],
+            [
+              9,
+              28
+            ]
+          ]
+        ]
+      },
+      "n3": {
+        "terminals": "R1[2]@20,12,down;U1[3]@13,14,right;U2[3]@36,14,left",
+        "runs": [
+          [
+            [
+              13,
+              14
+            ],
+            [
+              36,
+              14
+            ]
+          ],
+          [
+            [
+              20,
+              12
+            ],
+            [
+              20,
+              14
+            ]
+          ]
+        ]
+      },
+      "n4": {
+        "terminals": "R2[2]@20,26,down;U1[4]@13,16,right;U2[4]@36,16,left",
+        "runs": [
+          [
+            [
+              13,
+              16
+            ],
+            [
+              36,
+              16
+            ]
+          ],
+          [
+            [
+              14,
+              16
+            ],
+            [
+              14,
+              27
+            ]
+          ],
+          [
+            [
+              14,
+              27
+            ],
+            [
+              20,
+              27
+            ]
+          ],
+          [
+            [
+              20,
+              26
+            ],
+            [
+              20,
+              27
+            ]
+          ]
+        ]
+      }
+    }
+  },
+  "ops": [
+    {
+      "op": "setProp",
+      "part": "R1",
+      "key": "value",
+      "value": "4.7k xxxxxxxx"
+    }
+  ]
+}

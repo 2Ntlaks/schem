@@ -1,0 +1,344 @@
+{
+  "seed": 133,
+  "maxPatterns": 5,
+  "editSeed": 4123,
+  "kind": "longer value",
+  "originalBreaks": [
+    "untouched parts moved 2.25 G on average (at most 2)",
+    "an untouched part moved 9 G (at most 6)"
+  ],
+  "project": {
+    "circuit": {
+      "parts": [
+        {
+          "id": "U1",
+          "type": "ic",
+          "props": {
+            "label": "MCU",
+            "controller": "true"
+          },
+          "pins": [
+            {
+              "number": "1",
+              "name": "VCC",
+              "role": "power_in"
+            },
+            {
+              "number": "2",
+              "name": "GND",
+              "role": "ground"
+            },
+            {
+              "number": "3",
+              "name": "SDA",
+              "role": "bidir",
+              "iface": [
+                "i2c.sda"
+              ]
+            },
+            {
+              "number": "4",
+              "name": "SCL",
+              "role": "bidir",
+              "iface": [
+                "i2c.scl"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "R1",
+          "type": "resistor",
+          "props": {
+            "value": "4.7k"
+          }
+        },
+        {
+          "id": "R2",
+          "type": "resistor",
+          "props": {
+            "value": "4.7k"
+          }
+        },
+        {
+          "id": "U2",
+          "type": "ic",
+          "props": {
+            "label": "INA219"
+          },
+          "pins": [
+            {
+              "number": "1",
+              "name": "VCC",
+              "role": "power_in"
+            },
+            {
+              "number": "2",
+              "name": "GND",
+              "role": "ground"
+            },
+            {
+              "number": "3",
+              "name": "SDA",
+              "role": "bidir",
+              "iface": [
+                "i2c.sda"
+              ]
+            },
+            {
+              "number": "4",
+              "name": "SCL",
+              "role": "bidir",
+              "iface": [
+                "i2c.scl"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "C1",
+          "type": "capacitor",
+          "props": {
+            "value": "100n"
+          }
+        }
+      ],
+      "nets": [
+        {
+          "id": "n1",
+          "name": "VCC",
+          "endpoints": [
+            "U1.VCC",
+            "R1.1",
+            "R2.1",
+            "U2.VCC",
+            "C1.1"
+          ]
+        },
+        {
+          "id": "n2",
+          "name": "GND",
+          "endpoints": [
+            "U1.GND",
+            "U2.GND",
+            "C1.2"
+          ]
+        },
+        {
+          "id": "n3",
+          "endpoints": [
+            "U1.SDA",
+            "R1.2",
+            "U2.SDA"
+          ]
+        },
+        {
+          "id": "n4",
+          "endpoints": [
+            "U1.SCL",
+            "R2.2",
+            "U2.SCL"
+          ]
+        }
+      ]
+    }
+  },
+  "previous": {
+    "parts": {
+      "C1": {
+        "at": [
+          45,
+          6
+        ],
+        "orient": {
+          "rot": 90,
+          "flip": false
+        }
+      },
+      "R1": {
+        "at": [
+          19,
+          6
+        ],
+        "orient": {
+          "rot": 90,
+          "flip": false
+        }
+      },
+      "R2": {
+        "at": [
+          19,
+          19
+        ],
+        "orient": {
+          "rot": 90,
+          "flip": false
+        }
+      },
+      "U1": {
+        "at": [
+          5,
+          10
+        ],
+        "orient": {
+          "rot": 0,
+          "flip": false
+        },
+        "sides": {
+          "top": [
+            "1"
+          ],
+          "right": [
+            "3",
+            "4"
+          ],
+          "bottom": [
+            "2"
+          ]
+        }
+      },
+      "U2": {
+        "at": [
+          33,
+          10
+        ],
+        "orient": {
+          "rot": 0,
+          "flip": false
+        },
+        "sides": {
+          "top": [
+            "1"
+          ],
+          "left": [
+            "3",
+            "4"
+          ],
+          "bottom": [
+            "2"
+          ]
+        }
+      }
+    },
+    "routes": {
+      "n2": {
+        "terminals": "C1[2]@45,10,down;U1[2]@9,20,down;U2[2]@37,20,down",
+        "runs": [],
+        "ports": true
+      },
+      "n1": {
+        "terminals": "C1[1]@45,6,up;R1[1]@19,6,up;R2[1]@19,19,up;U1[1]@9,10,up;U2[1]@37,10,up",
+        "runs": [],
+        "ports": true
+      },
+      "n3": {
+        "terminals": "R1[2]@19,12,down;U1[3]@13,14,right;U2[3]@33,14,left",
+        "runs": [
+          [
+            [
+              13,
+              14
+            ],
+            [
+              33,
+              14
+            ]
+          ],
+          [
+            [
+              19,
+              12
+            ],
+            [
+              19,
+              14
+            ]
+          ]
+        ]
+      },
+      "n4": {
+        "terminals": "R2[2]@19,25,down;U1[4]@13,16,right;U2[4]@33,16,left",
+        "runs": [
+          [
+            [
+              13,
+              16
+            ],
+            [
+              14,
+              16
+            ]
+          ],
+          [
+            [
+              14,
+              15
+            ],
+            [
+              14,
+              26
+            ]
+          ],
+          [
+            [
+              14,
+              15
+            ],
+            [
+              22,
+              15
+            ]
+          ],
+          [
+            [
+              14,
+              26
+            ],
+            [
+              19,
+              26
+            ]
+          ],
+          [
+            [
+              19,
+              25
+            ],
+            [
+              19,
+              26
+            ]
+          ],
+          [
+            [
+              22,
+              15
+            ],
+            [
+              22,
+              16
+            ]
+          ],
+          [
+            [
+              22,
+              16
+            ],
+            [
+              33,
+              16
+            ]
+          ]
+        ]
+      }
+    }
+  },
+  "ops": [
+    {
+      "op": "setProp",
+      "part": "U2",
+      "key": "label",
+      "value": "INA219 xxxxxxxxxxxx"
+    }
+  ]
+}

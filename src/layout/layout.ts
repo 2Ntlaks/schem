@@ -4,7 +4,7 @@ import {
   cmpNatural, cmpStr, edgeKey, gridBox, isHorizontal, key, step, unionBox, unitEdges, xformBox, xformDir, xformPt,
   boxesOverlap, type Box, type Dir, type Orient, type Pt,
 } from "../geom/geom.js";
-import { obstacleFromLabel, type Obstacle } from "../geom/forbidden.js";
+import { edgeForbidden, obstacleFromLabel, type Obstacle } from "../geom/forbidden.js";
 import { canonical, netKind, type Circuit, type Net, type PinDef, type PinDefs } from "../core/model.js";
 import { groupRepresentative, validate, type ValidCircuit } from "../core/validate.js";
 import { parseQuantity, quantityOf } from "../core/quantity.js";
@@ -97,10 +97,11 @@ export function layout(project: Project, opts: LayoutOptions = {}): LayoutResult
   const orientHint = new Map(hints.flatMap((h) => (h.type === "orient" ? [[h.part, h] as const] : [])));
   const sidesHint = new Map(hints.flatMap((h) => (h.type === "pinSides" ? [[h.part, h.sides] as const] : [])));
   const affected = new Set(opts.affected ?? []);
-  /** Previous geometry of a part the edit did not touch (orientation and pin sides are kept). */
-  const prevOf = (id: string) => (opts.previous && !affected.has(id) ? opts.previous.parts[id] : undefined);
+  /** Existing geometry stays stable unless an explicit orientation or pin-side hint replaces it. */
+  const prevOf = (id: string) => opts.previous?.parts[id];
+  const newOrigins = new Map<string, Pt>();
   /** Previous position of any part that existed before (positions and order are kept where possible). */
-  const prevPos = (id: string) => opts.previous?.parts[id];
+  const prevPos = (id: string) => opts.previous?.parts[id] ?? (newOrigins.has(id) ? { at: newOrigins.get(id)! } : undefined);
   const circuit = project.circuit;
   const defs = pinDefsOf(circuit);
   if (!circuit.parts.length) return { status: "invalid_input", pinDefs: defs, issues: ["the circuit has no parts, so there is nothing to draw."], notes };
@@ -161,6 +162,18 @@ export function layout(project: Project, opts: LayoutOptions = {}): LayoutResult
     const on = pinsOn(id);
     const tap = sym?.kind === "two-pin" && on.filter((p) => portNet.has(p.net)).length === 1 && on.filter((p) => !portNet.has(p.net)).length === 1;
     colValue.set(id, rank.get(id)! - (tap && rank.get(id)! > 0 ? 0.5 : 0));
+  }
+  // A new connection can shorten graph distances without changing any existing geometry.
+  // Preserve spatial columns in incremental mode instead of re-ranking the entire sheet.
+  if (opts.previous && ids.some((id) => !opts.previous!.parts[id])) {
+    const oldColumns = [...new Set(ids.flatMap((id) => opts.previous!.parts[id] ? [opts.previous!.parts[id]!.at[0]] : []))].sort((a, b) => a - b);
+    for (const id of ids) {
+      const prev = opts.previous.parts[id];
+      if (prev) { colValue.set(id, prev.at[0]); continue; }
+      const adjacent = [...neighbours.get(id)!].flatMap((n) => opts.previous!.parts[n] ? [opts.previous!.parts[n]!.at[0]] : []);
+      const target = adjacent.length ? adjacent.reduce((a, b) => a + b, 0) / adjacent.length : oldColumns[0] ?? 0;
+      colValue.set(id, [...oldColumns].sort((a, b) => Math.abs(a - target) - Math.abs(b - target) || a - b)[0] ?? target);
+    }
   }
   const colVals = [...new Set(colValue.values())].sort((a, b) => a - b);
   const colOf = new Map(ids.map((id) => [id, colVals.indexOf(colValue.get(id)!)]));
@@ -226,6 +239,47 @@ export function layout(project: Project, opts: LayoutOptions = {}): LayoutResult
     placed.set(id, { id, sym, orient, col, rank: rank.get(id)!, ko, labels, ports, env, pins });
   }
 
+  // Try other label positions before moving parts or disturbing existing conductors.
+  if (opts.previous) for (const id of ids) {
+    const old = opts.previous.parts[id];
+    if (!old || !affected.has(id)) continue;
+    const P = placed.get(id)!;
+    const avoid: Box[] = [...P.ports.map((p) => p.box), ...P.pins.map((p) => {
+      const a = step(p.at, p.dir);
+      return { x: a[0] - 0.5, y: a[1] - 0.5, w: 1, h: 1 };
+    })];
+    for (const other of ids) if (other !== id && opts.previous.parts[other]) {
+      const p = opts.previous.parts[other]!;
+      avoid.push(shift(placed.get(other)!.env, [p.at[0] - old.at[0], p.at[1] - old.at[1]]));
+    }
+    for (const r of Object.values(opts.previous.routes)) for (const run of r.runs) {
+      for (let i = 0; i + 1 < run.length; i++) {
+        const [a, b] = [run[i]!, run[i + 1]!];
+        avoid.push({ x: Math.min(a[0], b[0]) - old.at[0] - 0.1, y: Math.min(a[1], b[1]) - old.at[1] - 0.1,
+          w: Math.abs(a[0] - b[0]) + 0.2, h: Math.abs(a[1] - b[1]) + 0.2 });
+      }
+    }
+    P.labels = labelFor(partOf.get(id)!, P.sym, P.orient, P.ko, avoid, intent.overrides?.labelSide?.[id], true);
+    P.env = P.ko;
+    for (const l of P.labels) P.env = unionBox(P.env, gridBox(l.box));
+    for (const p of P.ports) P.env = unionBox(P.env, p.box);
+  }
+
+  // Insert new parts into free space below the existing drawing, near their connected column.
+  // Inserting into a barycentre slot would push every existing part below that slot.
+  if (opts.previous) {
+    let bottom = Math.max(MARGIN, ...ids.flatMap((id) => {
+      const p = opts.previous!.parts[id], e = placed.get(id)!.env;
+      return p ? [p.at[1] + e.y + e.h] : [];
+    }));
+    for (const id of ids) if (!opts.previous.parts[id]) {
+      const e = placed.get(id)!.env;
+      const origin: Pt = [Math.max(MARGIN - e.x, colValue.get(id)!), bottom + 2 - e.y];
+      newOrigins.set(id, origin);
+      bottom = origin[1] + e.y + e.h;
+    }
+  }
+
   // Ordering candidate B: barycentre sweeps (fixed count) within each column.
   const columns: string[][] = colVals.map((_, c) => ids.filter((id) => colOf.get(id) === c));
   for (let sweep = 0; sweep < 4; sweep++) {
@@ -271,6 +325,13 @@ export function layout(project: Project, opts: LayoutOptions = {}): LayoutResult
   const through = (c: number) => wired.filter((n) => { const cs = partsOfNet.get(n.id)!.map((p) => colOf.get(p)!); return Math.min(...cs) < c && Math.max(...cs) > c; }).length;
   const cons: Constraint[] = [];
   const vx = (id: string) => `x:${id}`, vy = (id: string) => `y:${id}`;
+  const clearAtPrevious = (a: string, b: string) => {
+    const pieces = (id: string) => {
+      const P = placed.get(id)!, origin = prevPos(id)!.at;
+      return [P.ko, ...P.labels.map((l) => gridBox(l.box)), ...P.ports.map((p) => p.box)].map((box) => shift(box, origin));
+    };
+    return pieces(a).every((aa) => pieces(b).every((bb) => !boxesOverlap(aa, bb)));
+  };
   for (const id of ids) {
     const e = placed.get(id)!.env;
     cons.push({ a: vx(id), b: X0, c: MARGIN - e.x, priority: "structural", why: `margin ${id}` });
@@ -284,7 +345,11 @@ export function layout(project: Project, opts: LayoutOptions = {}): LayoutResult
       // did not overlap, with 1 G to spare) need no horizontal separation (SPEC 9.5 stability).
       const pa = prevPos(a), pb = prevPos(b);
       if (pa && pb && (pa.at[1] + ea.y + ea.h + 1 <= pb.at[1] + eb.y || pb.at[1] + eb.y + eb.h + 1 <= pa.at[1] + ea.y)) continue;
-      cons.push({ a: vx(b), b: vx(a), c: gap + ea.x + ea.w - eb.x, priority: "structural", why: `column ${c} before ${c + 1}` });
+      const separation = pa && pb ? 1 + spacing : gap;
+      let distance = separation + ea.x + ea.w - eb.x;
+      // Envelopes include empty corners. Do not move real geometry that already clears.
+      if (pa && pb && clearAtPrevious(a, b)) distance = Math.min(distance, pb.at[0] - pa.at[0]);
+      cons.push({ a: vx(b), b: vx(a), c: distance, priority: "structural", why: `column ${c} before ${c + 1}` });
     }
   }
   for (let c = 0; c < columns.length; c++) {
@@ -292,7 +357,11 @@ export function layout(project: Project, opts: LayoutOptions = {}): LayoutResult
     const gapY = 2 + through(c) + spacing;
     for (let i = 0; i + 1 < col.length; i++) {
       const ea = placed.get(col[i]!)!.env, eb = placed.get(col[i + 1]!)!.env;
-      cons.push({ a: vy(col[i + 1]!), b: vy(col[i]!), c: gapY + ea.y + ea.h - eb.y, priority: "structural", why: `order in column ${c}` });
+      const separation = prevPos(col[i]!) && prevPos(col[i + 1]!) ? 1 + spacing : gapY;
+      let distance = separation + ea.y + ea.h - eb.y;
+      const pa = prevPos(col[i]!), pb = prevPos(col[i + 1]!);
+      if (pa && pb && clearAtPrevious(col[i]!, col[i + 1]!)) distance = Math.min(distance, pb.at[1] - pa.at[1]);
+      cons.push({ a: vy(col[i + 1]!), b: vy(col[i]!), c: distance, priority: "structural", why: `order in column ${c}` });
     }
   }
   const vars = ids.flatMap((id) => [vx(id), vy(id)]);
@@ -416,7 +485,8 @@ export function layout(project: Project, opts: LayoutOptions = {}): LayoutResult
         for (let i = 0; i + 1 < s.length; i++) prewired.push([s[i]!, s[i + 1]!]);
       }
       requests.push({ net: n.id, terminals: terms, prewired, noRoute: true });
-    } else if (opts.previous && opts.reuseRoutes !== false && opts.previous.routes[n.id]?.terminals === signature(terms)) {
+    } else if (opts.previous && opts.reuseRoutes !== false && opts.previous.routes[n.id]?.terminals === signature(terms)
+      && opts.previous.routes[n.id]!.runs.every((w) => unitEdges(w).every(([a, b]) => !edgeForbidden(a, b, obstacles)))) {
       // Incremental mode: a net whose drawn terminals did not move keeps its route.
       requests.push({ net: n.id, terminals: terms, prewired: opts.previous.routes[n.id]!.runs.flatMap((w) => unitEdges(w)), noRoute: true });
     } else requests.push({ net: n.id, terminals: terms, ...(opts.prewire?.[n.id] ? { prewired: opts.prewire[n.id]!.flatMap((w) => unitEdges(w)) } : {}) });
@@ -616,7 +686,7 @@ function displayValue(type: string, raw: string): string {
   return `${n} ${p}${sym}`;
 }
 
-function labelFor(part: Circuit["parts"][0], sym: SymbolDef, o: Orient, ko: Box, avoid: Box[], side?: string): Placed["labels"] {
+function labelFor(part: Circuit["parts"][0], sym: SymbolDef, o: Orient, ko: Box, avoid: Box[], side?: string, alternatives = false): Placed["labels"] {
   if (sym.kind === "port") return [];
   const lines = [part.id];
   const value = part.props?.value ?? part.props?.label ?? part.props?.color;
@@ -643,6 +713,7 @@ function labelFor(part: Circuit["parts"][0], sym: SymbolDef, o: Orient, ko: Box,
     "below-left-out": { box: { x: ko.x + 1 - w, y: ko.y + ko.h + gap, w, h }, align: "end" },
     "below-right-out": { box: { x: ko.x + ko.w - 1, y: ko.y + ko.h + gap, w, h }, align: "start" },
   };
+  if (alternatives) order.push(...Object.keys(cands).filter((s) => !order.includes(s)));
   for (const pick of order) {
     const c = cands[pick]!;
     if (!avoid.some((b) => boxesOverlap(gridBox(c.box), b))) return [{ box: c.box, lines, align: c.align }];

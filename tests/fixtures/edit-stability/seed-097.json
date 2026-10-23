@@ -1,0 +1,423 @@
+{
+  "seed": 97,
+  "maxPatterns": 5,
+  "editSeed": 3007,
+  "kind": "add part",
+  "originalBreaks": [
+    "an untouched part moved 8 G (at most 6)",
+    "routes changed on 2 nets the edit did not involve (at most 1): n5, n6"
+  ],
+  "project": {
+    "circuit": {
+      "parts": [
+        {
+          "id": "V1",
+          "type": "vsource",
+          "props": {
+            "value": "9V"
+          }
+        },
+        {
+          "id": "R1",
+          "type": "resistor",
+          "props": {
+            "value": "10k"
+          }
+        },
+        {
+          "id": "D1",
+          "type": "led",
+          "props": {
+            "color": "red"
+          }
+        },
+        {
+          "id": "R2",
+          "type": "resistor",
+          "props": {
+            "value": "10k"
+          }
+        },
+        {
+          "id": "C1",
+          "type": "capacitor",
+          "props": {
+            "value": "100n"
+          }
+        },
+        {
+          "id": "V2",
+          "type": "vsource",
+          "props": {
+            "value": "9V"
+          }
+        },
+        {
+          "id": "R3",
+          "type": "resistor",
+          "props": {
+            "value": "47k"
+          }
+        },
+        {
+          "id": "D2",
+          "type": "led",
+          "props": {
+            "color": "green"
+          }
+        }
+      ],
+      "nets": [
+        {
+          "id": "n1",
+          "endpoints": [
+            "V1.+",
+            "R1.1",
+            "R2.1"
+          ]
+        },
+        {
+          "id": "n2",
+          "endpoints": [
+            "R1.2",
+            "D1.anode"
+          ]
+        },
+        {
+          "id": "n3",
+          "name": "GND",
+          "endpoints": [
+            "D1.cathode",
+            "V1.-",
+            "C1.2",
+            "D2.cathode",
+            "V2.-"
+          ]
+        },
+        {
+          "id": "n4",
+          "endpoints": [
+            "R2.2",
+            "C1.1"
+          ]
+        },
+        {
+          "id": "n5",
+          "endpoints": [
+            "V2.+",
+            "R3.1"
+          ]
+        },
+        {
+          "id": "n6",
+          "endpoints": [
+            "R3.2",
+            "D2.anode"
+          ]
+        }
+      ]
+    }
+  },
+  "previous": {
+    "parts": {
+      "C1": {
+        "at": [
+          26,
+          18
+        ],
+        "orient": {
+          "rot": 90,
+          "flip": false
+        }
+      },
+      "D1": {
+        "at": [
+          26,
+          10
+        ],
+        "orient": {
+          "rot": 90,
+          "flip": false
+        }
+      },
+      "D2": {
+        "at": [
+          26,
+          26
+        ],
+        "orient": {
+          "rot": 90,
+          "flip": false
+        }
+      },
+      "R1": {
+        "at": [
+          14,
+          8
+        ],
+        "orient": {
+          "rot": 0,
+          "flip": false
+        }
+      },
+      "R2": {
+        "at": [
+          14,
+          16
+        ],
+        "orient": {
+          "rot": 0,
+          "flip": false
+        }
+      },
+      "R3": {
+        "at": [
+          14,
+          24
+        ],
+        "orient": {
+          "rot": 0,
+          "flip": false
+        }
+      },
+      "V1": {
+        "at": [
+          8,
+          10
+        ],
+        "orient": {
+          "rot": 90,
+          "flip": false
+        }
+      },
+      "V2": {
+        "at": [
+          8,
+          26
+        ],
+        "orient": {
+          "rot": 90,
+          "flip": false
+        }
+      }
+    },
+    "routes": {
+      "n3": {
+        "terminals": "C1[2]@26,22,down;D1[K]@26,14,down;D2[K]@26,30,down;V1[-]@8,16,down;V2[-]@8,32,down",
+        "runs": [],
+        "ports": true
+      },
+      "n4": {
+        "terminals": "C1[1]@26,18,up;R2[2]@20,16,right",
+        "runs": [
+          [
+            [
+              20,
+              16
+            ],
+            [
+              21,
+              16
+            ]
+          ],
+          [
+            [
+              21,
+              16
+            ],
+            [
+              21,
+              17
+            ]
+          ],
+          [
+            [
+              21,
+              17
+            ],
+            [
+              26,
+              17
+            ]
+          ],
+          [
+            [
+              26,
+              17
+            ],
+            [
+              26,
+              18
+            ]
+          ]
+        ]
+      },
+      "n2": {
+        "terminals": "D1[A]@26,10,up;R1[2]@20,8,right",
+        "runs": [
+          [
+            [
+              20,
+              8
+            ],
+            [
+              26,
+              8
+            ]
+          ],
+          [
+            [
+              26,
+              8
+            ],
+            [
+              26,
+              10
+            ]
+          ]
+        ]
+      },
+      "n6": {
+        "terminals": "D2[A]@26,26,up;R3[2]@20,24,right",
+        "runs": [
+          [
+            [
+              20,
+              24
+            ],
+            [
+              21,
+              24
+            ]
+          ],
+          [
+            [
+              21,
+              24
+            ],
+            [
+              21,
+              25
+            ]
+          ],
+          [
+            [
+              21,
+              25
+            ],
+            [
+              26,
+              25
+            ]
+          ],
+          [
+            [
+              26,
+              25
+            ],
+            [
+              26,
+              26
+            ]
+          ]
+        ]
+      },
+      "n5": {
+        "terminals": "R3[1]@14,24,left;V2[+]@8,26,up",
+        "runs": [
+          [
+            [
+              8,
+              24
+            ],
+            [
+              14,
+              24
+            ]
+          ],
+          [
+            [
+              8,
+              24
+            ],
+            [
+              8,
+              26
+            ]
+          ]
+        ]
+      },
+      "n1": {
+        "terminals": "R1[1]@14,8,left;R2[1]@14,16,left;V1[+]@8,10,up",
+        "runs": [
+          [
+            [
+              8,
+              8
+            ],
+            [
+              14,
+              8
+            ]
+          ],
+          [
+            [
+              13,
+              8
+            ],
+            [
+              13,
+              16
+            ]
+          ],
+          [
+            [
+              13,
+              16
+            ],
+            [
+              14,
+              16
+            ]
+          ],
+          [
+            [
+              8,
+              8
+            ],
+            [
+              8,
+              10
+            ]
+          ]
+        ]
+      }
+    }
+  },
+  "ops": [
+    {
+      "op": "addPart",
+      "part": {
+        "id": "RX1",
+        "type": "resistor",
+        "props": {
+          "value": "1k"
+        }
+      }
+    },
+    {
+      "op": "connect",
+      "endpoints": [
+        "RX1.1",
+        "V1.+"
+      ]
+    },
+    {
+      "op": "connect",
+      "endpoints": [
+        "RX1.2",
+        "R1.2"
+      ]
+    }
+  ]
+}

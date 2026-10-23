@@ -1,0 +1,345 @@
+{
+  "seed": 38,
+  "maxPatterns": 5,
+  "editSeed": 1178,
+  "kind": "longer value",
+  "originalBreaks": [
+    "untouched parts moved 2.67 G on average (at most 2)",
+    "an untouched part moved 8 G (at most 6)"
+  ],
+  "project": {
+    "circuit": {
+      "parts": [
+        {
+          "id": "R1",
+          "type": "resistor",
+          "props": {
+            "value": "47k"
+          }
+        },
+        {
+          "id": "R2",
+          "type": "resistor",
+          "props": {
+            "value": "47k"
+          }
+        },
+        {
+          "id": "R3",
+          "type": "resistor",
+          "props": {
+            "value": "1k"
+          }
+        },
+        {
+          "id": "C1",
+          "type": "capacitor",
+          "props": {
+            "value": "22p"
+          }
+        },
+        {
+          "id": "V1",
+          "type": "vsource",
+          "props": {
+            "value": "5V"
+          }
+        },
+        {
+          "id": "R4",
+          "type": "resistor",
+          "props": {
+            "value": "220"
+          }
+        },
+        {
+          "id": "D1",
+          "type": "led",
+          "props": {
+            "color": "green"
+          }
+        }
+      ],
+      "nets": [
+        {
+          "id": "n1",
+          "endpoints": [
+            "R1.2",
+            "R2.1",
+            "R3.1"
+          ]
+        },
+        {
+          "id": "n2",
+          "name": "GND",
+          "endpoints": [
+            "R2.2",
+            "C1.2",
+            "D1.cathode",
+            "V1.-"
+          ]
+        },
+        {
+          "id": "n3",
+          "endpoints": [
+            "R3.2",
+            "C1.1"
+          ]
+        },
+        {
+          "id": "n4",
+          "endpoints": [
+            "V1.+",
+            "R4.1"
+          ]
+        },
+        {
+          "id": "n5",
+          "endpoints": [
+            "R4.2",
+            "D1.anode"
+          ]
+        }
+      ]
+    }
+  },
+  "previous": {
+    "parts": {
+      "C1": {
+        "at": [
+          32,
+          10
+        ],
+        "orient": {
+          "rot": 90,
+          "flip": false
+        }
+      },
+      "D1": {
+        "at": [
+          23,
+          10
+        ],
+        "orient": {
+          "rot": 90,
+          "flip": false
+        }
+      },
+      "R1": {
+        "at": [
+          58,
+          8
+        ],
+        "orient": {
+          "rot": 0,
+          "flip": false
+        }
+      },
+      "R2": {
+        "at": [
+          50,
+          10
+        ],
+        "orient": {
+          "rot": 90,
+          "flip": false
+        }
+      },
+      "R3": {
+        "at": [
+          46,
+          8
+        ],
+        "orient": {
+          "rot": 180,
+          "flip": false
+        }
+      },
+      "R4": {
+        "at": [
+          13,
+          8
+        ],
+        "orient": {
+          "rot": 0,
+          "flip": false
+        }
+      },
+      "V1": {
+        "at": [
+          8,
+          10
+        ],
+        "orient": {
+          "rot": 90,
+          "flip": false
+        }
+      }
+    },
+    "routes": {
+      "n2": {
+        "terminals": "C1[2]@32,14,down;D1[K]@23,14,down;R2[2]@50,16,down;V1[-]@8,16,down",
+        "runs": [],
+        "ports": true
+      },
+      "n3": {
+        "terminals": "C1[1]@32,10,up;R3[2]@40,8,left",
+        "runs": [
+          [
+            [
+              32,
+              8
+            ],
+            [
+              32,
+              10
+            ]
+          ],
+          [
+            [
+              32,
+              8
+            ],
+            [
+              40,
+              8
+            ]
+          ]
+        ]
+      },
+      "n5": {
+        "terminals": "D1[A]@23,10,up;R4[2]@19,8,right",
+        "runs": [
+          [
+            [
+              19,
+              8
+            ],
+            [
+              23,
+              8
+            ]
+          ],
+          [
+            [
+              23,
+              8
+            ],
+            [
+              23,
+              10
+            ]
+          ]
+        ]
+      },
+      "n4": {
+        "terminals": "R4[1]@13,8,left;V1[+]@8,10,up",
+        "runs": [
+          [
+            [
+              8,
+              8
+            ],
+            [
+              13,
+              8
+            ]
+          ],
+          [
+            [
+              8,
+              8
+            ],
+            [
+              8,
+              10
+            ]
+          ]
+        ]
+      },
+      "n1": {
+        "terminals": "R1[2]@64,8,right;R2[1]@50,10,up;R3[1]@46,8,right",
+        "runs": [
+          [
+            [
+              46,
+              8
+            ],
+            [
+              50,
+              8
+            ]
+          ],
+          [
+            [
+              50,
+              8
+            ],
+            [
+              50,
+              10
+            ]
+          ],
+          [
+            [
+              50,
+              9
+            ],
+            [
+              52,
+              9
+            ]
+          ],
+          [
+            [
+              52,
+              10
+            ],
+            [
+              65,
+              10
+            ]
+          ],
+          [
+            [
+              52,
+              9
+            ],
+            [
+              52,
+              10
+            ]
+          ],
+          [
+            [
+              64,
+              8
+            ],
+            [
+              65,
+              8
+            ]
+          ],
+          [
+            [
+              65,
+              8
+            ],
+            [
+              65,
+              10
+            ]
+          ]
+        ]
+      }
+    }
+  },
+  "ops": [
+    {
+      "op": "setProp",
+      "part": "D1",
+      "key": "color",
+      "value": "green xxxxxxxxxx"
+    }
+  ]
+}

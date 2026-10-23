@@ -1,0 +1,491 @@
+{
+  "seed": 64,
+  "maxPatterns": 5,
+  "editSeed": 1984,
+  "kind": "longer value",
+  "originalBreaks": [
+    "untouched parts moved 2.29 G on average (at most 2)",
+    "an untouched part moved 8 G (at most 6)"
+  ],
+  "project": {
+    "circuit": {
+      "parts": [
+        {
+          "id": "V1",
+          "type": "vsource",
+          "props": {
+            "value": "1V"
+          }
+        },
+        {
+          "id": "R1",
+          "type": "resistor",
+          "props": {
+            "value": "10k"
+          }
+        },
+        {
+          "id": "C1",
+          "type": "capacitor",
+          "props": {
+            "value": "1u"
+          }
+        },
+        {
+          "id": "U1",
+          "type": "ic",
+          "props": {
+            "label": "MCU",
+            "controller": "true"
+          },
+          "pins": [
+            {
+              "number": "1",
+              "name": "VCC",
+              "role": "power_in"
+            },
+            {
+              "number": "2",
+              "name": "GND",
+              "role": "ground"
+            },
+            {
+              "number": "3",
+              "name": "SDA",
+              "role": "bidir",
+              "iface": [
+                "i2c.sda"
+              ]
+            },
+            {
+              "number": "4",
+              "name": "SCL",
+              "role": "bidir",
+              "iface": [
+                "i2c.scl"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "R2",
+          "type": "resistor",
+          "props": {
+            "value": "4.7k"
+          }
+        },
+        {
+          "id": "R3",
+          "type": "resistor",
+          "props": {
+            "value": "4.7k"
+          }
+        },
+        {
+          "id": "U2",
+          "type": "ic",
+          "props": {
+            "label": "SHT31"
+          },
+          "pins": [
+            {
+              "number": "1",
+              "name": "VCC",
+              "role": "power_in"
+            },
+            {
+              "number": "2",
+              "name": "GND",
+              "role": "ground"
+            },
+            {
+              "number": "3",
+              "name": "SDA",
+              "role": "bidir",
+              "iface": [
+                "i2c.sda"
+              ]
+            },
+            {
+              "number": "4",
+              "name": "SCL",
+              "role": "bidir",
+              "iface": [
+                "i2c.scl"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "C2",
+          "type": "capacitor",
+          "props": {
+            "value": "100n"
+          }
+        }
+      ],
+      "nets": [
+        {
+          "id": "n1",
+          "endpoints": [
+            "V1.+",
+            "R1.1"
+          ]
+        },
+        {
+          "id": "n2",
+          "name": "GND",
+          "endpoints": [
+            "V1.-",
+            "C1.2",
+            "U1.GND",
+            "U2.GND",
+            "C2.2"
+          ]
+        },
+        {
+          "id": "n3",
+          "endpoints": [
+            "R1.2",
+            "C1.1"
+          ]
+        },
+        {
+          "id": "n4",
+          "name": "VCC",
+          "endpoints": [
+            "U1.VCC",
+            "R2.1",
+            "R3.1",
+            "U2.VCC",
+            "C2.1"
+          ]
+        },
+        {
+          "id": "n5",
+          "endpoints": [
+            "U1.SDA",
+            "R2.2",
+            "U2.SDA"
+          ]
+        },
+        {
+          "id": "n6",
+          "endpoints": [
+            "U1.SCL",
+            "R3.2",
+            "U2.SCL"
+          ]
+        }
+      ]
+    }
+  },
+  "previous": {
+    "parts": {
+      "C1": {
+        "at": [
+          46,
+          10
+        ],
+        "orient": {
+          "rot": 90,
+          "flip": false
+        }
+      },
+      "C2": {
+        "at": [
+          54,
+          6
+        ],
+        "orient": {
+          "rot": 90,
+          "flip": false
+        }
+      },
+      "R1": {
+        "at": [
+          31,
+          8
+        ],
+        "orient": {
+          "rot": 0,
+          "flip": false
+        }
+      },
+      "R2": {
+        "at": [
+          20,
+          11
+        ],
+        "orient": {
+          "rot": 90,
+          "flip": false
+        }
+      },
+      "R3": {
+        "at": [
+          20,
+          25
+        ],
+        "orient": {
+          "rot": 90,
+          "flip": false
+        }
+      },
+      "U1": {
+        "at": [
+          5,
+          15
+        ],
+        "orient": {
+          "rot": 0,
+          "flip": false
+        },
+        "sides": {
+          "top": [
+            "1"
+          ],
+          "right": [
+            "3",
+            "4"
+          ],
+          "bottom": [
+            "2"
+          ]
+        }
+      },
+      "U2": {
+        "at": [
+          34,
+          15
+        ],
+        "orient": {
+          "rot": 0,
+          "flip": false
+        },
+        "sides": {
+          "top": [
+            "1"
+          ],
+          "left": [
+            "3",
+            "4"
+          ],
+          "bottom": [
+            "2"
+          ]
+        }
+      },
+      "V1": {
+        "at": [
+          8,
+          29
+        ],
+        "orient": {
+          "rot": 90,
+          "flip": false
+        }
+      }
+    },
+    "routes": {
+      "n2": {
+        "terminals": "C1[2]@46,14,down;C2[2]@54,10,down;U1[2]@9,25,down;U2[2]@38,25,down;V1[-]@8,35,down",
+        "runs": [],
+        "ports": true
+      },
+      "n4": {
+        "terminals": "C2[1]@54,6,up;R2[1]@20,11,up;R3[1]@20,25,up;U1[1]@9,15,up;U2[1]@38,15,up",
+        "runs": [],
+        "ports": true
+      },
+      "n3": {
+        "terminals": "C1[1]@46,10,up;R1[2]@37,8,right",
+        "runs": [
+          [
+            [
+              37,
+              8
+            ],
+            [
+              46,
+              8
+            ]
+          ],
+          [
+            [
+              46,
+              8
+            ],
+            [
+              46,
+              10
+            ]
+          ]
+        ]
+      },
+      "n1": {
+        "terminals": "R1[1]@31,8,left;V1[+]@8,29,up",
+        "runs": [
+          [
+            [
+              8,
+              28
+            ],
+            [
+              15,
+              28
+            ]
+          ],
+          [
+            [
+              15,
+              21
+            ],
+            [
+              15,
+              28
+            ]
+          ],
+          [
+            [
+              15,
+              21
+            ],
+            [
+              27,
+              21
+            ]
+          ],
+          [
+            [
+              27,
+              8
+            ],
+            [
+              27,
+              21
+            ]
+          ],
+          [
+            [
+              27,
+              8
+            ],
+            [
+              31,
+              8
+            ]
+          ],
+          [
+            [
+              8,
+              28
+            ],
+            [
+              8,
+              29
+            ]
+          ]
+        ]
+      },
+      "n5": {
+        "terminals": "R2[2]@20,17,down;U1[3]@13,19,right;U2[3]@34,19,left",
+        "runs": [
+          [
+            [
+              13,
+              19
+            ],
+            [
+              34,
+              19
+            ]
+          ],
+          [
+            [
+              20,
+              17
+            ],
+            [
+              20,
+              19
+            ]
+          ]
+        ]
+      },
+      "n6": {
+        "terminals": "R3[2]@20,31,down;U1[4]@13,21,right;U2[4]@34,21,left",
+        "runs": [
+          [
+            [
+              13,
+              21
+            ],
+            [
+              14,
+              21
+            ]
+          ],
+          [
+            [
+              14,
+              21
+            ],
+            [
+              14,
+              32
+            ]
+          ],
+          [
+            [
+              14,
+              32
+            ],
+            [
+              28,
+              32
+            ]
+          ],
+          [
+            [
+              20,
+              31
+            ],
+            [
+              20,
+              32
+            ]
+          ],
+          [
+            [
+              28,
+              21
+            ],
+            [
+              28,
+              32
+            ]
+          ],
+          [
+            [
+              28,
+              21
+            ],
+            [
+              34,
+              21
+            ]
+          ]
+        ]
+      }
+    }
+  },
+  "ops": [
+    {
+      "op": "setProp",
+      "part": "U2",
+      "key": "label",
+      "value": "SHT31 xxxxxxxxxx"
+    }
+  ]
+}

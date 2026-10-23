@@ -1,0 +1,763 @@
+{
+  "seed": 80,
+  "maxPatterns": 5,
+  "editSeed": 2480,
+  "kind": "add part",
+  "originalBreaks": [
+    "untouched parts moved 5.5 G on average (at most 2)",
+    "an untouched part moved 11 G (at most 6)",
+    "routes changed on 2 nets the edit did not involve (at most 1): n8, n9"
+  ],
+  "project": {
+    "circuit": {
+      "parts": [
+        {
+          "id": "U1",
+          "type": "ic",
+          "props": {
+            "label": "MCU",
+            "controller": "true"
+          },
+          "pins": [
+            {
+              "number": "1",
+              "name": "VCC",
+              "role": "power_in"
+            },
+            {
+              "number": "2",
+              "name": "GND",
+              "role": "ground"
+            },
+            {
+              "number": "3",
+              "name": "SDA",
+              "role": "bidir",
+              "iface": [
+                "i2c.sda"
+              ]
+            },
+            {
+              "number": "4",
+              "name": "SCL",
+              "role": "bidir",
+              "iface": [
+                "i2c.scl"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "R1",
+          "type": "resistor",
+          "props": {
+            "value": "4.7k"
+          }
+        },
+        {
+          "id": "R2",
+          "type": "resistor",
+          "props": {
+            "value": "4.7k"
+          }
+        },
+        {
+          "id": "U2",
+          "type": "ic",
+          "props": {
+            "label": "MPU6050"
+          },
+          "pins": [
+            {
+              "number": "1",
+              "name": "VCC",
+              "role": "power_in"
+            },
+            {
+              "number": "2",
+              "name": "GND",
+              "role": "ground"
+            },
+            {
+              "number": "3",
+              "name": "SDA",
+              "role": "bidir",
+              "iface": [
+                "i2c.sda"
+              ]
+            },
+            {
+              "number": "4",
+              "name": "SCL",
+              "role": "bidir",
+              "iface": [
+                "i2c.scl"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "R3",
+          "type": "resistor",
+          "props": {
+            "value": "47k"
+          }
+        },
+        {
+          "id": "R4",
+          "type": "resistor",
+          "props": {
+            "value": "100k"
+          }
+        },
+        {
+          "id": "U3",
+          "type": "opamp"
+        },
+        {
+          "id": "R5",
+          "type": "resistor",
+          "props": {
+            "value": "220"
+          }
+        },
+        {
+          "id": "R6",
+          "type": "resistor",
+          "props": {
+            "value": "1k"
+          }
+        },
+        {
+          "id": "U4",
+          "type": "opamp"
+        },
+        {
+          "id": "R7",
+          "type": "resistor",
+          "props": {
+            "value": "10k"
+          }
+        },
+        {
+          "id": "R8",
+          "type": "resistor",
+          "props": {
+            "value": "1k"
+          }
+        }
+      ],
+      "nets": [
+        {
+          "id": "n1",
+          "name": "VCC",
+          "endpoints": [
+            "U1.VCC",
+            "R1.1",
+            "R2.1",
+            "U2.VCC",
+            "R3.1"
+          ]
+        },
+        {
+          "id": "n2",
+          "name": "GND",
+          "endpoints": [
+            "U1.GND",
+            "U2.GND",
+            "R4.2",
+            "U3.IN+",
+            "U4.IN+"
+          ]
+        },
+        {
+          "id": "n3",
+          "endpoints": [
+            "U1.SDA",
+            "R1.2",
+            "U2.SDA"
+          ]
+        },
+        {
+          "id": "n4",
+          "endpoints": [
+            "U1.SCL",
+            "R2.2",
+            "U2.SCL"
+          ]
+        },
+        {
+          "id": "n5",
+          "endpoints": [
+            "R3.2",
+            "R4.1",
+            "R5.1",
+            "R7.1"
+          ]
+        },
+        {
+          "id": "n6",
+          "endpoints": [
+            "R5.2",
+            "U3.IN-",
+            "R6.1"
+          ]
+        },
+        {
+          "id": "n7",
+          "endpoints": [
+            "U3.OUT",
+            "R6.2"
+          ]
+        },
+        {
+          "id": "n8",
+          "endpoints": [
+            "R7.2",
+            "U4.IN-",
+            "R8.1"
+          ]
+        },
+        {
+          "id": "n9",
+          "endpoints": [
+            "U4.OUT",
+            "R8.2"
+          ]
+        }
+      ]
+    }
+  },
+  "previous": {
+    "parts": {
+      "R1": {
+        "at": [
+          19,
+          6
+        ],
+        "orient": {
+          "rot": 90,
+          "flip": false
+        }
+      },
+      "R2": {
+        "at": [
+          19,
+          19
+        ],
+        "orient": {
+          "rot": 90,
+          "flip": false
+        }
+      },
+      "R3": {
+        "at": [
+          46,
+          6
+        ],
+        "orient": {
+          "rot": 90,
+          "flip": false
+        }
+      },
+      "R4": {
+        "at": [
+          55,
+          16
+        ],
+        "orient": {
+          "rot": 90,
+          "flip": false
+        }
+      },
+      "R5": {
+        "at": [
+          64,
+          14
+        ],
+        "orient": {
+          "rot": 0,
+          "flip": false
+        }
+      },
+      "R6": {
+        "at": [
+          76,
+          14
+        ],
+        "orient": {
+          "rot": 0,
+          "flip": false
+        }
+      },
+      "R7": {
+        "at": [
+          64,
+          33
+        ],
+        "orient": {
+          "rot": 0,
+          "flip": false
+        }
+      },
+      "R8": {
+        "at": [
+          76,
+          33
+        ],
+        "orient": {
+          "rot": 0,
+          "flip": false
+        }
+      },
+      "U1": {
+        "at": [
+          5,
+          10
+        ],
+        "orient": {
+          "rot": 0,
+          "flip": false
+        },
+        "sides": {
+          "top": [
+            "1"
+          ],
+          "right": [
+            "3",
+            "4"
+          ],
+          "bottom": [
+            "2"
+          ]
+        }
+      },
+      "U2": {
+        "at": [
+          34,
+          10
+        ],
+        "orient": {
+          "rot": 0,
+          "flip": false
+        },
+        "sides": {
+          "top": [
+            "1"
+          ],
+          "left": [
+            "3",
+            "4"
+          ],
+          "bottom": [
+            "2"
+          ]
+        }
+      },
+      "U3": {
+        "at": [
+          78,
+          22
+        ],
+        "orient": {
+          "rot": 0,
+          "flip": false
+        }
+      },
+      "U4": {
+        "at": [
+          78,
+          41
+        ],
+        "orient": {
+          "rot": 0,
+          "flip": false
+        }
+      }
+    },
+    "routes": {
+      "n1": {
+        "terminals": "R1[1]@19,6,up;R2[1]@19,19,up;R3[1]@46,6,up;U1[1]@9,10,up;U2[1]@38,10,up",
+        "runs": [],
+        "ports": true
+      },
+      "n2": {
+        "terminals": "R4[2]@55,22,down;U1[2]@9,20,down;U2[2]@38,20,down;U3[3]@78,23,left;U4[3]@78,42,left",
+        "runs": [
+          [
+            [
+              77,
+              23
+            ],
+            [
+              77,
+              24
+            ]
+          ],
+          [
+            [
+              77,
+              23
+            ],
+            [
+              78,
+              23
+            ]
+          ],
+          [
+            [
+              77,
+              42
+            ],
+            [
+              77,
+              43
+            ]
+          ],
+          [
+            [
+              77,
+              42
+            ],
+            [
+              78,
+              42
+            ]
+          ]
+        ],
+        "ports": true
+      },
+      "n7": {
+        "terminals": "R6[2]@82,14,right;U3[1]@84,22,right",
+        "runs": [
+          [
+            [
+              82,
+              14
+            ],
+            [
+              85,
+              14
+            ]
+          ],
+          [
+            [
+              84,
+              22
+            ],
+            [
+              85,
+              22
+            ]
+          ],
+          [
+            [
+              85,
+              14
+            ],
+            [
+              85,
+              22
+            ]
+          ]
+        ]
+      },
+      "n9": {
+        "terminals": "R8[2]@82,33,right;U4[1]@84,41,right",
+        "runs": [
+          [
+            [
+              82,
+              33
+            ],
+            [
+              85,
+              33
+            ]
+          ],
+          [
+            [
+              84,
+              41
+            ],
+            [
+              85,
+              41
+            ]
+          ],
+          [
+            [
+              85,
+              33
+            ],
+            [
+              85,
+              41
+            ]
+          ]
+        ]
+      },
+      "n3": {
+        "terminals": "R1[2]@19,12,down;U1[3]@13,14,right;U2[3]@34,14,left",
+        "runs": [
+          [
+            [
+              13,
+              14
+            ],
+            [
+              34,
+              14
+            ]
+          ],
+          [
+            [
+              19,
+              12
+            ],
+            [
+              19,
+              14
+            ]
+          ]
+        ]
+      },
+      "n4": {
+        "terminals": "R2[2]@19,25,down;U1[4]@13,16,right;U2[4]@34,16,left",
+        "runs": [
+          [
+            [
+              13,
+              16
+            ],
+            [
+              14,
+              16
+            ]
+          ],
+          [
+            [
+              14,
+              15
+            ],
+            [
+              14,
+              26
+            ]
+          ],
+          [
+            [
+              14,
+              15
+            ],
+            [
+              22,
+              15
+            ]
+          ],
+          [
+            [
+              14,
+              26
+            ],
+            [
+              19,
+              26
+            ]
+          ],
+          [
+            [
+              19,
+              25
+            ],
+            [
+              19,
+              26
+            ]
+          ],
+          [
+            [
+              22,
+              15
+            ],
+            [
+              22,
+              16
+            ]
+          ],
+          [
+            [
+              22,
+              16
+            ],
+            [
+              34,
+              16
+            ]
+          ]
+        ]
+      },
+      "n6": {
+        "terminals": "R5[2]@70,14,right;R6[1]@76,14,left;U3[2]@78,21,left",
+        "runs": [
+          [
+            [
+              70,
+              14
+            ],
+            [
+              76,
+              14
+            ]
+          ],
+          [
+            [
+              75,
+              14
+            ],
+            [
+              75,
+              21
+            ]
+          ],
+          [
+            [
+              75,
+              21
+            ],
+            [
+              78,
+              21
+            ]
+          ]
+        ]
+      },
+      "n8": {
+        "terminals": "R7[2]@70,33,right;R8[1]@76,33,left;U4[2]@78,40,left",
+        "runs": [
+          [
+            [
+              70,
+              33
+            ],
+            [
+              76,
+              33
+            ]
+          ],
+          [
+            [
+              75,
+              33
+            ],
+            [
+              75,
+              40
+            ]
+          ],
+          [
+            [
+              75,
+              40
+            ],
+            [
+              78,
+              40
+            ]
+          ]
+        ]
+      },
+      "n5": {
+        "terminals": "R3[2]@46,12,down;R4[1]@55,16,up;R5[1]@64,14,left;R7[1]@64,33,left",
+        "runs": [
+          [
+            [
+              46,
+              12
+            ],
+            [
+              46,
+              13
+            ]
+          ],
+          [
+            [
+              46,
+              13
+            ],
+            [
+              55,
+              13
+            ]
+          ],
+          [
+            [
+              55,
+              13
+            ],
+            [
+              55,
+              16
+            ]
+          ],
+          [
+            [
+              55,
+              14
+            ],
+            [
+              64,
+              14
+            ]
+          ],
+          [
+            [
+              63,
+              14
+            ],
+            [
+              63,
+              33
+            ]
+          ],
+          [
+            [
+              63,
+              33
+            ],
+            [
+              64,
+              33
+            ]
+          ]
+        ]
+      }
+    }
+  },
+  "ops": [
+    {
+      "op": "addPart",
+      "part": {
+        "id": "RX1",
+        "type": "resistor",
+        "props": {
+          "value": "1k"
+        }
+      }
+    },
+    {
+      "op": "connect",
+      "endpoints": [
+        "RX1.1",
+        "R5.2"
+      ]
+    },
+    {
+      "op": "connect",
+      "endpoints": [
+        "RX1.2",
+        "U1.VCC"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,443 @@
+{
+  "seed": 114,
+  "maxPatterns": 5,
+  "editSeed": 3534,
+  "kind": "longer value",
+  "originalBreaks": [
+    "routes changed on 3 nets the edit did not involve (at most 1): n4, n5, n6"
+  ],
+  "project": {
+    "circuit": {
+      "parts": [
+        {
+          "id": "V1",
+          "type": "vsource",
+          "props": {
+            "value": "1V"
+          }
+        },
+        {
+          "id": "R1",
+          "type": "resistor",
+          "props": {
+            "value": "47k"
+          }
+        },
+        {
+          "id": "C1",
+          "type": "capacitor",
+          "props": {
+            "value": "22p"
+          }
+        },
+        {
+          "id": "R2",
+          "type": "resistor",
+          "props": {
+            "value": "47k"
+          }
+        },
+        {
+          "id": "C2",
+          "type": "capacitor",
+          "props": {
+            "value": "22p"
+          }
+        },
+        {
+          "id": "U1",
+          "type": "opamp"
+        },
+        {
+          "id": "R3",
+          "type": "resistor",
+          "props": {
+            "value": "4.7k"
+          }
+        },
+        {
+          "id": "R4",
+          "type": "resistor",
+          "props": {
+            "value": "100k"
+          }
+        }
+      ],
+      "nets": [
+        {
+          "id": "n1",
+          "endpoints": [
+            "V1.+",
+            "R1.1",
+            "R3.1"
+          ]
+        },
+        {
+          "id": "n2",
+          "name": "GND",
+          "endpoints": [
+            "V1.-",
+            "C1.2",
+            "C2.2",
+            "U1.IN+"
+          ]
+        },
+        {
+          "id": "n3",
+          "endpoints": [
+            "R1.2",
+            "C1.1",
+            "R2.1"
+          ]
+        },
+        {
+          "id": "n4",
+          "endpoints": [
+            "R2.2",
+            "C2.1"
+          ]
+        },
+        {
+          "id": "n5",
+          "endpoints": [
+            "R3.2",
+            "U1.IN-",
+            "R4.1"
+          ]
+        },
+        {
+          "id": "n6",
+          "endpoints": [
+            "U1.OUT",
+            "R4.2"
+          ]
+        }
+      ]
+    }
+  },
+  "previous": {
+    "parts": {
+      "C1": {
+        "at": [
+          24,
+          10
+        ],
+        "orient": {
+          "rot": 90,
+          "flip": false
+        }
+      },
+      "C2": {
+        "at": [
+          47,
+          10
+        ],
+        "orient": {
+          "rot": 90,
+          "flip": false
+        }
+      },
+      "R1": {
+        "at": [
+          13,
+          8
+        ],
+        "orient": {
+          "rot": 0,
+          "flip": false
+        }
+      },
+      "R2": {
+        "at": [
+          34,
+          8
+        ],
+        "orient": {
+          "rot": 0,
+          "flip": false
+        }
+      },
+      "R3": {
+        "at": [
+          13,
+          16
+        ],
+        "orient": {
+          "rot": 0,
+          "flip": false
+        }
+      },
+      "R4": {
+        "at": [
+          34,
+          16
+        ],
+        "orient": {
+          "rot": 0,
+          "flip": false
+        }
+      },
+      "U1": {
+        "at": [
+          36,
+          24
+        ],
+        "orient": {
+          "rot": 0,
+          "flip": false
+        }
+      },
+      "V1": {
+        "at": [
+          8,
+          10
+        ],
+        "orient": {
+          "rot": 90,
+          "flip": false
+        }
+      }
+    },
+    "routes": {
+      "n2": {
+        "terminals": "C1[2]@24,14,down;C2[2]@47,14,down;U1[3]@36,25,left;V1[-]@8,16,down",
+        "runs": [
+          [
+            [
+              35,
+              25
+            ],
+            [
+              35,
+              26
+            ]
+          ],
+          [
+            [
+              35,
+              25
+            ],
+            [
+              36,
+              25
+            ]
+          ]
+        ],
+        "ports": true
+      },
+      "n4": {
+        "terminals": "C2[1]@47,10,up;R2[2]@40,8,right",
+        "runs": [
+          [
+            [
+              40,
+              8
+            ],
+            [
+              47,
+              8
+            ]
+          ],
+          [
+            [
+              47,
+              8
+            ],
+            [
+              47,
+              10
+            ]
+          ]
+        ]
+      },
+      "n6": {
+        "terminals": "R4[2]@40,16,right;U1[1]@42,24,right",
+        "runs": [
+          [
+            [
+              40,
+              16
+            ],
+            [
+              43,
+              16
+            ]
+          ],
+          [
+            [
+              42,
+              24
+            ],
+            [
+              43,
+              24
+            ]
+          ],
+          [
+            [
+              43,
+              16
+            ],
+            [
+              43,
+              24
+            ]
+          ]
+        ]
+      },
+      "n3": {
+        "terminals": "C1[1]@24,10,up;R1[2]@19,8,right;R2[1]@34,8,left",
+        "runs": [
+          [
+            [
+              19,
+              8
+            ],
+            [
+              34,
+              8
+            ]
+          ],
+          [
+            [
+              24,
+              8
+            ],
+            [
+              24,
+              10
+            ]
+          ]
+        ]
+      },
+      "n1": {
+        "terminals": "R1[1]@13,8,left;R3[1]@13,16,left;V1[+]@8,10,up",
+        "runs": [
+          [
+            [
+              8,
+              8
+            ],
+            [
+              13,
+              8
+            ]
+          ],
+          [
+            [
+              12,
+              8
+            ],
+            [
+              12,
+              16
+            ]
+          ],
+          [
+            [
+              12,
+              16
+            ],
+            [
+              13,
+              16
+            ]
+          ],
+          [
+            [
+              8,
+              8
+            ],
+            [
+              8,
+              10
+            ]
+          ]
+        ]
+      },
+      "n5": {
+        "terminals": "R3[2]@19,16,right;R4[1]@34,16,left;U1[2]@36,23,left",
+        "runs": [
+          [
+            [
+              19,
+              16
+            ],
+            [
+              20,
+              16
+            ]
+          ],
+          [
+            [
+              20,
+              16
+            ],
+            [
+              20,
+              17
+            ]
+          ],
+          [
+            [
+              20,
+              17
+            ],
+            [
+              26,
+              17
+            ]
+          ],
+          [
+            [
+              26,
+              16
+            ],
+            [
+              26,
+              17
+            ]
+          ],
+          [
+            [
+              26,
+              16
+            ],
+            [
+              34,
+              16
+            ]
+          ],
+          [
+            [
+              33,
+              16
+            ],
+            [
+              33,
+              23
+            ]
+          ],
+          [
+            [
+              33,
+              23
+            ],
+            [
+              36,
+              23
+            ]
+          ]
+        ]
+      }
+    }
+  },
+  "ops": [
+    {
+      "op": "setProp",
+      "part": "C1",
+      "key": "value",
+      "value": "22p xxxxxx"
+    }
+  ]
+}
