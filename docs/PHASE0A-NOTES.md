@@ -18,7 +18,9 @@ Status on 2026-10-23: Phase 0a is complete. Gates 1 and 2 pass, and the owner pa
 
 Run everything with `npm test` and `npm run draw`.
 
-## Where the 0a code differs from SPEC.md (to fold into the spec before 0b)
+## Where the 0a code differed from SPEC.md
+
+All rows below were folded into SPEC.md rev C.2 (section 18, "Rev C.2 changes"), together with two more found then: the channel and column gaps also count internal and through nets, and the straight-wire pass covers every pin pair of a net.
 
 | Area | SPEC says | 0a does | Why |
 |---|---|---|---|

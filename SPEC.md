@@ -2,14 +2,14 @@
 
 | | |
 |---|---|
-| Status | Draft for review, **rev C** |
+| Status | **rev C.2**: Phase 0a built; its deviations and the open "fix before 0b" items folded in |
 | Date | 2026-10-23 |
 | Working name | `schem` (placeholder for the CLI and package names, final name to be decided) |
 | Author | Project owner, drafted with Claude Code |
-| Reviews | rev A: `archive/SPEC-REVIEW-revA.md`, rev B: `archive/SPEC-REVIEW-revB.md` |
-| Previous | `archive/SPEC-revA.md`, `archive/SPEC-revB.md` |
+| Reviews | rev A: `archive/SPEC-REVIEW-revA.md`, rev B: `archive/SPEC-REVIEW-revB.md`, rev C: `archive/SPEC-REVIEW-revC.md` |
+| Previous | `archive/SPEC-revA.md`, `archive/SPEC-revB.md`, `archive/SPEC-revC1.md` |
 
-Section 18 maps every rev B finding (N01-N22, F31 and the over-corrections) to what changed. The rev A finding map is in `archive/SPEC-revB.md` section 18. Section numbers are kept from earlier revisions.
+Section 18 maps every rev B finding (N01-N22, F31 and the over-corrections) to what changed, then lists the rev C.1 amendments and the rev C.2 changes. The rev A finding map is in `archive/SPEC-revB.md` section 18. Section numbers are kept from earlier revisions.
 
 ---
 
@@ -113,7 +113,7 @@ flowchart LR
 | `mcp` | MCP server (phase 2). |
 | `editor` | Web editor (phase 3). |
 
-**Stack:** TypeScript on Node.js 22+ (tested on 24), browser-capable except PNG conversion and file access. pnpm workspaces, committed lockfile, exact dependency versions. Candidate dependencies, confirmed or dropped in Phase 0: `elkjs` (ordering only, if used), `@resvg/resvg-js` (PNG), `harfbuzzjs` or `fontkit` (shaping), `zod` (schemas), `vitest` (tests).
+**Stack:** TypeScript on Node.js 22+ (tested on 24), browser-capable except PNG conversion and file access. npm (one package in Phase 0; npm workspaces once the packages split), committed lockfile, exact dependency versions. In use since Phase 0a: `@resvg/resvg-js` (PNG), `opentype.js` with DejaVu Sans (measurement and outlined text), `vitest` (tests). Still candidates: `elkjs` (ordering only, if used), `zod` (schemas). The final font and shaper (`harfbuzzjs` or `fontkit`) are chosen in Phase 1 (rev C.2).
 
 ## 6. Data model
 
@@ -176,7 +176,7 @@ An ambiguous name is an error listing the candidates by number.
 { "id": "n3", "name": "SDA", "kind": "signal", "endpoints": ["U1[21]", "U2[3]", "R1[2]"] }
 ```
 
-- **Storage identity.** `id` is assigned once from `meta.nextNetId` and never changes. It is used only to refer to the net in edits and overrides. **Layout never uses it for ordering** (section 9.6).
+- **Storage identity.** `id` is assigned once from `meta.nextNetId` and never changes. It is used only to refer to the net in edits and overrides. **Layout never uses it for ordering** (section 9.6). When the DSL is compiled, new nets get their ids in canonical-key order (section 9.6), not in line order, so reordering `net` lines gives the same ids and the same output (rev C.2). Layout output that names a net (`layout.routes[].net`, `data-net`) uses this id.
 - **Names** are optional, unique, changeable (`renameNet`).
 - **Kind:** `signal`, `power`, `ground`. Names such as `GND`, `VCC`, `VDD`, `3V3`, `5V`, `VIN`, `VBAT`, `+12V` default to `power`/`ground`; explicit `kind` wins.
 - **Domain:** optional string. Ground nets with different domains are never merged and must be visibly distinguishable (section 9.2 step 3).
@@ -372,7 +372,7 @@ part U2 ic "Sensor" pins: VIN GND SDA SCL
 - **Pin declaration:** `[NUMBER:]NAME[/ROLE][@GROUP]`. Without a number, pins are numbered 1, 2, 3 … in the order written. Without a role: `ground` for names matching `GND|VSS|AGND|DGND`, `power_in` for `VCC|VDD|VIN|3V3|5V|V+|VBAT`, otherwise `bidir`. Without a group: none.
 - **Logical inventory vs visible pins.** All pins exist in the model. Pins that are in a net, marked no-connect, or explicitly shown are drawn; other pins are hidden by default (`style.showUnusedPins: false`). The part note gives the hidden count.
 - **Unconnected supplies are reported.** A `power_in` or `ground` pin in no net is always a warning, whether drawn or hidden.
-- **Box shape is fixed before placement**, from an ordered candidate list of pin-side assignments (power top, ground bottom, upstream pins left, downstream right, then variants). Repair may try the next candidate.
+- **Box shape is fixed before placement**, from an ordered candidate list of pin-side assignments (power top, ground bottom, upstream pins left, downstream right, then variants). Repair may try the next candidate. Side pins are 2 G apart; top and bottom pins are spaced by their name widths (at least 2 G) so the names never run together (rev C.2).
 - **Modules** (`module:esp32-devkitc-v4`, `module:arduino-uno-r3`, `module:raspberry-pi-pico`, sensor breakouts) carry real pin numbers, names, aliases, groups, roles, interface roles, a `controller` flag for microcontroller boards, and the documentation URL and revision they come from. Aliases follow the board's own documentation exactly (on the ESP32-DevKitC V4, header label `D2` is GPIO9). Board revisions are separate module ids. **Phase 1 ships only the modules the corpus uses.**
 
 ## 8. Text DSL
@@ -525,9 +525,10 @@ flowchart TB
 **Step 1: Templates.** Matched on the full graph (section 9.4). Matching does not depend on ranks. A part belongs to at most one region. Overlaps are resolved by template priority, then larger region, then the lowest canonical key of the region's parts. Losing matches are kept as repair alternatives. Templates may declare child slots (decoupling capacitors inside an IC region); otherwise regions do not nest. Each region becomes one **block**; each remaining part is its own block. A region's **boundary terminals** are the endpoints whose nets leave it.
 
 **Step 2: Flow inference**, on the block graph, in this order:
-1. **Ignore power and ground nets** for flow.
-2. **Sources:** blocks containing a source part, a connector hinted `input`, a pin with role `output` or `power_out`, or a `controller` module.
+1. **Nets ignored for flow:** ground nets, and power nets drawn as ports. A power net drawn as a wire (a power path, or a power net with two endpoints) carries flow, so in a wired battery loop the parts after the battery still rank after it (rev C.2).
+2. **Sources:** blocks containing a source part, a part with `flow: input`, a connector hinted `input`, or a `controller` module. A pin role `output` or `power_out` does **not** make its block a source: an op-amp's OUT pin would otherwise make the op-amp a source and reverse the ranks of its own input resistors (rev C.2). A template may set the ranks of its blocks explicitly (Appendix A.2).
 3. **Ranks:** breadth-first distance from the set of sources, visiting neighbours in canonical-key order. Blocks hinted `output` get the highest rank. Blocks not reached get ranks by a second pass starting from their lowest canonical key, placed after the reached blocks.
+3a. **Taps** (rev C.2): a two-pin part with exactly one wired pin and one pin drawn as a port (a pull-up or pull-down) is placed half a column upstream of its rank, so it sits between the driver and the receivers of its wired net.
 4. **Feedback:** after ranking, an edge between blocks whose ranks are not increasing in the direction of signal flow is a feedback edge. Feedback inside a template region is handled by the template.
 5. **Interfaces:** a net is an I2C SDA (or SCL) bus if at least one endpoint on it has `iface: i2c.sda` (or `i2c.scl`) and none has a conflicting interface. Directional interfaces (SPI MOSI from controller to peripheral, MISO the reverse, UART TX to RX) take their direction from the interface roles. **Shared `bidir` pins alone never imply a bus.**
 6. **Confidence:** a block whose rank came from step 3's second pass, a guessed decoupling assignment, or a template matched without interface metadata (by net names only) is low confidence.
@@ -536,7 +537,7 @@ flowchart TB
 - **Power domains are inferred without deleting any edge:** a net is power-connected if it is `power`/`ground`, or if it is reached from such a net through a series **power-path element** (fuse, switch, regulator, diode or inductor whose other side is power-connected, or a high-side transistor's switched side).
 - Power-path parts and the nets between them are drawn as **wires**, with supply symbols only at the outer ends, so the current path stays visible. A power-path net with no name gets a visible generated name only if it must become a port; otherwise it stays a wire.
 - Every other connection to a `power`/`ground` net starts as a **port candidate**. Port symbols (with their size and orientation) are added to the measurement in step 4, so their space is reserved.
-- Ports require a visible name: the default ground (`GND`, no domain) shows only the symbol; every other power or ground port shows its net name, and its domain if set. A net with no name cannot be drawn with ports.
+- Ports require a visible name: the default ground (`GND`, no domain) shows only the symbol; every other power or ground port shows its net name, and its domain if set. A net with no name cannot be drawn with ports. The render model still carries the implied text `GND` for the default ground port, so the verifier compares names the same way for every port; nothing extra is drawn (rev C.2).
 - Signal nets: wires, unless overridden to `label` (requires a named net; drawn as net labels, never as supply symbols).
 
 **Step 3b: Default orientations** (rev C.1), for parts not placed by a template, in this order:
@@ -545,7 +546,7 @@ flowchart TB
 3. Two-pin parts with one pin on a ground net: vertical, that pin down. With one pin on a power net drawn as a port: vertical, that pin up.
 4. Other two-pin parts: horizontal, with the pin whose net reaches lower-rank blocks on the left (ties: chain `in` pin left).
 
-**Step 4: Measure.** For each block candidate: visual envelopes, routing keep-outs, label sizes (bundled font, section 12.2) for each candidate label side, port symbols, IC box candidates.
+**Step 4: Measure.** For each block candidate: visual envelopes, routing keep-outs, label sizes (bundled font, section 12.2) for each candidate label side, port symbols, IC box candidates. A label position is rejected if it covers a port symbol or any pin's **approach point** (a label there can make the pin unreachable); generated IC boxes also try label positions at their outside corners (rev C.2).
 
 **Step 5: Region interiors.** Each template region is solved on its own, using the same difference-constraint solver as step 6 (template constraints, measured sizes, chosen label sides, child slots). Output: local integer geometry, boundary port positions, label anchors and the region's envelope (including reserved wire corridors).
 - Label sides are tried in each label's preference order, a fixed number of times.
@@ -553,16 +554,16 @@ flowchart TB
 - **Proven vs not found:** a contradiction found by the solver is proven infeasible for that template and label choice. A routing failure only means "not found within budget".
 
 **Step 6: Global order and constraint solve.**
-- **Order.** Blocks get a column (rank) and a band (supply, signal, ground). The order within each column is chosen to reduce crossings. Phase 0 compares two ordering implementations (section 15): **A**, ELK `layered` on the block graph used for order only (pinned version, `randomSeed: 1`, each multi-endpoint net as a star through a dummy net node); **B**, a fixed number of barycentre sweeps. Star edge directions follow pin roles (driver → net node → receivers); for `passive` and `bidir` endpoints, from the lower-rank block to the net node to the higher-rank block; for equal ranks, by canonical key.
+- **Order.** Blocks get a column (rank) and a band (supply, signal, ground). The order within each column is chosen to reduce crossings. Phase 0 compares two ordering implementations (section 15): **A**, ELK `layered` on the block graph used for order only (pinned version, `randomSeed: 1`, each multi-endpoint net as a star through a dummy net node); **B**, a fixed number of barycentre sweeps (4, alternating forward and backward), where a neighbour's position is its index in its column plus the relative height (0 top, 1 bottom) of the pin it shares with the block (rev C.2: fewer crossings than the plain index). Star edge directions follow pin roles (driver → net node → receivers); for `passive` and `bidir` endpoints, from the lower-rank block to the net node to the higher-rank block; for equal ranks, by canonical key.
 - **Constraint solve.** Positions are found by solving two separate systems of **difference constraints**, one for x and one for y, each of the form `a - b ≥ c` or `a - b = c` with integers:
-  - column order: `left(next) - right(prev) ≥ gap`, where the channel gap between columns i and i+1 is **2 + the number of nets with endpoints on both sides of the channel** (an upper bound on the vertical tracks the router needs there; rev C.1);
-  - order within a column: `top(next) - bottom(prev) ≥ gap`;
+  - column order: `left(next) - right(prev) ≥ gap`, where the channel gap between columns i and i+1 is **2 + the number of wired nets with endpoints on both sides of the channel + the number of wired nets whose endpoints all lie in column i or all in column i+1** (an upper bound on the vertical tracks the router needs there; rev C.1, internal nets added in rev C.2);
+  - order within a column: `top(next) - bottom(prev) ≥ 2 + the number of wired nets passing through the column` (endpoints both left and right of it; rev C.2);
   - bands: supply band above signal above ground;
   - hints at their priorities (section 6.4), alignment on alignment points;
   - region envelopes as rigid blocks;
   - locks as equalities to fixed values.
   The system is solved by longest paths in the constraint graph (Bellman-Ford; `a - b ≥ c` is an edge from b to a with weight c; an origin variable `x0 = 0` has a zero-weight edge to every variable, and a lock `a = v` is `a - x0 ≥ v` and `x0 - a ≥ -v`). This gives the most compact integer solution, or finds a **positive cycle** of constraints that cannot all hold. **Structural constraints** (column order, order within a column, bands, rigid region envelopes) are never dropped. If a cycle contains only structural, lock, strict or high constraints, the result is `infeasible` and the cycle's constraints are the reported conflict set. Otherwise the lowest-priority constraint on the cycle is dropped (with a finding) and the solve is repeated, at most 50 times; then `budget_exhausted`.
-- **Straight wires** (rev C.1, 0a version): after the least solution, try to add, one at a time in canonical order, an equality making the two pins of each two-endpoint net share a coordinate (convention 11). Each is kept only if the system stays feasible. Phase 0b may replace this with an optimising pass (network simplex).
+- **Straight wires** (rev C.2, the 0a version): after the least solution, candidate equalities are tried one at a time, and each is kept only if the system stays feasible. For every pair of pins of one wired net on blocks in different columns: two sideways pins (`left`/`right`) get the same row; a sideways pin and an up/down pin get a **one-bend** equality (the sideways pin's row 2 G beyond the up/down pin, on the side it faces). Candidates are tried by column distance (one-bend pairs half a column later), then by canonical key. Phase 0b may replace this with an optimising pass (network simplex).
 - Blocks are never moved independently of their ports; nothing is snapped after the solve, because the solve is already integer.
 
 **Step 7: Route.** Own grid router.
@@ -571,15 +572,16 @@ flowchart TB
 - **Terminal rule:** a wire reaches a pin anchor only along that pin's `dir`, from outside the keep-out. A wire never passes through a pin anchor.
 - **Crossings:** a wire may cross another net's wire only perpendicularly and straight through (no turn on the crossing point), at a cost.
 - **Search:** A* over states (grid point, arrival direction). Cost = length + bend penalty (direction change) + crossing penalty + proximity penalty near foreign pins. Heuristic = Manhattan distance. Ties are broken by (f, h, direction order E, S, W, N, x, y).
-- **Trees:** each net starts at its most upstream endpoint (by rank, then canonical key) and adds the remaining endpoints in canonical order; each new branch may join the existing tree at any of its grid points except pin anchors and existing junctions, creating a T junction with a dot, never a four-way junction. (Joining at a pin anchor would make a branch enter the pin from the side, which the verifier rejects.)
+- **Trees:** each net starts at its most upstream endpoint (by rank, then canonical key) and adds the remaining endpoints **nearest to the existing tree first** (Manhattan distance; ties by canonical order; rev C.2, for shorter trees); each new branch may join the existing tree at any of its grid points except pin anchors and existing junctions, creating a T junction with a dot, never a four-way junction. (Joining at a pin anchor would make a branch enter the pin from the side, which the verifier rejects.)
 - **Net order:** template-internal nets first, then by fewest endpoints, then by canonical key.
+- **Pre-routed segments:** a template may hand the router fixed conductor segments of a net (bus trunks, reserved corridors, port stubs). They are part of that net's tree from the start and forbidden to every other net, like any wire (rev C.2).
 - **Budgets:** a node-expansion cap per connection (default 20,000) and a fixed number of rip-up-and-reroute passes (default 3) for nets involved in the most crossings.
 
-**Step 7b: Power presentation, final.** A port candidate becomes a wire when, after routing, the endpoint is within 3 G (Manhattan) of another endpoint of the same net with a free straight or one-bend path, and that wire would cross nothing. Fixed threshold, applied in canonical order.
+**Step 7b: Power presentation, final.** A port candidate becomes a wire when, after routing, the endpoint is within 3 G (Manhattan) of another endpoint of the same net with a free straight or one-bend path, and that wire would cross nothing. Fixed threshold, applied in canonical order. The other endpoint keeps its port, so the two must not share a ray (rev C.2): **either** both port symbols are replaced by one wire between the two pins plus one port at the wire's far end, **or** the new wire joins the other endpoint's port stub at a T (with a dot). The rerouted pair is re-checked against the forbidden geometry; if neither form fits, both stay ports.
 
 **Step 8: Verify** the render model (section 9.7).
 
-**Step 9: Repair.** On failure, or severe Group 2 breaks, try the next candidate in a fixed list: next IC pin-side candidate, next orientation of a part next to the failure, the alternative template match, next label side, spacing +1 G around the failure. Budget: 8 rounds. **Budgets are counts, never wall-clock time.** A separate timeout (default 30 s) only aborts with `budget_exhausted`; it never selects a different result.
+**Step 9: Repair.** (Phase 0a has only the last item: if routing fails, all spacing +2 G and lay out again, at most 3 times; rev C.2.) On failure, or severe Group 2 breaks, try the next candidate in a fixed list: next IC pin-side candidate, next orientation of a part next to the failure, the alternative template match, next label side, spacing +1 G around the failure. Budget: 8 rounds. **Budgets are counts, never wall-clock time.** A separate timeout (default 30 s) only aborts with `budget_exhausted`; it never selects a different result.
 
 **Statuses**
 
@@ -864,6 +866,7 @@ Phase 2 themes: `textbook`, `dark`, `blueprint`, `mono-print`. Themes are JSON a
    - *Test set*: touched **once**, at the end of a phase, rated blind. Includes the owner's hardware projects.
 2. **Verifier counterexample suite** (built first, Phase 0a): every counterexample from the rev B review plus our own. A dotless T split or unsplit; a dotless X split into four segments; a group member placed in a second net; a hidden connected pin; a no-connect pin with a mark; a dangling stub; a port anchor off a wire; two ports with the same name in different domains; a wire entering a pin from the wrong side; resistor values differing only in value (`circuitEquals` must catch it). Each has an expected result.
 3. **Verifier on every test**, every corpus circuit, every edit test.
+3a. **Quality checks (rev C.2)** layered on the verifier, as drawn in `docs/verification-stack.html`: layer 2 (no overlaps, on grid, text inside the sheet), layer 3 (convention checks, section 9.1 group 2), layer 4 (readability metrics with limits, section 10.1), layer 5 (generated circuits, metamorphic and determinism tests, items 5-8 below) and layer 6 (a blind AI judge panel with a written rubric, calibrated against the owner's ratings). Layers 1-4 run on every drawing; layers 1-5 on every `npm test`.
 4. **Golden files** for the development and validation sets, with a side-by-side HTML report for review.
 5. **Metamorphic tests** (canonical mode, output must be identical): parts and nets reordered; endpoints by alias, name or number; DSL vs equivalent JSON; save and reload; a no-op edit; setting an orientation to its current value; repeating any visual operation.
 6. **Edit-sequence tests:** add then remove a part (topology identical, drift bounded); conflicting locks → `infeasible` with a correct conflict set; strict hint contradiction rejected; `addPart` repeated → clear error; merge rules (all six cases).
@@ -910,9 +913,11 @@ Phase 2 themes: `textbook`, `dark`, `blueprint`, `mono-print`. Themes are JSON a
 
 ### Phase 0b: layout quality (about 2 weeks)
 
+**Before work starts (rev C.2):** cases frozen (below), verification layers 2-6 built (section 13 item 3a), Appendix A run through the router and verifier as tests.
+
 **Build:** templates (op-amp inverting/summing, I2C pull-ups, decoupling, H-bridge, bridge rectifier, low-side switch); incremental mode; the visual operations; a **minimal findings harness** (findings with checked fixes for crossings, convention breaks and label collisions; no text description or alt text yet).
 
-**Cases, frozen before work starts** (netlists, allowed hints and edit scripts committed to `phase0/cases/`):
+**Cases, frozen before work starts** (netlists, allowed hints and edit scripts committed to `phase0/cases/`, validation cases in `validation/`, test cases in `test/`, edit scripts in `edits/`, with a SHA-256 manifest; written by an agent that does not read the layout code, and the test folder is not opened by the layout builder until the end gate):
 
 | # | Case | Set |
 |---|---|---|
@@ -929,7 +934,7 @@ Phase 2 themes: `textbook`, `dark`, `blueprint`, `mono-print`. Themes are JSON a
 | 11 | Owner's real hardware project, about 30 parts | **test** |
 | 12 | Owner's second real project | **test** |
 
-If the owner has not supplied cases 11 and 12 when Phase 0b starts, they are replaced by: (11) Arduino Uno + I2C 16×2 LCD + DHT22 + buzzer + push button; (12) ESP32 + MOSFET LED-strip driver + buck converter module + status LED.
+Cases 1, 3 and 5 were developed during Phase 0a, so gate 3 below (validation set) is biased in their favour; the test-set figures in gate 2 decide. If the owner has not supplied cases 11 and 12 when Phase 0b starts, they are replaced by: (11) Arduino Uno + I2C 16×2 LCD + DHT22 + buzzer + push button; (12) ESP32 + MOSFET LED-strip driver + buck converter module + status LED.
 
 **Edit scripts** (cases 3, 5, 7, 11), each applied separately: change one value to a 3× longer text; add a part on an existing net; remove a part; change one IC's pin sides.
 
@@ -975,7 +980,7 @@ More modules; drafting netlists from Arduino / ESP-IDF / MicroPython pin definit
 2. Licence: MIT or Apache-2.0?
 3. Phase 1 symbol style: IEEE/US (zigzag resistor, proposed) or IEC (box resistor)?
 4. Web editor (phase 3): hosted site, local app, or both?
-5. Which two of your hardware projects are test cases 11 and 12? (Needed before Phase 0b, not 0a.)
+5. Which two of your hardware projects are test cases 11 and 12? (Not supplied by the 0b freeze on 2026-10-23, so the section 15 substitutes are used unless the owner supplies them before the freeze is committed.)
 6. Is an HTTP API wanted, or are CLI + MCP enough?
 
 ## 17. Notes for the reviewer (rev C)
@@ -1029,12 +1034,34 @@ Mark each comment **blocker for 0a**, **fix before 0b**, or **later**, with a se
 | Structural constraints never dropped; origin variable; drop bound | Fixed | 9.2 step 6 |
 | Least solution puts blocks at the top (straight wires) | Fixed for 0a (greedy equalities); optimising pass may come in 0b | 9.2 step 6 |
 | Single-endpoint nets can never be valid | Fixed | 9.7 |
-| Appendix A.1 pin anchors on the summing node; A.2 ranks and crossing count; 7b overlapping ports; net ids in layout output | **Open, fix before 0b** | Appendix A, 9.2 step 7b, 6.3 |
+| Appendix A.1 pin anchors on the summing node; A.2 ranks and crossing count; 7b overlapping ports; net ids in layout output | Fixed in rev C.2 | Appendix A, 9.2 steps 2 and 7b, 6.3 |
 | Case-insensitive groups and net names; class-level `circuitEquivalent`; INT token, `->` spacing, stale lock takeover | **Open, later** | 6.2-6.3, 6.9, 8, 11.2 |
+
+### Rev C.2 changes (Phase 0a built; from `docs/PHASE0A-NOTES.md` and the open C.1 rows)
+
+| Change | Why | Where |
+|---|---|---|
+| Output pins no longer make a block a source; `flow: input` does | an op-amp's OUT pin reversed the summing-amplifier ranks | 9.2 step 2 |
+| Flow ignores ground nets and port-drawn power nets; wired power nets carry flow | a wired battery loop needs its supply net to rank the resistor after the battery | 9.2 step 2 |
+| Taps half a column upstream | puts pull-ups between the controller and the peripherals | 9.2 step 2 |
+| Barycentre uses the shared pin's height on the neighbour | fewer crossings in case 5 | 9.2 step 6 |
+| Channel and column gaps count internal and through nets | the router ran out of tracks | 9.2 step 6 |
+| Straight-wire pass covers all pin pairs and one-bend pairs | case 1 and the sources in case 3 | 9.2 step 6 |
+| Router adds the nearest endpoint first; pre-routed template segments | shorter trees; bus trunks for A.2 | 9.2 step 7 |
+| 7b: one wire plus one port, or a T on the other stub | the 7b wire overlapped the other port | 9.2 step 7b |
+| 0a repair: spacing +2 G, at most 3 times | needed while label placement is simple | 9.2 step 9 |
+| Labels clear of approach points; corner positions for chips | a label in front of a pin made case 5 unroutable | 9.2 step 4 |
+| Default ground carries text `GND` in the render model | the verifier compares names uniformly | 9.2 step 3 |
+| DSL net ids in canonical order | metamorphic reorder test | 6.3 |
+| npm, opentype.js, DejaVu Sans in Phase 0 | pnpm not installed; final font in Phase 1 | 5 |
+| Appendix A.1 and A.2 corrected and run as tests | review rows A.1 and A.2 | Appendix A, `tests/appendix-a.test.ts` |
+| Generated IC boxes space top and bottom pins by name width; a supply or ground symbol on a side pin gets a stub long enough to clear the box | names ran together ("SCLSDAVIN"); a side-pin supply symbol overlapped its own chip (both found by layer 2 on A.2) | 7.3, 9.2 step 3 |
+| Sheet bounds start from the drawing, not the origin | every 0a drawing had a 3 G band of extra margin at the top and left (found by layer 4) | 12.1 |
+| Verification layers 2-6 named; 0b preconditions; validation-set bias noted | owner's verification plan | 13 item 3a, 15 |
 
 ## Appendix A: worked block graphs
 
-*Rev C.1 note: the constraints in A.1 and A.2 have known errors (see the amendments table) and will be corrected, and run through the router and verifier as tests, before templates are built in Phase 0b.*
+*Rev C.2: A.1 and A.2 are corrected (rev C review rows A.1 and A.2) and checked by `tests/appendix-a.test.ts`, with the placements in `tests/support/appendix-a.ts`. That test places the parts exactly as these constraints say, routes with the 0a router (A.2's trunks pre-routed) and must pass verification layers 1-4 with the stated junction and crossing counts. Two constraints were tightened when the test first ran: input rows 5 G apart, not 4 (a resistor's two-line label sits above it), and peripherals 5 G below the SCL trunk, not 4 (their labels sit above the box).*
 
 ### A.1 Inverting summing amplifier (Phase 0 case 3)
 
@@ -1053,12 +1080,14 @@ edges:   V1[+] -> nA -> RG1.in1      V2[+] -> nB -> RG1.in2
          V3[+] -> nC -> RG1.in3      RG1.out -> OUT -> RL[1]
 ```
 
-**Region interior** (x and y difference constraints, grid units; `S` is the summing-node column):
-- `U1` rotation 0. `S = U1.INm.x - 2`.
-- `R1.pin2.x = S`, `R2.pin2.x = S`, `R3.pin2.x = S` (input resistors end at the node column), all horizontal.
-- `R1.y = U1.INm.y`; `R2.y - R1.y ≥ 4`; `R3.y - R2.y ≥ 4` (stacked rows, label height included in the measured gap).
-- `Rf` horizontal; `Rf.pin1.x = S`; `U1.top.y - Rf.y ≥ 3` (above the op-amp, leaving a 1 G corridor plus its label); `Rf.pin2.x ≤ U1.OUT.x`.
-- Output tap column `T = U1.OUT.x + 2`; corridor reserved from `Rf.pin2` right to `T` and down to the OUT line.
+**Region interior** (x and y difference constraints, grid units). `INm`, `INp` and `OUT` are U1's pin anchors; with the built-in op-amp, `INp = INm + (0, 2)` and `OUT = INm + (6, 1)`.
+- `U1` rotation 0. **Node column** `S = INm.x - 3`. The summing node is one vertical conductor at `x = S`, and nothing else uses that column. (`INm.x - 3`, not `- 1`: the IN+ ground symbol is centred at `INm.x - 1` and is 2 G wide, so its keep-out reaches `INm.x - 2`.)
+- **Inputs:** R1, R2, R3 horizontal, `R_i.pin2.x ≤ S - 1`, each joined to the node column by a T. Rows: `R1.y = INm.y - 2`, `R2.y - R1.y ≥ 5`, `R3.y - R2.y ≥ 5` (each resistor's two-line label sits above it), and no input row equals `INm.y`. The node column therefore never carries a pin anchor, and every junction on it has three directions.
+- **IN- branch:** a horizontal wire from the node column at row `INm.y` straight into IN- (its own T on the column).
+- **Feedback:** Rf horizontal above the op-amp, `Rf.y ≤ INm.y - 5` (op-amp top `INm.y - 1.5`, then a 1 G corridor plus Rf's label), `Rf.pin1.x ≥ S + 2`. Rf[1] runs left to the node column and turns down: the top of the column is a corner, not a junction.
+- **Output:** tap column `T = OUT.x + 2`, `Rf.pin2.x ≤ T - 1`. Rf[2] runs right to `T` and down to the OUT row, a T on the line from OUT to the load.
+- **IN+:** the 0a port stub (left 1 G, then down) to a ground symbol at `(INm.x - 1, INp.y + 1)`.
+- **Expected drawing:** 4 junction dots (R1, IN-, R2 on the node column; the output tap), every pair of dots at least 2 G apart, no crossings.
 
 ### A.2 I2C bus with pull-ups (Phase 0 case 5)
 
@@ -1066,7 +1095,7 @@ edges:   V1[+] -> nA -> RG1.in1      V2[+] -> nB -> RG1.in2
 
 **Step 1:** the I2C template matches nets SDA and SCL (interface roles on U2 and U3) with pull-ups R1, R2 → region RG_i2c = {R1, R2}. U1, U2, U3 stay ordinary blocks, but the template adds constraints that link them (below).
 
-**Step 2:** U1 is a controller → rank 0; RG_i2c → rank 1; U2, U3 → rank 2.
+**Step 2:** the template **sets the ranks explicitly** (rev C.2): U1 → 0, RG_i2c → 1, U2 and U3 → 2. Breadth-first search alone would give U2 and U3 rank 1, because they share SDA with U1 directly.
 
 **Block graph handed to ordering:**
 
@@ -1079,9 +1108,10 @@ edges:   U1.GPIO21 -> SDA -> RG_i2c.sda, U2.SDA, U3.SDA
 
 (`bidir` endpoints: direction from lower rank to higher rank.)
 
-**Constraints added by the template:**
-- Pin sides: U1 GPIO21 and GPIO22 on its right side, SDA above SCL; U2 and U3 SDA and SCL on their left side, SDA above SCL.
-- `U2.x = U3.x` (one column); `U3.top.y - U2.bottom.y ≥ 3`.
-- Trunks: SDA at `y = U1.GPIO21.y`, SCL at `y = U1.GPIO22.y`, horizontal from U1 to the peripheral column, with vertical taps to each peripheral's pins.
-- R1 and R2 vertical, side by side between U1 and the peripheral column, both bodies above the SDA trunk, each `pin1` at a 3V3 port above; `R2.x - R1.x ≥ 3`.
-- `R1.pin2` joins the SDA trunk directly. `R2.pin2` joins the SCL trunk by a vertical wire that crosses the SDA trunk once. This one crossing is the conventional drawing and is expected; the template reports it as accepted, not as a finding.
+**Constraints added by the template** (the conventional bus drawing):
+- **Controller:** U1 GPIO21 and GPIO22 on its right side, SDA above SCL.
+- **Trunks:** SDA at `y = U1.GPIO21.y`, SCL at `y = U1.GPIO22.y` (2 G below), horizontal from each controller pin's approach point to the last peripheral's tap on that net. They are handed to the router as pre-routed segments (9.2 step 7); without them the router draws parallel side lines instead of a bus.
+- **Peripherals in one row below the trunks:** `U2.y = U3.y`, `U3.left - U2.right ≥ 4`, SDA and SCL on their **top** side with **SCL left of SDA** (so the last peripheral's SDA tap needs no crossing), the supply pin on the **right** side (a supply symbol on the top side would block the SDA pin's approach), ground at the bottom. `U2.top ≥ SCL.y + 5`, so the peripheral's label above the box clears the SCL trunk.
+- **Taps:** vertical from each trunk down to the pin. Each SDA tap except the last peripheral's crosses the SCL trunk once, straight through.
+- **Pull-ups:** R1 and R2 vertical, side by side between U1 and U2, bodies above the SDA trunk, each `pin1` at a 3V3 port above, R1 left of R2, `R2.x - R1.x ≥` R1's label width + 2. R1[2] drops to the SDA trunk (a T). R2[2] drops to the SCL trunk, crossing the SDA trunk once.
+- **Expected drawing (a template output, not a finding):** crossings = the number of peripherals (2 for case 5): one for R2's drop and one for each SDA tap except the last. Junction dots = 2 × (number of peripherals): on each trunk, the pull-up tap and every peripheral tap except the last (the trunk ends in a corner there).
