@@ -467,5 +467,14 @@
       "key": "value",
       "value": "4.7k xxxxxxxx"
     }
-  ]
+  ],
+  "affected": {
+    "parts": [
+      "R3"
+    ],
+    "nets": [
+      "n4",
+      "n6"
+    ]
+  }
 }

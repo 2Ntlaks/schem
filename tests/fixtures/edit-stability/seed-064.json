@@ -487,5 +487,16 @@
       "key": "label",
       "value": "SHT31 xxxxxxxxxx"
     }
-  ]
+  ],
+  "affected": {
+    "parts": [
+      "U2"
+    ],
+    "nets": [
+      "n2",
+      "n4",
+      "n5",
+      "n6"
+    ]
+  }
 }

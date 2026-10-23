@@ -439,5 +439,14 @@
       "key": "value",
       "value": "22p xxxxxx"
     }
-  ]
+  ],
+  "affected": {
+    "parts": [
+      "C1"
+    ],
+    "nets": [
+      "n2",
+      "n3"
+    ]
+  }
 }

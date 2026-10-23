@@ -47,6 +47,8 @@ export interface LayoutOptions {
   affected?: readonly string[];
   /** Keep the previous routes of nets whose drawn terminals did not change (default true). */
   reuseRoutes?: boolean;
+  /** Local repair origins. These retain normal spacing and intent constraints. */
+  anchors?: Record<string, Pt>;
 }
 
 const LABEL_SIZE = 12;   // SVG units (1.2 G)
@@ -80,7 +82,7 @@ interface Placed {
   rank: number;
   /** Local (oriented) geometry relative to the part origin. */
   ko: Box;
-  labels: Array<{ box: Box; lines: string[]; align: "start" | "middle" | "end" }>;
+  labels: Array<{ box: Box; lines: string[]; align: "start" | "middle" | "end"; position: string }>;
   ports: Array<{ pin: string; net: Net; anchor: Pt; stub: Pt[]; box: Box; kind: "ground" | "power" }>;
   env: Box;
   pins: Array<{ number: string; at: Pt; dir: Dir }>;
@@ -165,12 +167,15 @@ export function layout(project: Project, opts: LayoutOptions = {}): LayoutResult
   }
   // A new connection can shorten graph distances without changing any existing geometry.
   // Preserve spatial columns in incremental mode instead of re-ranking the entire sheet.
-  if (opts.previous && ids.some((id) => !opts.previous!.parts[id])) {
-    const oldColumns = [...new Set(ids.flatMap((id) => opts.previous!.parts[id] ? [opts.previous!.parts[id]!.at[0]] : []))].sort((a, b) => a - b);
+  if (opts.previous) {
+    const useCachedColumns = ids.every((id) => !opts.previous!.parts[id] || opts.previous!.parts[id]!.column !== undefined);
+    const added = ids.some((id) => !opts.previous!.parts[id]);
+    const oldColumn = (id: string) => useCachedColumns ? opts.previous!.parts[id]!.column! : added ? opts.previous!.parts[id]!.at[0] : colValue.get(id)!;
+    const oldColumns = [...new Set(ids.flatMap((id) => opts.previous!.parts[id] ? [oldColumn(id)] : []))].sort((a, b) => a - b);
     for (const id of ids) {
       const prev = opts.previous.parts[id];
-      if (prev) { colValue.set(id, prev.at[0]); continue; }
-      const adjacent = [...neighbours.get(id)!].flatMap((n) => opts.previous!.parts[n] ? [opts.previous!.parts[n]!.at[0]] : []);
+      if (prev) { colValue.set(id, oldColumn(id)); continue; }
+      const adjacent = [...neighbours.get(id)!].flatMap((n) => opts.previous!.parts[n] ? [oldColumn(n)] : []);
       const target = adjacent.length ? adjacent.reduce((a, b) => a + b, 0) / adjacent.length : oldColumns[0] ?? 0;
       colValue.set(id, [...oldColumns].sort((a, b) => Math.abs(a - target) - Math.abs(b - target) || a - b)[0] ?? target);
     }
@@ -232,7 +237,7 @@ export function layout(project: Project, opts: LayoutOptions = {}): LayoutResult
     }
     // Labels must keep clear of port symbols and of every pin's approach point.
     const approachBoxes = pins.map((p): Box => { const a = step(p.at, p.dir); return { x: a[0] - 0.5, y: a[1] - 0.5, w: 1, h: 1 }; });
-    const labels = labelFor(part, sym, orient, ko, [...ports.map((q) => q.box), ...approachBoxes], intent.overrides?.labelSide?.[id]);
+    const labels = labelFor(part, sym, orient, ko, [...ports.map((q) => q.box), ...approachBoxes], intent.overrides?.labelSide?.[id] ?? prev?.labelPosition);
     let env = ko;
     for (const l of labels) env = unionBox(env, gridBox(l.box));
     for (const q of ports) env = unionBox(env, q.box);
@@ -259,7 +264,7 @@ export function layout(project: Project, opts: LayoutOptions = {}): LayoutResult
           w: Math.abs(a[0] - b[0]) + 0.2, h: Math.abs(a[1] - b[1]) + 0.2 });
       }
     }
-    P.labels = labelFor(partOf.get(id)!, P.sym, P.orient, P.ko, avoid, intent.overrides?.labelSide?.[id], true);
+    P.labels = labelFor(partOf.get(id)!, P.sym, P.orient, P.ko, avoid, intent.overrides?.labelSide?.[id] ?? old.labelPosition, true);
     P.env = P.ko;
     for (const l of P.labels) P.env = unionBox(P.env, gridBox(l.box));
     for (const p of P.ports) P.env = unionBox(P.env, p.box);
@@ -274,7 +279,10 @@ export function layout(project: Project, opts: LayoutOptions = {}): LayoutResult
     }));
     for (const id of ids) if (!opts.previous.parts[id]) {
       const e = placed.get(id)!.env;
-      const origin: Pt = [Math.max(MARGIN - e.x, colValue.get(id)!), bottom + 2 - e.y];
+      const column = colOf.get(id)!;
+      const xs = ids.flatMap((other) => colOf.get(other) === column && opts.previous!.parts[other] ? [opts.previous!.parts[other]!.at[0]] : []);
+      const x = xs.length ? Math.round(xs.reduce((a, b) => a + b, 0) / xs.length) : MARGIN - e.x;
+      const origin: Pt = [Math.max(MARGIN - e.x, x), bottom + 2 - e.y];
       newOrigins.set(id, origin);
       bottom = origin[1] + e.y + e.h;
     }
@@ -367,6 +375,9 @@ export function layout(project: Project, opts: LayoutOptions = {}): LayoutResult
   const vars = ids.flatMap((id) => [vx(id), vy(id)]);
   const known = new Set(ids);
   for (const l of locks.values()) if (known.has(l.part)) cons.push(...eq(vx(l.part), X0, l.x, "lock", `lock ${l.part}`), ...eq(vy(l.part), X0, l.y, "lock", `lock ${l.part}`));
+  for (const [id, origin] of Object.entries(opts.anchors ?? {})) if (known.has(id)) {
+    cons.push(...eq(vx(id), X0, origin[0], "high", `repair ${id}`), ...eq(vy(id), X0, origin[1], "high", `repair ${id}`));
+  }
   for (const h of hints) {
     if (h.type === "relative" && known.has(h.part) && known.has(h.of)) {
       const ep = placed.get(h.part)!.env, eo = placed.get(h.of)!.env;
@@ -571,7 +582,8 @@ export function layout(project: Project, opts: LayoutOptions = {}): LayoutResult
   const state: LayoutState = { parts: {}, routes: {} };
   for (const id of ids) {
     const P = placed.get(id)!;
-    const entry: LayoutState["parts"][string] = { at: at(id), orient: P.orient };
+    const entry: LayoutState["parts"][string] = { at: at(id), orient: P.orient, column: P.col };
+    if (P.labels[0]) entry.labelPosition = P.labels[0].position;
     if (P.sym.kind === "ic") {
       const side = (d: Dir): Side => (d === "left" ? "left" : d === "right" ? "right" : d === "up" ? "top" : "bottom");
       const sides: Partial<Record<Side, string[]>> = {};
@@ -697,7 +709,7 @@ function labelFor(part: Circuit["parts"][0], sym: SymbolDef, o: Orient, ko: Box,
   const prefer = sym.kind === "ic"
     ? ["above-left", "above-right", "below-left", "below-right", "above-left-out", "above-right-out", "below-left-out", "below-right-out", "left", "right"]
     : vertical ? (sym.kind === "source" ? ["left", "right"] : ["right", "left"]) : sym.labelPrefer;
-  const order = side ? [side, ...prefer.filter((x) => x !== side)] : prefer; // label-side override first (SPEC 6.4)
+  const order = side ? [side, ...prefer.filter((x) => x !== side)] : [...prefer]; // label-side override first (SPEC 6.4)
   const gap = 0.4;
   const cands: Record<string, { box: Box; align: "start" | "middle" | "end" }> = {
     above: { box: { x: ko.x + ko.w / 2 - w / 2, y: ko.y - gap - h, w, h }, align: "middle" },
@@ -716,10 +728,10 @@ function labelFor(part: Circuit["parts"][0], sym: SymbolDef, o: Orient, ko: Box,
   if (alternatives) order.push(...Object.keys(cands).filter((s) => !order.includes(s)));
   for (const pick of order) {
     const c = cands[pick]!;
-    if (!avoid.some((b) => boxesOverlap(gridBox(c.box), b))) return [{ box: c.box, lines, align: c.align }];
+    if (!avoid.some((b) => boxesOverlap(gridBox(c.box), b))) return [{ box: c.box, lines, align: c.align, position: pick }];
   }
   const c = cands[order[0]!]!;
-  return [{ box: c.box, lines, align: c.align }];
+  return [{ box: c.box, lines, align: c.align, position: order[0]! }];
 }
 
 /** Merge unit edges of one net into maximal straight runs (for drawing only). */

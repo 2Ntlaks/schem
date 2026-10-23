@@ -486,5 +486,14 @@
       "key": "color",
       "value": "green xxxxxxxxxx"
     }
-  ]
+  ],
+  "affected": {
+    "parts": [
+      "D1"
+    ],
+    "nets": [
+      "n2",
+      "n6"
+    ]
+  }
 }

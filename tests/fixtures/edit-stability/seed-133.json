@@ -340,5 +340,16 @@
       "key": "label",
       "value": "INA219 xxxxxxxxxxxx"
     }
-  ]
+  ],
+  "affected": {
+    "parts": [
+      "U2"
+    ],
+    "nets": [
+      "n1",
+      "n2",
+      "n3",
+      "n4"
+    ]
+  }
 }

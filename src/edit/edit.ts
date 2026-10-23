@@ -9,7 +9,7 @@ import { resolveEndpoint } from "../core/validate.js";
 import type { Hint, HintPriority, Intent, LayoutState, Side } from "../core/intent.js";
 import { layout, pinDefsOf, type LayoutResult, type Project, type Status } from "../layout/layout.js";
 import { checkDrawing, type DrawingCheck } from "../quality/index.js";
-import { changeReport, type ChangeReport } from "./report.js";
+import { changeReport, stabilityBreaks, type ChangeReport } from "./report.js";
 
 export type VisualOp =
   | { op: "lock"; part: string; at?: Pt; rot?: Rot; flip?: boolean }
@@ -91,6 +91,22 @@ export function edit(req: EditRequest): EditResult {
   const attempts: Array<{ mode: EditMode; run: () => LayoutResult }> = [];
   if (previous && !canonical) {
     attempts.push({ mode: "incremental", run: () => layout(project, { previous, affected: affected.parts }) });
+    // Move a touched part locally before widening to a full reroute or canonical layout.
+    // Untouched origins remain anchored so a repair cannot displace the rest of the sheet.
+    const fixed = Object.fromEntries(Object.entries(previous.parts).filter(([id]) => !affected.parts.includes(id)).map(([id, p]) => [id, p.at]));
+    const geometryTargets = new Set(req.ops.flatMap((op) =>
+      op.op === "setOrientation" || op.op === "setPinSides" || op.op === "setLabelSide" || op.op === "setProp" ? [op.part] : []));
+    const repairParts = affected.parts.filter((part) => previous.parts[part] && !intent.locks?.some((l) => l.part === part)
+      && (!geometryTargets.size || geometryTargets.has(part)));
+    let repairCount = 0;
+    repair: for (const offset of [[0, -2], [0, 2], [-2, 0], [2, 0], [0, -4], [0, 4], [-4, 0], [4, 0]] as const) {
+      for (const part of repairParts) {
+        if (repairCount++ >= 8) break repair;
+        const origin = previous.parts[part]!.at;
+        const anchors = { ...fixed, [part]: [origin[0] + offset[0], origin[1] + offset[1]] as Pt };
+        attempts.push({ mode: "incremental", run: () => layout(project, { previous, affected: affected.parts, anchors }) });
+      }
+    }
     attempts.push({ mode: "incremental-reroute", run: () => layout(project, { previous, affected: affected.parts, reuseRoutes: false }) });
   }
   attempts.push({ mode: "canonical", run: () => layout(project) });
@@ -99,18 +115,23 @@ export function edit(req: EditRequest): EditResult {
   for (const a of attempts) {
     const r = a.run();
     last = r;
-    if (!r.render || !r.status.startsWith("valid")) { issues.push(`${a.mode}: ${r.status}${r.issues.length ? ` (${r.issues[0]})` : ""}`); if (r.status === "infeasible" || r.status === "invalid_input") break; continue; }
+    if (!r.render || !r.status.startsWith("valid")) { issues.push(`${a.mode}: ${r.status}${r.issues.length ? ` (${r.issues[0]})` : ""}`); if (r.status === "invalid_input") break; continue; }
     const q = checkDrawing(circuit, r.pinDefs, r.render);
     if (!q.valid) { issues.push(`${a.mode}: drawing failed checks (${[...q.connections.errors, ...q.overlaps].map((i) => i.code).join(", ")})`); continue; }
     const locked = new Set((intent.locks ?? []).map((l) => l.part));
+    const report = previous ? changeReport(previous, r.state!, new Set(affected.parts), new Set(affected.nets), locked) : undefined;
+    // A valid drawing can still disrupt unrelated work. Apply gate 4 before accepting any
+    // incremental candidate, including the canonical fallback. Explicit global relayouts opt out.
+    const breaks = report && !canonical ? stabilityBreaks(report) : [];
+    if (breaks.length) { issues.push(`${a.mode}: stability gate failed (${breaks.join("; ")})`); continue; }
     return {
       saved: true, status: r.status, project, layout: r, check: q, mode: a.mode, affected, issues,
-      ...(previous ? { report: changeReport(previous, r.state!, new Set(affected.parts), new Set(affected.nets), locked) } : {}),
+      ...(report ? { report } : {}),
       revision: revision(project), layoutToken: layoutToken(project, r.state!),
     };
   }
   const status = last?.status && !last.status.startsWith("valid") ? last.status : "budget_exhausted";
-  return { ...unchanged(status, [`edit rejected: no valid layout (D4). ${issues.join("; ")}`]), affected };
+  return { ...unchanged(status, [`edit rejected: no valid${previous && !canonical ? ", stable" : ""} layout (D4). ${issues.join("; ")}`]), affected };
 }
 
 class EditError extends Error {}

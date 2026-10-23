@@ -25,7 +25,15 @@ export interface Intent {
 
 /** What a layout keeps for the next incremental layout (SPEC 6.5 `layout.parts`, `layout.routes`). */
 export interface LayoutState {
-  parts: Record<string, { at: Pt; orient: Orient; sides?: Partial<Record<Side, string[]>> }>;
+  parts: Record<string, {
+    at: Pt;
+    orient: Orient;
+    sides?: Partial<Record<Side, string[]>>;
+    /** Placement column, retained when edits change the graph's flow ranks. */
+    column?: number;
+    /** Selected label candidate, retained so subsequent edits do not reset a repaired label. */
+    labelPosition?: string;
+  }>;
   /**
    * Per net id: a signature of its drawn terminals and the conductor runs drawn for it.
    * `ports` marks a net drawn only with supply or ground symbols (its runs are their stubs).

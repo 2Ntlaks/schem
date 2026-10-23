@@ -118,23 +118,24 @@ describe("transactions (D4)", () => {
 });
 
 describe("generated circuits under random edits (layer 5)", () => {
-  it("every saved edit passes layers 1-2, and at least 85% meet the stability gate", () => {
-    let saved = 0, stable = 0;
-    const unstable: string[] = [];
-    for (let seed = 1; seed <= 80; seed++) {
+  it("every saved edit passes layers 1-2 and the stability gate across 150 seeds", () => {
+    let eligible = 0, saved = 0;
+    const rejected: string[] = [];
+    for (let seed = 1; seed <= 150; seed++) {
       const g = generate(seed, 5);
       const base = layout({ circuit: g.circuit });
       if (!base.state || !base.status.startsWith("valid")) continue;
       const e = randomEdit(g.circuit, seed * 31);
       if (!e.ops.length) continue;
+      eligible++;
       const r = edit({ project: { circuit: g.circuit }, previous: base.state, ops: e.ops });
-      if (!r.saved) continue;
+      if (!r.saved) { rejected.push(`#${seed} ${e.kind}: ${r.issues.join("; ")}`); continue; }
       saved++;
       expect(r.check!.valid, `#${seed}`).toBe(true);
-      const breaks = stabilityBreaks(r.report!);
-      if (breaks.length) unstable.push(`#${seed} ${e.kind}: ${breaks.join("; ")}`); else stable++;
+      expect(stabilityBreaks(r.report!), `#${seed} ${e.kind}`).toEqual([]);
     }
-    expect(saved).toBeGreaterThan(60);
-    expect(stable / saved, unstable.join("\n")).toBeGreaterThanOrEqual(0.85);
+    // Guard against satisfying stability merely by rejecting edits.
+    expect(eligible).toBeGreaterThan(120);
+    expect(saved, rejected.join("\n")).toBe(eligible);
   }, 120_000);
 });
