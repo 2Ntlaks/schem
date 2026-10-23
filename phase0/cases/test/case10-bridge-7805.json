@@ -1,0 +1,195 @@
+{
+  "schema": "schem/1.0",
+  "meta": {
+    "title": "Case 10: bridge rectifier + smoothing capacitor + 7805 regulator",
+    "created": "2026-10-23",
+    "nextNetId": 7,
+    "nextHintId": 1
+  },
+  "circuit": {
+    "parts": [
+      {
+        "id": "V1",
+        "type": "ac-source",
+        "props": {
+          "value": "12V",
+          "label": "12 V AC"
+        }
+      },
+      {
+        "id": "D1",
+        "type": "diode",
+        "props": {
+          "partNumber": "1N4007"
+        }
+      },
+      {
+        "id": "D2",
+        "type": "diode",
+        "props": {
+          "partNumber": "1N4007"
+        }
+      },
+      {
+        "id": "D3",
+        "type": "diode",
+        "props": {
+          "partNumber": "1N4007"
+        }
+      },
+      {
+        "id": "D4",
+        "type": "diode",
+        "props": {
+          "partNumber": "1N4007"
+        }
+      },
+      {
+        "id": "C1",
+        "type": "polarised-capacitor",
+        "props": {
+          "value": "2200u"
+        }
+      },
+      {
+        "id": "C2",
+        "type": "capacitor",
+        "props": {
+          "value": "220n"
+        }
+      },
+      {
+        "id": "U1",
+        "type": "ic",
+        "props": {
+          "label": "LM7805",
+          "partNumber": "LM7805CT"
+        },
+        "pins": [
+          {
+            "number": "1",
+            "name": "INPUT",
+            "role": "power_in"
+          },
+          {
+            "number": "2",
+            "name": "GND",
+            "role": "ground"
+          },
+          {
+            "number": "3",
+            "name": "OUTPUT",
+            "role": "power_out"
+          }
+        ]
+      },
+      {
+        "id": "C3",
+        "type": "capacitor",
+        "props": {
+          "value": "100n"
+        }
+      },
+      {
+        "id": "R1",
+        "type": "resistor",
+        "props": {
+          "value": "330"
+        }
+      },
+      {
+        "id": "D5",
+        "type": "led",
+        "props": {
+          "color": "green"
+        }
+      }
+    ],
+    "nets": [
+      {
+        "id": "n1",
+        "name": "AC1",
+        "endpoints": [
+          "D1[A]",
+          "D3[K]",
+          "V1[1]"
+        ]
+      },
+      {
+        "id": "n2",
+        "name": "AC2",
+        "endpoints": [
+          "D2[A]",
+          "D4[K]",
+          "V1[2]"
+        ]
+      },
+      {
+        "id": "n3",
+        "name": "VUNREG",
+        "kind": "power",
+        "endpoints": [
+          "C1[+]",
+          "C2[1]",
+          "D1[K]",
+          "D2[K]",
+          "U1[1]"
+        ]
+      },
+      {
+        "id": "n4",
+        "name": "GND",
+        "endpoints": [
+          "C1[-]",
+          "C2[2]",
+          "C3[2]",
+          "D3[A]",
+          "D4[A]",
+          "D5[K]",
+          "U1[2]"
+        ]
+      },
+      {
+        "id": "n5",
+        "name": "5V",
+        "endpoints": [
+          "C3[1]",
+          "R1[1]",
+          "U1[3]"
+        ]
+      },
+      {
+        "id": "n6",
+        "endpoints": [
+          "D5[A]",
+          "R1[2]"
+        ]
+      }
+    ],
+    "nc": []
+  },
+  "intent": {
+    "hints": [],
+    "locks": [],
+    "overrides": {},
+    "style": {
+      "theme": "clean",
+      "symbols": "ieee"
+    }
+  },
+  "assets": {
+    "library": "schem-symbols@phase0b-proposal",
+    "definitions": {}
+  },
+  "ext": {
+    "phase0": {
+      "case": 10,
+      "set": "test",
+      "author": "agent B (independent case author)",
+      "source": "12 V AC (transformer secondary drawn as an AC source), 1N4007 bridge, 2200 uF reservoir, LM7805 with 0.22 uF in / 0.1 uF out (datasheet test conditions), power LED with 330 ohm",
+      "pinSources": {
+        "U1": "TI LM340/LM7805 datasheet SNOSBT0L (rev. September 2016), Pin Functions, 3-pin TO-220: https://www.ti.com/lit/ds/symlink/lm340.pdf"
+      }
+    }
+  }
+}

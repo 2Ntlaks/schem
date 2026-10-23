@@ -1,0 +1,25 @@
+{
+  "schema": "schem-edit/phase0b",
+  "case": "validation/case03-summing.json",
+  "edit": "pin-sides",
+  "description": "Op-amp U1 (the only IC): IN+ above IN- on the left, OUT on the right. The built-in op-amp draws IN- above IN+, so this asks for the other input order. Applying it (for example as a vertical mirror) or rejecting it with an explanation are both acceptable (expect.ok \"either\"; AUTHOR-NOTES item 21).",
+  "ops": [
+    {
+      "op": "setPinSides",
+      "part": "U1",
+      "left": [
+        "U1[3]",
+        "U1[2]"
+      ],
+      "right": [
+        "U1[1]"
+      ]
+    }
+  ],
+  "expect": {
+    "ok": "either",
+    "affectedParts": [
+      "U1"
+    ]
+  }
+}

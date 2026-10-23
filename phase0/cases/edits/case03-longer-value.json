@@ -1,0 +1,20 @@
+{
+  "schema": "schem-edit/phase0b",
+  "case": "validation/case03-summing.json",
+  "edit": "longer-value",
+  "description": "Feedback resistor value text from \"20k\" (3 characters) to \"20k ±0.1%\" (9). Not a parseable quantity, so it is displayed as written (W320) and the label really grows.",
+  "ops": [
+    {
+      "op": "setProp",
+      "part": "Rf",
+      "key": "value",
+      "value": "20k ±0.1%"
+    }
+  ],
+  "expect": {
+    "ok": true,
+    "affectedParts": [
+      "Rf"
+    ]
+  }
+}

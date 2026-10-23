@@ -1,0 +1,363 @@
+{
+  "note": "Pin inventories assumed by agent B for SPEC 7.2 symbol types that src/symbols/library.ts does not have yet. A proposal for Phase 0b, not a library.",
+  "types": {
+    "polarised-capacitor": {
+      "name": "Polarised capacitor",
+      "specName": "polarised capacitor",
+      "pins": [
+        {
+          "number": "+",
+          "name": "+",
+          "role": "passive",
+          "aliases": [
+            "pos",
+            "p"
+          ],
+          "chain": "in"
+        },
+        {
+          "number": "-",
+          "name": "-",
+          "role": "passive",
+          "aliases": [
+            "neg",
+            "n"
+          ],
+          "chain": "out"
+        }
+      ]
+    },
+    "potentiometer": {
+      "name": "Potentiometer",
+      "specName": "potentiometer",
+      "pins": [
+        {
+          "number": "1",
+          "name": "1",
+          "role": "passive"
+        },
+        {
+          "number": "2",
+          "name": "wiper",
+          "role": "passive",
+          "aliases": [
+            "W",
+            "w"
+          ]
+        },
+        {
+          "number": "3",
+          "name": "3",
+          "role": "passive"
+        }
+      ],
+      "note": "1 and 3 are the track ends, 2 the wiper (the usual datasheet and KiCad numbering)."
+    },
+    "diode": {
+      "name": "Diode",
+      "specName": "diode",
+      "pins": [
+        {
+          "number": "A",
+          "name": "anode",
+          "role": "passive",
+          "aliases": [
+            "a",
+            "+"
+          ],
+          "chain": "in"
+        },
+        {
+          "number": "K",
+          "name": "cathode",
+          "role": "passive",
+          "aliases": [
+            "k",
+            "-"
+          ],
+          "chain": "out"
+        }
+      ],
+      "note": "Same numbers and names as the built-in led, but no numeric aliases: diode pin 1 is the cathode in common libraries (KiCad), the opposite of the built-in led's alias 1 = anode."
+    },
+    "npn": {
+      "name": "NPN transistor",
+      "specName": "NPN",
+      "pins": [
+        {
+          "number": "B",
+          "name": "base",
+          "role": "passive",
+          "aliases": [
+            "b"
+          ]
+        },
+        {
+          "number": "C",
+          "name": "collector",
+          "role": "passive",
+          "aliases": [
+            "c"
+          ]
+        },
+        {
+          "number": "E",
+          "name": "emitter",
+          "role": "passive",
+          "aliases": [
+            "e"
+          ]
+        }
+      ],
+      "note": "Symbol pins, not package pins: the package pinout (TO-92 EBC or CBE) is not modelled; props.partNumber names the part."
+    },
+    "pnp": {
+      "name": "PNP transistor",
+      "specName": "PNP",
+      "pins": [
+        {
+          "number": "B",
+          "name": "base",
+          "role": "passive",
+          "aliases": [
+            "b"
+          ]
+        },
+        {
+          "number": "C",
+          "name": "collector",
+          "role": "passive",
+          "aliases": [
+            "c"
+          ]
+        },
+        {
+          "number": "E",
+          "name": "emitter",
+          "role": "passive",
+          "aliases": [
+            "e"
+          ]
+        }
+      ]
+    },
+    "nmos": {
+      "name": "N-channel MOSFET",
+      "specName": "N-MOSFET",
+      "pins": [
+        {
+          "number": "G",
+          "name": "gate",
+          "role": "passive",
+          "aliases": [
+            "g"
+          ]
+        },
+        {
+          "number": "D",
+          "name": "drain",
+          "role": "passive",
+          "aliases": [
+            "d"
+          ]
+        },
+        {
+          "number": "S",
+          "name": "source",
+          "role": "passive",
+          "aliases": [
+            "s"
+          ]
+        }
+      ],
+      "note": "Symbol pins, not package pins (TO-220 is G D S for the parts used, but that is not modelled)."
+    },
+    "pmos": {
+      "name": "P-channel MOSFET",
+      "specName": "P-MOSFET",
+      "pins": [
+        {
+          "number": "G",
+          "name": "gate",
+          "role": "passive",
+          "aliases": [
+            "g"
+          ]
+        },
+        {
+          "number": "D",
+          "name": "drain",
+          "role": "passive",
+          "aliases": [
+            "d"
+          ]
+        },
+        {
+          "number": "S",
+          "name": "source",
+          "role": "passive",
+          "aliases": [
+            "s"
+          ]
+        }
+      ]
+    },
+    "spst": {
+      "name": "SPST switch",
+      "specName": "SPST",
+      "pins": [
+        {
+          "number": "1",
+          "name": "1",
+          "role": "passive",
+          "chain": "in"
+        },
+        {
+          "number": "2",
+          "name": "2",
+          "role": "passive",
+          "chain": "out"
+        }
+      ]
+    },
+    "pushbutton": {
+      "name": "Push button (normally open)",
+      "specName": "push button",
+      "pins": [
+        {
+          "number": "1",
+          "name": "1",
+          "role": "passive",
+          "chain": "in"
+        },
+        {
+          "number": "2",
+          "name": "2",
+          "role": "passive",
+          "chain": "out"
+        }
+      ]
+    },
+    "buzzer": {
+      "name": "Buzzer (polarised, active)",
+      "specName": "buzzer",
+      "pins": [
+        {
+          "number": "+",
+          "name": "+",
+          "role": "passive",
+          "aliases": [
+            "pos",
+            "p"
+          ],
+          "chain": "in"
+        },
+        {
+          "number": "-",
+          "name": "-",
+          "role": "passive",
+          "aliases": [
+            "neg",
+            "n"
+          ],
+          "chain": "out"
+        }
+      ]
+    },
+    "motor": {
+      "name": "DC motor",
+      "specName": "motor",
+      "pins": [
+        {
+          "number": "1",
+          "name": "1",
+          "role": "passive",
+          "aliases": [
+            "+"
+          ]
+        },
+        {
+          "number": "2",
+          "name": "2",
+          "role": "passive",
+          "aliases": [
+            "-"
+          ]
+        }
+      ]
+    },
+    "relay": {
+      "name": "Relay, one changeover contact",
+      "specName": "relay (one symbol)",
+      "pins": [
+        {
+          "number": "A1",
+          "name": "A1",
+          "role": "passive"
+        },
+        {
+          "number": "A2",
+          "name": "A2",
+          "role": "passive"
+        },
+        {
+          "number": "11",
+          "name": "COM",
+          "role": "passive"
+        },
+        {
+          "number": "12",
+          "name": "NC",
+          "role": "passive"
+        },
+        {
+          "number": "14",
+          "name": "NO",
+          "role": "passive"
+        }
+      ],
+      "note": "Terminal numbers follow EN 50005 (coil A1/A2, changeover contact 11 common, 12 normally closed, 14 normally open)."
+    },
+    "fuse": {
+      "name": "Fuse",
+      "specName": "fuse",
+      "pins": [
+        {
+          "number": "1",
+          "name": "1",
+          "role": "passive",
+          "chain": "in"
+        },
+        {
+          "number": "2",
+          "name": "2",
+          "role": "passive",
+          "chain": "out"
+        }
+      ]
+    },
+    "ac-source": {
+      "name": "AC voltage source",
+      "specName": "AC source",
+      "pins": [
+        {
+          "number": "1",
+          "name": "1",
+          "role": "passive"
+        },
+        {
+          "number": "2",
+          "name": "2",
+          "role": "passive"
+        }
+      ],
+      "note": "Unpolarised; value is the RMS voltage."
+    },
+    "header": {
+      "name": "Header connector",
+      "specName": "header connector",
+      "pins": [],
+      "note": "Pin count and names vary per part, so each header part carries its own pins (like ic)."
+    }
+  }
+}

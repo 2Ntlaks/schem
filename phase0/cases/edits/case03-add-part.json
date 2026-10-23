@@ -1,0 +1,44 @@
+{
+  "schema": "schem-edit/phase0b",
+  "case": "validation/case03-summing.json",
+  "edit": "add-part",
+  "description": "Add a 100 pF compensation capacitor Cf in parallel with Rf (SUM to OUT), both existing nets.",
+  "ops": [
+    {
+      "op": "addPart",
+      "part": {
+        "id": "Cf",
+        "type": "capacitor",
+        "props": {
+          "value": "100p"
+        }
+      }
+    },
+    {
+      "op": "connect",
+      "endpoints": [
+        "Cf[1]",
+        "Rf[1]"
+      ]
+    },
+    {
+      "op": "connect",
+      "endpoints": [
+        "Cf[2]",
+        "Rf[2]"
+      ]
+    }
+  ],
+  "expect": {
+    "ok": true,
+    "affectedParts": [
+      "Cf",
+      "R1",
+      "R2",
+      "R3",
+      "RL",
+      "Rf",
+      "U1"
+    ]
+  }
+}

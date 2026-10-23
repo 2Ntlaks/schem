@@ -1,0 +1,166 @@
+{
+  "schema": "schem/1.0",
+  "meta": {
+    "title": "Case 8: differential pair with current-mirror load",
+    "created": "2026-10-23",
+    "nextNetId": 8,
+    "nextHintId": 1
+  },
+  "circuit": {
+    "parts": [
+      {
+        "id": "V1",
+        "type": "vsource",
+        "props": {
+          "value": "1mV"
+        }
+      },
+      {
+        "id": "V2",
+        "type": "vsource",
+        "props": {
+          "value": "12V"
+        }
+      },
+      {
+        "id": "V3",
+        "type": "vsource",
+        "props": {
+          "value": "12V"
+        }
+      },
+      {
+        "id": "Q1",
+        "type": "npn",
+        "props": {
+          "partNumber": "2N3904"
+        }
+      },
+      {
+        "id": "Q2",
+        "type": "npn",
+        "props": {
+          "partNumber": "2N3904"
+        }
+      },
+      {
+        "id": "Q3",
+        "type": "pnp",
+        "props": {
+          "partNumber": "2N3906"
+        }
+      },
+      {
+        "id": "Q4",
+        "type": "pnp",
+        "props": {
+          "partNumber": "2N3906"
+        }
+      },
+      {
+        "id": "RE",
+        "type": "resistor",
+        "props": {
+          "value": "11k"
+        }
+      },
+      {
+        "id": "RL",
+        "type": "resistor",
+        "props": {
+          "value": "10k"
+        }
+      }
+    ],
+    "nets": [
+      {
+        "id": "n1",
+        "name": "+12V",
+        "kind": "power",
+        "endpoints": [
+          "Q3[E]",
+          "Q4[E]",
+          "V2[+]"
+        ]
+      },
+      {
+        "id": "n2",
+        "name": "-12V",
+        "kind": "power",
+        "endpoints": [
+          "RE[2]",
+          "V3[-]"
+        ]
+      },
+      {
+        "id": "n3",
+        "name": "GND",
+        "endpoints": [
+          "Q2[B]",
+          "RL[2]",
+          "V1[-]",
+          "V2[-]",
+          "V3[+]"
+        ]
+      },
+      {
+        "id": "n4",
+        "name": "IN",
+        "endpoints": [
+          "Q1[B]",
+          "V1[+]"
+        ]
+      },
+      {
+        "id": "n5",
+        "name": "TAIL",
+        "endpoints": [
+          "Q1[E]",
+          "Q2[E]",
+          "RE[1]"
+        ]
+      },
+      {
+        "id": "n6",
+        "name": "MIRROR",
+        "endpoints": [
+          "Q1[C]",
+          "Q3[B]",
+          "Q3[C]",
+          "Q4[B]"
+        ]
+      },
+      {
+        "id": "n7",
+        "name": "OUT",
+        "endpoints": [
+          "Q2[C]",
+          "Q4[C]",
+          "RL[1]"
+        ]
+      }
+    ],
+    "nc": []
+  },
+  "intent": {
+    "hints": [],
+    "locks": [],
+    "overrides": {},
+    "style": {
+      "theme": "clean",
+      "symbols": "ieee"
+    }
+  },
+  "assets": {
+    "library": "schem-symbols@phase0b-proposal",
+    "definitions": {}
+  },
+  "ext": {
+    "phase0": {
+      "case": 8,
+      "set": "validation",
+      "author": "agent B (independent case author)",
+      "source": "textbook BJT differential amplifier: 2N3904 pair, 2N3906 current mirror, 11k tail resistor to -12 V (about 1 mA), single-ended 1 mV input, 10k load (gain about 200), +/-12 V sources"
+    }
+  }
+}

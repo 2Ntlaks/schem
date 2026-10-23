@@ -1,0 +1,113 @@
+{
+  "schema": "schem/1.0",
+  "meta": {
+    "title": "Case 2: voltage divider feeding an op-amp buffer",
+    "created": "2026-10-23",
+    "nextNetId": 5,
+    "nextHintId": 1
+  },
+  "circuit": {
+    "parts": [
+      {
+        "id": "B1",
+        "type": "battery",
+        "props": {
+          "value": "9V"
+        }
+      },
+      {
+        "id": "R1",
+        "type": "resistor",
+        "props": {
+          "value": "10k"
+        }
+      },
+      {
+        "id": "R2",
+        "type": "resistor",
+        "props": {
+          "value": "10k"
+        }
+      },
+      {
+        "id": "C1",
+        "type": "capacitor",
+        "props": {
+          "value": "100n"
+        }
+      },
+      {
+        "id": "U1",
+        "type": "opamp"
+      },
+      {
+        "id": "RL",
+        "type": "resistor",
+        "props": {
+          "value": "10k"
+        }
+      }
+    ],
+    "nets": [
+      {
+        "id": "n1",
+        "name": "9V",
+        "endpoints": [
+          "B1[+]",
+          "R1[1]"
+        ]
+      },
+      {
+        "id": "n2",
+        "name": "VREF",
+        "endpoints": [
+          "C1[1]",
+          "R1[2]",
+          "R2[1]",
+          "U1[3]"
+        ]
+      },
+      {
+        "id": "n3",
+        "name": "VOUT",
+        "endpoints": [
+          "RL[1]",
+          "U1[1]",
+          "U1[2]"
+        ]
+      },
+      {
+        "id": "n4",
+        "name": "GND",
+        "endpoints": [
+          "B1[-]",
+          "C1[2]",
+          "R2[2]",
+          "RL[2]"
+        ]
+      }
+    ],
+    "nc": []
+  },
+  "intent": {
+    "hints": [],
+    "locks": [],
+    "overrides": {},
+    "style": {
+      "theme": "clean",
+      "symbols": "ieee"
+    }
+  },
+  "assets": {
+    "library": "schem-symbols@phase0b-proposal",
+    "definitions": {}
+  },
+  "ext": {
+    "phase0": {
+      "case": 2,
+      "set": "validation",
+      "author": "agent B (independent case author)",
+      "source": "textbook circuit: 9 V battery, 10k/10k divider with 100 nF filter, unity-gain follower (built-in 3-pin op-amp), 10k load"
+    }
+  }
+}

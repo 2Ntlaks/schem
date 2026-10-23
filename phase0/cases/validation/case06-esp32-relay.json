@@ -1,0 +1,486 @@
+{
+  "schema": "schem/1.0",
+  "meta": {
+    "title": "Case 6: ESP32 + relay via NPN driver + flyback diode",
+    "created": "2026-10-23",
+    "nextNetId": 9,
+    "nextHintId": 1
+  },
+  "circuit": {
+    "parts": [
+      {
+        "id": "U1",
+        "type": "module:esp32-devkitc-v4"
+      },
+      {
+        "id": "R1",
+        "type": "resistor",
+        "props": {
+          "value": "1k"
+        }
+      },
+      {
+        "id": "R2",
+        "type": "resistor",
+        "props": {
+          "value": "10k"
+        }
+      },
+      {
+        "id": "Q1",
+        "type": "npn",
+        "props": {
+          "partNumber": "2N2222A"
+        }
+      },
+      {
+        "id": "D1",
+        "type": "diode",
+        "props": {
+          "partNumber": "1N4148"
+        }
+      },
+      {
+        "id": "K1",
+        "type": "relay",
+        "props": {
+          "partNumber": "SRD-05VDC-SL-C",
+          "label": "5 V relay"
+        }
+      },
+      {
+        "id": "J1",
+        "type": "header",
+        "props": {
+          "label": "LOAD"
+        },
+        "pins": [
+          {
+            "number": "1",
+            "name": "COM",
+            "role": "passive"
+          },
+          {
+            "number": "2",
+            "name": "NO",
+            "role": "passive"
+          },
+          {
+            "number": "3",
+            "name": "NC",
+            "role": "passive"
+          }
+        ]
+      }
+    ],
+    "nets": [
+      {
+        "id": "n1",
+        "name": "5V",
+        "endpoints": [
+          "D1[K]",
+          "K1[A1]",
+          "U1[J2-19]"
+        ]
+      },
+      {
+        "id": "n2",
+        "name": "GND",
+        "endpoints": [
+          "Q1[E]",
+          "R2[2]",
+          "U1{GND}"
+        ]
+      },
+      {
+        "id": "n3",
+        "name": "RELAY",
+        "endpoints": [
+          "R1[1]",
+          "U1[J2-10]"
+        ]
+      },
+      {
+        "id": "n4",
+        "endpoints": [
+          "Q1[B]",
+          "R1[2]",
+          "R2[1]"
+        ]
+      },
+      {
+        "id": "n5",
+        "endpoints": [
+          "D1[A]",
+          "K1[A2]",
+          "Q1[C]"
+        ]
+      },
+      {
+        "id": "n6",
+        "endpoints": [
+          "J1[1]",
+          "K1[11]"
+        ]
+      },
+      {
+        "id": "n7",
+        "endpoints": [
+          "J1[2]",
+          "K1[14]"
+        ]
+      },
+      {
+        "id": "n8",
+        "endpoints": [
+          "J1[3]",
+          "K1[12]"
+        ]
+      }
+    ],
+    "nc": []
+  },
+  "intent": {
+    "hints": [],
+    "locks": [],
+    "overrides": {},
+    "style": {
+      "theme": "clean",
+      "symbols": "ieee"
+    }
+  },
+  "assets": {
+    "library": "schem-symbols@phase0b-proposal",
+    "definitions": {
+      "module:esp32-devkitc-v4": {
+        "id": "module:esp32-devkitc-v4",
+        "version": 1,
+        "kind": "module",
+        "name": "ESP32-DevKitC V4",
+        "refPrefix": "U",
+        "controller": true,
+        "doc": {
+          "title": "ESP32-DevKitC V4 User Guide, section Header Block (tables J2 and J3)",
+          "url": "https://docs.espressif.com/projects/esp-dev-kits/en/latest/esp32/esp32-devkitc/user_guide.html",
+          "revision": "board ESP32-DevKitC V4 (page 'latest' as retrieved; photo shows ESP32-WROOM-32E)",
+          "retrieved": "2026-10-23",
+          "pinNumbering": "J2-n and J3-n are the header and the 'No.' column of the user guide's J2 and J3 tables.",
+          "notes": "GND is on J2-14, J3-1 and J3-7 (one ground on the board, so group GND). D0-D3, CLK and CMD (GPIO6-11) connect to the SPI flash; the guide says to avoid them. Roles: P -> 3V3 power_out (on-board regulator output) and 5V power_in (board supply input); I -> input; I/O -> bidir; G -> ground. No interface roles: any GPIO can carry I2C or SPI through the GPIO matrix, so the board documentation assigns none."
+        },
+        "pins": [
+          {
+            "number": "J2-1",
+            "name": "3V3",
+            "role": "power_out"
+          },
+          {
+            "number": "J2-2",
+            "name": "EN",
+            "role": "input",
+            "aliases": [
+              "CHIP_PU"
+            ]
+          },
+          {
+            "number": "J2-3",
+            "name": "VP",
+            "role": "input",
+            "aliases": [
+              "GPIO36",
+              "S_VP"
+            ]
+          },
+          {
+            "number": "J2-4",
+            "name": "VN",
+            "role": "input",
+            "aliases": [
+              "GPIO39",
+              "S_VN"
+            ]
+          },
+          {
+            "number": "J2-5",
+            "name": "IO34",
+            "role": "input",
+            "aliases": [
+              "GPIO34"
+            ]
+          },
+          {
+            "number": "J2-6",
+            "name": "IO35",
+            "role": "input",
+            "aliases": [
+              "GPIO35"
+            ]
+          },
+          {
+            "number": "J2-7",
+            "name": "IO32",
+            "role": "bidir",
+            "aliases": [
+              "GPIO32"
+            ]
+          },
+          {
+            "number": "J2-8",
+            "name": "IO33",
+            "role": "bidir",
+            "aliases": [
+              "GPIO33"
+            ]
+          },
+          {
+            "number": "J2-9",
+            "name": "IO25",
+            "role": "bidir",
+            "aliases": [
+              "GPIO25",
+              "DAC_1"
+            ]
+          },
+          {
+            "number": "J2-10",
+            "name": "IO26",
+            "role": "bidir",
+            "aliases": [
+              "GPIO26",
+              "DAC_2"
+            ]
+          },
+          {
+            "number": "J2-11",
+            "name": "IO27",
+            "role": "bidir",
+            "aliases": [
+              "GPIO27"
+            ]
+          },
+          {
+            "number": "J2-12",
+            "name": "IO14",
+            "role": "bidir",
+            "aliases": [
+              "GPIO14",
+              "MTMS"
+            ]
+          },
+          {
+            "number": "J2-13",
+            "name": "IO12",
+            "role": "bidir",
+            "aliases": [
+              "GPIO12",
+              "MTDI"
+            ]
+          },
+          {
+            "number": "J2-14",
+            "name": "GND",
+            "role": "ground",
+            "group": "GND"
+          },
+          {
+            "number": "J2-15",
+            "name": "IO13",
+            "role": "bidir",
+            "aliases": [
+              "GPIO13",
+              "MTCK"
+            ]
+          },
+          {
+            "number": "J2-16",
+            "name": "D2",
+            "role": "bidir",
+            "aliases": [
+              "GPIO9"
+            ]
+          },
+          {
+            "number": "J2-17",
+            "name": "D3",
+            "role": "bidir",
+            "aliases": [
+              "GPIO10"
+            ]
+          },
+          {
+            "number": "J2-18",
+            "name": "CMD",
+            "role": "bidir",
+            "aliases": [
+              "GPIO11"
+            ]
+          },
+          {
+            "number": "J2-19",
+            "name": "5V",
+            "role": "power_in"
+          },
+          {
+            "number": "J3-1",
+            "name": "GND",
+            "role": "ground",
+            "group": "GND"
+          },
+          {
+            "number": "J3-2",
+            "name": "IO23",
+            "role": "bidir",
+            "aliases": [
+              "GPIO23"
+            ]
+          },
+          {
+            "number": "J3-3",
+            "name": "IO22",
+            "role": "bidir",
+            "aliases": [
+              "GPIO22"
+            ]
+          },
+          {
+            "number": "J3-4",
+            "name": "TX",
+            "role": "bidir",
+            "aliases": [
+              "GPIO1",
+              "U0TXD"
+            ]
+          },
+          {
+            "number": "J3-5",
+            "name": "RX",
+            "role": "bidir",
+            "aliases": [
+              "GPIO3",
+              "U0RXD"
+            ]
+          },
+          {
+            "number": "J3-6",
+            "name": "IO21",
+            "role": "bidir",
+            "aliases": [
+              "GPIO21"
+            ]
+          },
+          {
+            "number": "J3-7",
+            "name": "GND",
+            "role": "ground",
+            "group": "GND"
+          },
+          {
+            "number": "J3-8",
+            "name": "IO19",
+            "role": "bidir",
+            "aliases": [
+              "GPIO19"
+            ]
+          },
+          {
+            "number": "J3-9",
+            "name": "IO18",
+            "role": "bidir",
+            "aliases": [
+              "GPIO18"
+            ]
+          },
+          {
+            "number": "J3-10",
+            "name": "IO5",
+            "role": "bidir",
+            "aliases": [
+              "GPIO5"
+            ]
+          },
+          {
+            "number": "J3-11",
+            "name": "IO17",
+            "role": "bidir",
+            "aliases": [
+              "GPIO17"
+            ]
+          },
+          {
+            "number": "J3-12",
+            "name": "IO16",
+            "role": "bidir",
+            "aliases": [
+              "GPIO16"
+            ]
+          },
+          {
+            "number": "J3-13",
+            "name": "IO4",
+            "role": "bidir",
+            "aliases": [
+              "GPIO4"
+            ]
+          },
+          {
+            "number": "J3-14",
+            "name": "IO0",
+            "role": "bidir",
+            "aliases": [
+              "GPIO0",
+              "BOOT"
+            ]
+          },
+          {
+            "number": "J3-15",
+            "name": "IO2",
+            "role": "bidir",
+            "aliases": [
+              "GPIO2"
+            ]
+          },
+          {
+            "number": "J3-16",
+            "name": "IO15",
+            "role": "bidir",
+            "aliases": [
+              "GPIO15",
+              "MTDO"
+            ]
+          },
+          {
+            "number": "J3-17",
+            "name": "D1",
+            "role": "bidir",
+            "aliases": [
+              "GPIO8"
+            ]
+          },
+          {
+            "number": "J3-18",
+            "name": "D0",
+            "role": "bidir",
+            "aliases": [
+              "GPIO7"
+            ]
+          },
+          {
+            "number": "J3-19",
+            "name": "CLK",
+            "role": "bidir",
+            "aliases": [
+              "GPIO6"
+            ]
+          }
+        ]
+      }
+    }
+  },
+  "ext": {
+    "phase0": {
+      "case": 6,
+      "set": "validation",
+      "author": "agent B (independent case author)",
+      "source": "ESP32-DevKitC V4 IO26 drives a 2N2222A through 1k (10k base pull-down); 5 V relay coil with 1N4148 flyback; contacts to a 3-way terminal"
+    }
+  }
+}

@@ -1,0 +1,43 @@
+{
+  "schema": "schem-edit/phase0b",
+  "case": "validation/case05-i2c.json",
+  "edit": "add-part",
+  "description": "Add a 100 nF capacitor C1 between 3V3 and GND (both existing nets).",
+  "ops": [
+    {
+      "op": "addPart",
+      "part": {
+        "id": "C1",
+        "type": "capacitor",
+        "props": {
+          "value": "100n"
+        }
+      }
+    },
+    {
+      "op": "connect",
+      "endpoints": [
+        "C1[1]",
+        "U1[1]"
+      ]
+    },
+    {
+      "op": "connect",
+      "endpoints": [
+        "C1[2]",
+        "U1[2]"
+      ]
+    }
+  ],
+  "expect": {
+    "ok": true,
+    "affectedParts": [
+      "C1",
+      "R1",
+      "R2",
+      "U1",
+      "U2",
+      "U3"
+    ]
+  }
+}

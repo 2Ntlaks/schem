@@ -1,0 +1,210 @@
+{
+  "schema": "schem/1.0",
+  "meta": {
+    "title": "Case 9: 555 astable with LED output",
+    "created": "2026-10-23",
+    "nextNetId": 8,
+    "nextHintId": 1
+  },
+  "circuit": {
+    "parts": [
+      {
+        "id": "B1",
+        "type": "battery",
+        "props": {
+          "value": "9V"
+        }
+      },
+      {
+        "id": "U1",
+        "type": "ic",
+        "props": {
+          "label": "NE555",
+          "partNumber": "NE555P"
+        },
+        "pins": [
+          {
+            "number": "1",
+            "name": "GND",
+            "role": "ground"
+          },
+          {
+            "number": "2",
+            "name": "TRIG",
+            "role": "input"
+          },
+          {
+            "number": "3",
+            "name": "OUT",
+            "role": "output"
+          },
+          {
+            "number": "4",
+            "name": "RESET",
+            "role": "input"
+          },
+          {
+            "number": "5",
+            "name": "CONT",
+            "role": "bidir"
+          },
+          {
+            "number": "6",
+            "name": "THRES",
+            "role": "input"
+          },
+          {
+            "number": "7",
+            "name": "DISCH",
+            "role": "output"
+          },
+          {
+            "number": "8",
+            "name": "VCC",
+            "role": "power_in"
+          }
+        ]
+      },
+      {
+        "id": "R1",
+        "type": "resistor",
+        "props": {
+          "value": "1k"
+        }
+      },
+      {
+        "id": "R2",
+        "type": "resistor",
+        "props": {
+          "value": "10k"
+        }
+      },
+      {
+        "id": "C1",
+        "type": "polarised-capacitor",
+        "props": {
+          "value": "10u"
+        }
+      },
+      {
+        "id": "C2",
+        "type": "capacitor",
+        "props": {
+          "value": "10n"
+        }
+      },
+      {
+        "id": "C3",
+        "type": "capacitor",
+        "props": {
+          "value": "100n"
+        }
+      },
+      {
+        "id": "R3",
+        "type": "resistor",
+        "props": {
+          "value": "470"
+        }
+      },
+      {
+        "id": "D1",
+        "type": "led",
+        "props": {
+          "color": "red"
+        }
+      }
+    ],
+    "nets": [
+      {
+        "id": "n1",
+        "name": "9V",
+        "endpoints": [
+          "B1[+]",
+          "C3[1]",
+          "R1[1]",
+          "U1[4]",
+          "U1[8]"
+        ]
+      },
+      {
+        "id": "n2",
+        "name": "GND",
+        "endpoints": [
+          "B1[-]",
+          "C1[-]",
+          "C2[2]",
+          "C3[2]",
+          "D1[K]",
+          "U1[1]"
+        ]
+      },
+      {
+        "id": "n3",
+        "name": "DIS",
+        "endpoints": [
+          "R1[2]",
+          "R2[1]",
+          "U1[7]"
+        ]
+      },
+      {
+        "id": "n4",
+        "name": "THR",
+        "endpoints": [
+          "C1[+]",
+          "R2[2]",
+          "U1[2]",
+          "U1[6]"
+        ]
+      },
+      {
+        "id": "n5",
+        "endpoints": [
+          "C2[1]",
+          "U1[5]"
+        ]
+      },
+      {
+        "id": "n6",
+        "name": "OUT",
+        "endpoints": [
+          "R3[1]",
+          "U1[3]"
+        ]
+      },
+      {
+        "id": "n7",
+        "endpoints": [
+          "D1[A]",
+          "R3[2]"
+        ]
+      }
+    ],
+    "nc": []
+  },
+  "intent": {
+    "hints": [],
+    "locks": [],
+    "overrides": {},
+    "style": {
+      "theme": "clean",
+      "symbols": "ieee"
+    }
+  },
+  "assets": {
+    "library": "schem-symbols@phase0b-proposal",
+    "definitions": {}
+  },
+  "ext": {
+    "phase0": {
+      "case": 9,
+      "set": "test",
+      "author": "agent B (independent case author)",
+      "source": "NE555P astable from a 9 V battery: RA 1k, RB 10k, 10 uF timing capacitor (about 7 Hz), 10 nF on CONT, 100 nF supply decoupling, LED with 470 ohm",
+      "pinSources": {
+        "U1": "TI NE555 datasheet SLFS022K (rev. March 2026), Table 4-1 Pin Functions, P (PDIP-8) column: https://www.ti.com/lit/ds/symlink/ne555.pdf"
+      }
+    }
+  }
+}

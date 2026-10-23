@@ -1,0 +1,20 @@
+{
+  "schema": "schem-edit/phase0b",
+  "case": "validation/case07-two-ic-decoupling.json",
+  "edit": "longer-value",
+  "description": "Decoupling capacitor C1 value text from \"100n\" (4 characters) to \"100n X7R 50V\" (12), displayed as written (W320).",
+  "ops": [
+    {
+      "op": "setProp",
+      "part": "C1",
+      "key": "value",
+      "value": "100n X7R 50V"
+    }
+  ],
+  "expect": {
+    "ok": true,
+    "affectedParts": [
+      "C1"
+    ]
+  }
+}

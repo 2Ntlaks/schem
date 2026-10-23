@@ -1,0 +1,22 @@
+{
+  "schema": "schem-edit/phase0b",
+  "case": "validation/case05-i2c.json",
+  "edit": "pin-sides",
+  "description": "Controller U1: put 3V3 and GND on the left side (3V3 above GND). The I2C pins are not named, so the A.2 template still places them.",
+  "ops": [
+    {
+      "op": "setPinSides",
+      "part": "U1",
+      "left": [
+        "U1[1]",
+        "U1[2]"
+      ]
+    }
+  ],
+  "expect": {
+    "ok": true,
+    "affectedParts": [
+      "U1"
+    ]
+  }
+}
