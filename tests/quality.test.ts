@@ -147,6 +147,11 @@ describe("layer 3: conventions", () => {
     }
   });
 
+  it("an upside-down source is caught (rule 7, sources)", () => {
+    const p = load("case01-led.json");
+    expect(ids({ ...p, intent: { hints: [{ id: "h1", type: "orient", part: "B1", rot: 270, flip: false, priority: "normal" }] } })).toContain("C7-source-B1");
+  });
+
   it("two series resistors off one line are caught (rule 11)", () => {
     const chain: Project = { circuit: {
       parts: [{ id: "V1", type: "vsource", props: { value: "5V" } }, { id: "R1", type: "resistor" }, { id: "R2", type: "resistor" }, { id: "D1", type: "led" }],

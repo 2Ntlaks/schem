@@ -1,6 +1,6 @@
 // Verification layer 3: drafting conventions (SPEC 9.1 group 2, 9.4). Each break is a
-// finding (SPEC 10.2). Checked fixes arrive with the Phase 0b findings harness; until then
-// every finding carries `fix: null`.
+// finding (SPEC 10.2) naming the parts involved; the findings harness (src/edit/findings.ts)
+// looks for a checked fix.
 
 import { key, type Pt } from "../geom/geom.js";
 import { canonical, netKind, type Circuit, type PinDefs } from "../core/model.js";
@@ -9,7 +9,7 @@ import { BUILTIN } from "../symbols/library.js";
 import type { DrawnPin, RenderModel } from "../render/model.js";
 import { conductors } from "./drawing.js";
 
-export interface Finding { id: string; severity: "error" | "warn" | "info"; message: string; fix: null }
+export interface Finding { id: string; severity: "error" | "warn" | "info"; message: string; parts: string[]; fix: null }
 
 /** A decoupling capacitor further than this (Manhattan, G) from the pin it serves is a break. */
 export const DECOUPLING_REACH = 8;
@@ -69,7 +69,14 @@ export function checkConventions(circuit: Circuit, pinDefs: PinDefs, m: RenderMo
     const want = port.kind === "ground" ? "down" : "up";      // direction the connection leaves towards the symbol
     const from = port.kind === "ground" ? "up" : "down";      // where the conductor must come from
     const ok = pin ? pin.dir === want : dirs !== undefined && dirs.size === 1 && dirs.has(from);
-    if (!ok) out.push({ id: `C7-${port.kind}-${k}`, severity: "warn", message: `${port.kind === "ground" ? "Ground" : "Supply"} symbol "${port.text}" at ${k} is not ${port.kind === "ground" ? "below" : "above"} its connection.`, fix: null });
+    if (!ok) out.push({ id: `C7-${port.kind}-${k}`, severity: "warn", message: `${port.kind === "ground" ? "Ground" : "Supply"} symbol "${port.text}" at ${k} is not ${port.kind === "ground" ? "below" : "above"} its connection.`, parts: pin ? [pin.part] : [], fix: null });
+  }
+
+  // 7 (sources): a battery or voltage source stands vertical with "+" above "-".
+  for (const part of circuit.parts) {
+    if (BUILTIN[part.type]?.kind !== "source") continue;
+    const plus = pinOf.get(`${part.id}[+]`), minus = pinOf.get(`${part.id}[-]`);
+    if (plus && minus && !(plus.at[0] === minus.at[0] && plus.at[1] < minus.at[1])) out.push({ id: `C7-source-${part.id}`, severity: "warn", message: `Source ${part.id} is not drawn vertical with "+" at the top.`, parts: [part.id], fix: null });
   }
 
   for (const part of circuit.parts) {
@@ -81,10 +88,10 @@ export function checkConventions(circuit: Circuit, pinDefs: PinDefs, m: RenderMo
     // 10: a two-pin part between a supply and ground is vertical, supply side up.
     if ((ka === "power" && kb === "ground") || (ka === "ground" && kb === "power")) {
       const [pw, gd] = ka === "power" ? [a, b] : [b, a];
-      if (!vertical || pw.at[1] > gd.at[1]) out.push({ id: `C10-${part.id}`, severity: "warn", message: `${part.id} sits between a supply and ground but is not drawn vertical with the supply side up.`, fix: null });
+      if (!vertical || pw.at[1] > gd.at[1]) out.push({ id: `C10-${part.id}`, severity: "warn", message: `${part.id} sits between a supply and ground but is not drawn vertical with the supply side up.`, parts: [part.id], fix: null });
     } else if (part.type === "resistor" && ((asPort(a) && kb === "signal") || (asPort(b) && ka === "signal"))) {
       // 9.4 pull-up / pull-down: vertical from a rail drawn as a symbol to the signal wire.
-      if (!vertical) out.push({ id: `C9.4-pull-${part.id}`, severity: "warn", message: `Pull-up or pull-down ${part.id} is not drawn vertical.`, fix: null });
+      if (!vertical) out.push({ id: `C9.4-pull-${part.id}`, severity: "warn", message: `Pull-up or pull-down ${part.id} is not drawn vertical.`, parts: [part.id], fix: null });
     }
   }
 
@@ -94,14 +101,14 @@ export function checkConventions(circuit: Circuit, pinDefs: PinDefs, m: RenderMo
     if (kind === "signal" && ps.length === 2 && ps.every((p) => twoPin(p.part)) && ps.every((p) => p.dir === "left" || p.dir === "right")) {
       const others = ps.map((p) => pinOf.get(`${p.part}[${pinDefs[p.part]!.find((d) => d.number !== p.number)!.number}]`));
       const sideways = others.every((o) => o !== undefined && o.at[1] === ps.find((p) => p.part === o.part)!.at[1]);
-      if (sideways && ps[0]!.at[1] !== ps[1]!.at[1]) out.push({ id: `C11-${ps.map((p) => p.part).sort().join("-")}`, severity: "warn", message: `${ps[0]!.part} and ${ps[1]!.part} are in series but not on one line.`, fix: null });
+      if (sideways && ps[0]!.at[1] !== ps[1]!.at[1]) out.push({ id: `C11-${ps.map((p) => p.part).sort().join("-")}`, severity: "warn", message: `${ps[0]!.part} and ${ps[1]!.part} are in series but not on one line.`, parts: ps.map((p) => p.part).sort(), fix: null });
     }
     // 8: signal flows left to right: a driven input is not left of its driver.
     if (kind === "signal") {
       const drivers = ps.filter((p) => role(p) === "output" || role(p) === "power_out");
       const inputs = ps.filter((p) => role(p) === "input");
       // An input of the driver's own part is local feedback (a follower), not backwards flow.
-      if (drivers.length === 1) for (const i of inputs) if (i.part !== drivers[0]!.part && i.at[0] < drivers[0]!.at[0]) out.push({ id: `C8-${i.part}[${i.number}]`, severity: "warn", message: `Signal flows right to left: input ${i.part}[${i.number}] is left of its driver ${drivers[0]!.part}[${drivers[0]!.number}].`, fix: null });
+      if (drivers.length === 1) for (const i of inputs) if (i.part !== drivers[0]!.part && i.at[0] < drivers[0]!.at[0]) out.push({ id: `C8-${i.part}[${i.number}]`, severity: "warn", message: `Signal flows right to left: input ${i.part}[${i.number}] is left of its driver ${drivers[0]!.part}[${drivers[0]!.number}].`, parts: [i.part, drivers[0]!.part], fix: null });
     }
   }
 
@@ -115,7 +122,7 @@ export function checkConventions(circuit: Circuit, pinDefs: PinDefs, m: RenderMo
     const served = (netPins.get(netOfPin.get(`${supply.part}[${supply.number}]`)!) ?? []).filter((p) => !twoPin(p.part) && !BUILTIN[typeOf.get(p.part) ?? ""] && role(p) === "power_in");
     if (!served.length) continue;
     const d = Math.min(...served.map((p) => manhattan(p.at, supply.at)));
-    if (d > DECOUPLING_REACH) out.push({ id: `C13-${part.id}`, severity: "warn", message: `Decoupling capacitor ${part.id} is ${d} G from the nearest supply pin it can serve (at most ${DECOUPLING_REACH} G).`, fix: null });
+    if (d > DECOUPLING_REACH) out.push({ id: `C13-${part.id}`, severity: "warn", message: `Decoupling capacitor ${part.id} is ${d} G from the nearest supply pin it can serve (at most ${DECOUPLING_REACH} G).`, parts: [part.id, ...new Set(served.map((p) => p.part))], fix: null });
   }
   return out.sort((x, y) => (x.id < y.id ? -1 : x.id > y.id ? 1 : 0));
 }

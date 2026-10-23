@@ -3,8 +3,12 @@
 // origin x0 (= 0, zero-weight edge to every variable) give the most compact integer
 // solution; a positive cycle means the constraints cannot all hold.
 
-export type Priority = "structural" | "lock" | "strict" | "high" | "template" | "normal" | "align";
-const RANK: Record<Priority, number> = { structural: 6, lock: 5, strict: 4, high: 3, template: 2, normal: 1, align: 0 };
+/**
+ * Incremental mode: `prev` keeps an untouched part where it was, `prevAffected` keeps a part the
+ * edit touched near where it was. They give way first, affected parts before untouched ones.
+ */
+export type Priority = "structural" | "lock" | "strict" | "high" | "template" | "normal" | "align" | "prev" | "prevAffected";
+const RANK: Record<Priority, number> = { structural: 8, lock: 7, strict: 6, high: 5, template: 4, normal: 3, align: 2, prev: 1, prevAffected: 0 };
 
 export interface Constraint { a: string; b: string; c: number; priority: Priority; why: string }
 

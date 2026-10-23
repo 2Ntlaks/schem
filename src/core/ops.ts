@@ -12,7 +12,8 @@ export type CircuitOp =
   | { op: "setNoConnect"; terminal: string; nc: boolean }
   | { op: "renamePart"; from: string; to: string }
   | { op: "removePart"; part: string }
-  | { op: "addPart"; part: { id: string; type: string; props?: Record<string, string> }; pins?: PinDef[] };
+  | { op: "addPart"; part: { id: string; type: string; props?: Record<string, string> }; pins?: PinDef[] }
+  | { op: "setProp"; part: string; key: string; value: string | null };
 
 /**
  * Apply operations as one transaction. Returns the new circuit and pin inventory,
@@ -122,8 +123,16 @@ function applyOne(c: Circuit, defs: PinDefs, op: CircuitOp): [Circuit, PinDefs] 
     }
     case "addPart": {
       if (c.parts.some((p) => p.id === op.part.id)) fail("E250", `part "${op.part.id}" already exists.`);
-      c.parts.push(structuredClone(op.part));
+      c.parts.push(structuredClone(op.pins ? { ...op.part, pins: op.pins } : op.part)); // pins kept on the part, as in the file
       defs = { ...defs, [op.part.id]: structuredClone(op.pins ?? defs[op.part.id] ?? []) };
+      return [c, defs];
+    }
+    case "setProp": {
+      const p = c.parts.find((x) => x.id === op.part);
+      if (!p) fail("E251", `unknown part "${op.part}".`);
+      const props = { ...(p.props ?? {}) };
+      if (op.value === null) delete props[op.key]; else props[op.key] = op.value;
+      if (Object.keys(props).length) p.props = props; else delete p.props;
       return [c, defs];
     }
   }

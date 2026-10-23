@@ -2,7 +2,7 @@
 // Limits are provisional: set on the Phase 0a drawings the owner commented on, to be
 // calibrated against the owner's blind ratings (docs/verification-stack.html).
 
-import { key, unkey, type Box } from "../geom/geom.js";
+import { key, unkey, type Box, type Pt } from "../geom/geom.js";
 import type { RenderModel } from "../render/model.js";
 import { boxDistance, conductors, isCorner, isCrossing, textBlocks } from "./drawing.js";
 
@@ -22,6 +22,8 @@ export interface Metrics {
   /** Part labels further than FAR_LABEL G from their part. */
   farLabels: number;
   sheet: [number, number];
+  /** Where each limited metric's worst cases are, for the findings harness. */
+  where: Partial<Record<keyof typeof LIMITS, Pt[]>>;
   /** |log(width / height) - log(4 / 3)|. */
   aspectError: number;
   /** Largest difference between opposite margins around the drawing's content (G). */
@@ -43,7 +45,7 @@ export const LIMITS = {
   aspectError: Math.log(3), // flags only very tall or very wide sheets
 } as const;
 
-export interface LimitBreach { metric: keyof typeof LIMITS; value: number; limit: number; message: string }
+export interface LimitBreach { metric: keyof typeof LIMITS; value: number; limit: number; message: string; at: Pt[] }
 
 export function measureDrawing(m: RenderModel): Metrics {
   const c = conductors(m);
@@ -52,10 +54,22 @@ export function measureDrawing(m: RenderModel): Metrics {
   const corners = new Set(points.filter((k) => isCorner(c, k)));
   const dots = [...c.dots].map(unkey);
 
+  const where: Metrics["where"] = { minDotSpacing: [], minCrossingToDot: [], jogs: [], squeezedRuns: [] };
   let minDotSpacing = Infinity;
-  for (let i = 0; i < dots.length; i++) for (let j = i + 1; j < dots.length; j++) minDotSpacing = Math.min(minDotSpacing, Math.hypot(dots[i]![0] - dots[j]![0], dots[i]![1] - dots[j]![1]));
+  for (let i = 0; i < dots.length; i++) for (let j = i + 1; j < dots.length; j++) {
+    const d = Math.hypot(dots[i]![0] - dots[j]![0], dots[i]![1] - dots[j]![1]);
+    minDotSpacing = Math.min(minDotSpacing, d);
+    if (d < LIMITS.minDotSpacing) where.minDotSpacing!.push(dots[i]!, dots[j]!);
+  }
   let minCrossingToDot = Infinity;
-  for (const k of crossings) { const p = unkey(k); for (const d of dots) minCrossingToDot = Math.min(minCrossingToDot, Math.hypot(p[0] - d[0], p[1] - d[1])); }
+  for (const k of crossings) {
+    const p = unkey(k);
+    for (const d of dots) {
+      const dist = Math.hypot(p[0] - d[0], p[1] - d[1]);
+      minCrossingToDot = Math.min(minCrossingToDot, dist);
+      if (dist < LIMITS.minCrossingToDot) where.minCrossingToDot!.push(p);
+    }
+  }
 
   // Jogs: walk from each corner along each of its directions to the next point that is not a
   // plain straight-through; if that is another corner within JOG_MAX, it is a short step.
@@ -65,7 +79,7 @@ export function measureDrawing(m: RenderModel): Metrics {
     for (let n = 1; n <= JOG_MAX; n++) {
       p = [p[0] + (d === "right" ? 1 : d === "left" ? -1 : 0), p[1] + (d === "down" ? 1 : d === "up" ? -1 : 0)];
       const pk = key(p);
-      if (corners.has(pk)) { if (pk > k) jogs++; break; }
+      if (corners.has(pk)) { if (pk > k) { jogs++; where.jogs!.push(unkey(k)); } break; }
       const s = c.dirs.get(pk);
       if (!s || s.size !== 2 || c.pinAt.has(pk) || c.dots.has(pk)) break;
     }
@@ -90,7 +104,7 @@ export function measureDrawing(m: RenderModel): Metrics {
     if (squeezed.has(prev)) continue; // count each run once, from its start
     let len = 0, q = p;
     while (squeezed.has(`${h}|${key(q)}`)) { len++; q = h === "h" ? [q[0] + 1, q[1]] : [q[0], q[1] + 1]; }
-    if (len >= SQUEEZE_RUN) squeezedRuns++;
+    if (len >= SQUEEZE_RUN) { squeezedRuns++; where.squeezedRuns!.push(p); }
   }
 
   const parts = new Map((m.electrical.keepouts ?? []).filter((k) => !k.part.includes(":")).map((k) => [k.part, k as Box]));
@@ -119,6 +133,7 @@ export function measureDrawing(m: RenderModel): Metrics {
     squeezedRuns,
     farLabels,
     sheet: [m.bounds.w, m.bounds.h],
+    where,
     aspectError: Math.abs(Math.log(m.bounds.w / m.bounds.h) - Math.log(4 / 3)),
     marginImbalance: Math.round(marginImbalance * 100) / 100,
   };
@@ -127,10 +142,10 @@ export function measureDrawing(m: RenderModel): Metrics {
 export function limitBreaches(x: Metrics): LimitBreach[] {
   const out: LimitBreach[] = [];
   const atLeast = (metric: "minDotSpacing" | "minCrossingToDot", what: string) => {
-    if (x[metric] < LIMITS[metric]) out.push({ metric, value: x[metric], limit: LIMITS[metric], message: `${what} ${round(x[metric])} G apart (at least ${LIMITS[metric]} G)` });
+    if (x[metric] < LIMITS[metric]) out.push({ metric, value: x[metric], limit: LIMITS[metric], message: `${what} ${round(x[metric])} G apart (at least ${LIMITS[metric]} G)`, at: x.where[metric] ?? [] });
   };
   const atMost = (metric: "jogs" | "squeezedRuns" | "farLabels" | "marginImbalance" | "aspectError", what: string) => {
-    if (x[metric] > LIMITS[metric]) out.push({ metric, value: x[metric], limit: LIMITS[metric], message: `${what}: ${round(x[metric])} (at most ${round(LIMITS[metric])})` });
+    if (x[metric] > LIMITS[metric]) out.push({ metric, value: x[metric], limit: LIMITS[metric], message: `${what}: ${round(x[metric])} (at most ${round(LIMITS[metric])})`, at: x.where[metric] ?? [] });
   };
   atLeast("minDotSpacing", "two junction dots are");
   atLeast("minCrossingToDot", "a crossing and a junction dot are");

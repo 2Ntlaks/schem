@@ -12,9 +12,11 @@ import { BUILTIN, checkSymbol, icSymbol, keepOut, type SymbolDef } from "../symb
 import { measure } from "../text/font.js";
 import { eq, solveWithDrops, X0, type Constraint } from "./solver.js";
 import { route, type NetRequest } from "./router.js";
+import { checkDrawing } from "../quality/index.js";
 import type { Art, DrawnPin, DrawnPort, Electrical, RenderModel } from "../render/model.js";
+import type { Intent, LayoutState, Side } from "../core/intent.js";
 
-export interface Project { meta?: { title?: string }; circuit: Circuit }
+export interface Project { meta?: { title?: string }; circuit: Circuit; intent?: Intent }
 
 export type Status = "valid" | "valid_low_confidence" | "infeasible" | "budget_exhausted" | "invalid_input";
 
@@ -23,7 +25,7 @@ export type Status = "valid" | "valid_low_confidence" | "infeasible" | "budget_e
  * the part's origin, optional orientation, and optional pin sides for generated IC boxes.
  * Positions become lock constraints, so the normal solve, routing and rendering still run.
  */
-export type Side = "left" | "right" | "top" | "bottom";
+export type { Side };
 export type Placement = Record<string, { at: Pt; orient?: Orient; sides?: Partial<Record<Side, string[]>> }>;
 
 export interface LayoutResult {
@@ -32,6 +34,19 @@ export interface LayoutResult {
   pinDefs: PinDefs;
   issues: string[];
   notes: string[];
+  /** Positions, orientations, pin sides and routes, for the next incremental layout. */
+  state?: LayoutState;
+}
+
+export interface LayoutOptions {
+  spacing?: number;
+  place?: Placement;
+  prewire?: Prewire;
+  /** Incremental mode (SPEC 9.5): the previous layout, and the parts the edit affects. */
+  previous?: LayoutState;
+  affected?: readonly string[];
+  /** Keep the previous routes of nets whose drawn terminals did not change (default true). */
+  reuseRoutes?: boolean;
 }
 
 const LABEL_SIZE = 12;   // SVG units (1.2 G)
@@ -74,8 +89,18 @@ interface Placed {
 /** Fixed conductor runs of a net (by net id), handed to the router as part of its tree (SPEC 9.2 step 7). */
 export type Prewire = Record<string, Pt[][]>;
 
-export function layout(project: Project, opts: { spacing?: number; place?: Placement; prewire?: Prewire } = {}): LayoutResult {
+export function layout(project: Project, opts: LayoutOptions = {}): LayoutResult {
   const notes: string[] = [];
+  const intent = project.intent ?? {};
+  const locks = new Map((intent.locks ?? []).map((l) => [l.part, l]));
+  const hints = intent.hints ?? [];
+  const orientHint = new Map(hints.flatMap((h) => (h.type === "orient" ? [[h.part, h] as const] : [])));
+  const sidesHint = new Map(hints.flatMap((h) => (h.type === "pinSides" ? [[h.part, h.sides] as const] : [])));
+  const affected = new Set(opts.affected ?? []);
+  /** Previous geometry of a part the edit did not touch (orientation and pin sides are kept). */
+  const prevOf = (id: string) => (opts.previous && !affected.has(id) ? opts.previous.parts[id] : undefined);
+  /** Previous position of any part that existed before (positions and order are kept where possible). */
+  const prevPos = (id: string) => opts.previous?.parts[id];
   const circuit = project.circuit;
   const defs = pinDefsOf(circuit);
   if (!circuit.parts.length) return { status: "invalid_input", pinDefs: defs, issues: ["the circuit has no parts, so there is nothing to draw."], notes };
@@ -158,9 +183,14 @@ export function layout(project: Project, opts: { spacing?: number; place?: Place
       if (sym.kind === "source") orient = { rot: 90, flip: false }; // "+" (left pin) up
       else if (sym.kind === "two-pin") orient = twoPinOrient(sym, id, drawnNet, netById, portNet, netCol);
     } else {
-      sym = icFor(id, defs[id]!, drawnNet, netById, ncSet, col, netCol, opts.place?.[id]?.sides);
+      sym = icFor(id, defs[id]!, drawnNet, netById, ncSet, col, netCol, opts.place?.[id]?.sides ?? sidesHint.get(id) ?? prevOf(id)?.sides);
     }
+    // Orientation precedence: fixed placement, lock, orient hint, previous layout, default.
+    const lockOf = locks.get(id), oh = orientHint.get(id), prev = prevOf(id);
     if (opts.place?.[id]?.orient) orient = opts.place[id]!.orient!;
+    else if (lockOf) orient = { rot: lockOf.rot, flip: lockOf.flip };
+    else if (oh) orient = { rot: oh.rot, flip: oh.flip };
+    else if (prev) orient = prev.orient;
     const ko = xformBox(keepOut(sym), [0, 0], orient);
     const pins = sym.pins
       .filter((p) => drawnNet.has(`${id}[${p.number}]`) || ncSet.has(`${id}[${p.number}]`) || sym.kind !== "ic")
@@ -175,13 +205,21 @@ export function layout(project: Project, opts: { spacing?: number; place?: Place
       // A side pin's stub runs out far enough that the symbol and its text clear the part.
       const half = Math.max(1, (portText(kind, net) ? measure(portText(kind, net)!, LABEL_SIZE).width / 10 : 0) / 2);
       const out = isHorizontal(p.dir) ? Math.max(1, Math.ceil(half)) : 1;
-      const stub: Pt[] = p.dir === want ? [] : [p.at, step(p.at, p.dir, out), step(step(p.at, p.dir, out), want)];
+      let stub: Pt[];
+      if (p.dir === want) stub = [];
+      else if (isHorizontal(p.dir)) stub = [p.at, step(p.at, p.dir, out), step(step(p.at, p.dir, out), want)];
+      else {
+        // The pin faces away from where the symbol must point (a flipped pull-up): leave the pin,
+        // step sideways clear of the part, and enter the symbol from the correct side.
+        const a = step(p.at, p.dir, 2), b = step(a, "right", Math.ceil(half) + 2);
+        stub = [p.at, a, b, step(b, want)];
+      }
       const anchor = stub.length ? stub[stub.length - 1]! : p.at;
       ports.push({ pin: p.number, net, anchor, stub, kind, box: portBox(kind, net, anchor) });
     }
     // Labels must keep clear of port symbols and of every pin's approach point.
     const approachBoxes = pins.map((p): Box => { const a = step(p.at, p.dir); return { x: a[0] - 0.5, y: a[1] - 0.5, w: 1, h: 1 }; });
-    const labels = labelFor(part, sym, orient, ko, [...ports.map((q) => q.box), ...approachBoxes]);
+    const labels = labelFor(part, sym, orient, ko, [...ports.map((q) => q.box), ...approachBoxes], intent.overrides?.labelSide?.[id]);
     let env = ko;
     for (const l of labels) env = unionBox(env, gridBox(l.box));
     for (const q of ports) env = unionBox(env, q.box);
@@ -213,9 +251,18 @@ export function layout(project: Project, opts: { spacing?: number; place?: Place
       columns[c] = [...columns[c]!].sort((a, b) => bary(a) - bary(b) || cur.get(a)! - cur.get(b)! || cmpStr(a, b));
     }
   }
+  // Incremental mode: parts from the previous layout keep their previous top-to-bottom order;
+  // new or affected parts keep the slots the sweeps gave them (SPEC 9.5 ordering cost).
+  if (opts.previous) for (let c = 0; c < columns.length; c++) {
+    const col = columns[c]!;
+    const kept = col.filter((id) => prevPos(id)).sort((a, b) => prevPos(a)!.at[1] - prevPos(b)!.at[1] || cmpStr(a, b));
+    let k = 0;
+    columns[c] = col.map((id) => (prevPos(id) ? kept[k++]! : id));
+  }
 
   // Step 6: difference constraints in x and y.
-  const spacing = opts.spacing ?? 0;
+  // setSpacing factor f adds round((f - 1) * 4) G to every gap.
+  const spacing = (opts.spacing ?? 0) + Math.max(0, Math.round(((intent.spacing ?? 1) - 1) * 4));
   const spans = (i: number) => wired.filter((n) => {
     const cs = partsOfNet.get(n.id)!.map((p) => colOf.get(p)!);
     return Math.min(...cs) <= i && Math.max(...cs) >= i + 1;
@@ -233,6 +280,10 @@ export function layout(project: Project, opts: { spacing?: number; place?: Place
     const gap = 2 + spans(c) + internal(c) + internal(c + 1) + spacing;
     for (const a of columns[c]!) for (const b of columns[c + 1]!) {
       const ea = placed.get(a)!.env, eb = placed.get(b)!.env;
+      // Incremental mode: two parts that existed before and were not side by side (their rows
+      // did not overlap, with 1 G to spare) need no horizontal separation (SPEC 9.5 stability).
+      const pa = prevPos(a), pb = prevPos(b);
+      if (pa && pb && (pa.at[1] + ea.y + ea.h + 1 <= pb.at[1] + eb.y || pb.at[1] + eb.y + eb.h + 1 <= pa.at[1] + ea.y)) continue;
       cons.push({ a: vx(b), b: vx(a), c: gap + ea.x + ea.w - eb.x, priority: "structural", why: `column ${c} before ${c + 1}` });
     }
   }
@@ -245,6 +296,38 @@ export function layout(project: Project, opts: { spacing?: number; place?: Place
     }
   }
   const vars = ids.flatMap((id) => [vx(id), vy(id)]);
+  const known = new Set(ids);
+  for (const l of locks.values()) if (known.has(l.part)) cons.push(...eq(vx(l.part), X0, l.x, "lock", `lock ${l.part}`), ...eq(vy(l.part), X0, l.y, "lock", `lock ${l.part}`));
+  for (const h of hints) {
+    if (h.type === "relative" && known.has(h.part) && known.has(h.of)) {
+      const ep = placed.get(h.part)!.env, eo = placed.get(h.of)!.env;
+      const why = `hint ${h.id}: ${h.part} ${h.rel} ${h.of}`;
+      if (h.rel === "right-of") cons.push({ a: vx(h.part), b: vx(h.of), c: eo.x + eo.w + 2 - ep.x, priority: h.priority, why });
+      if (h.rel === "left-of") cons.push({ a: vx(h.of), b: vx(h.part), c: ep.x + ep.w + 2 - eo.x, priority: h.priority, why });
+      if (h.rel === "below") cons.push({ a: vy(h.part), b: vy(h.of), c: eo.y + eo.h + 2 - ep.y, priority: h.priority, why });
+      if (h.rel === "above") cons.push({ a: vy(h.of), b: vy(h.part), c: ep.y + ep.h + 2 - eo.y, priority: h.priority, why });
+    }
+    if (h.type === "align") {
+      const ps = h.parts.filter((x) => known.has(x));
+      const al = (id: string) => { const P = placed.get(id)!; return xformPt(P.sym.align, [0, 0], P.orient); };
+      for (let i = 1; i < ps.length; i++) {
+        const [a, b] = [ps[i - 1]!, ps[i]!];
+        if (h.axis === "row") cons.push(...eq(vy(b), vy(a), al(a)[1] - al(b)[1], h.priority, `hint ${h.id}: row ${ps.join(" ")}`));
+        else cons.push(...eq(vx(b), vx(a), al(a)[0] - al(b)[0], h.priority, `hint ${h.id}: column ${ps.join(" ")}`));
+      }
+    }
+  }
+  // Incremental mode: untouched parts stay put. Lower bounds (never leftward or upward) keep the
+  // solve feasible; upper bounds are dropped first when something must make room (SPEC 9.5).
+  for (const id of ids) {
+    const prev = prevPos(id);
+    if (!prev || locks.has(id)) continue;
+    const priority = affected.has(id) ? "prevAffected" : "prev";
+    for (const [v, c] of [[vx(id), prev.at[0]], [vy(id), prev.at[1]]] as const) {
+      cons.push({ a: v, b: X0, c, priority, why: `previous ${id}` });
+      cons.push({ a: X0, b: v, c: -c, priority, why: `previous ${id}` });
+    }
+  }
   const place = opts.place;
   if (place) {
     const missing = ids.filter((id) => !place[id]);
@@ -252,8 +335,11 @@ export function layout(project: Project, opts: { spacing?: number; place?: Place
     cons.length = 0;
     for (const id of ids) cons.push(...eq(vx(id), X0, place[id]!.at[0], "lock", `lock ${id}`), ...eq(vy(id), X0, place[id]!.at[1], "lock", `lock ${id}`));
   }
-  let sol = solveWithDrops(vars, cons);
+  let sol = solveWithDrops(vars, cons, 50 + 2 * ids.length);
   if (!sol.ok) return { status: sol.reason, pinDefs: defs, issues: [`placement constraints conflict: ${sol.cycle.map((k) => k.why).join("; ")}`], notes };
+  for (const why of [...new Set(sol.dropped.filter((k) => k.why.startsWith("hint ")).map((k) => k.why))]) notes.push(`dropped ${why} (it conflicts with stronger constraints; use priority high to keep it)`);
+  const dropped = new Set(sol.dropped);
+  const active = cons.filter((k) => !dropped.has(k));
 
   // Straight-wire pass: try to line up horizontal pins of the same net, one equality at a time.
   const candidates: Array<{ k: Constraint[]; order: [number, string] }> = [];
@@ -278,7 +364,7 @@ export function layout(project: Project, opts: { spacing?: number; place?: Place
   candidates.sort((a, b) => a.order[0] - b.order[0] || cmpStr(a.order[1], b.order[1]));
   const kept: Constraint[] = [];
   for (const cand of candidates) {
-    const trial = solveWithDrops(vars, [...cons, ...kept, ...cand.k], 0);
+    const trial = solveWithDrops(vars, [...active, ...kept, ...cand.k], 0);
     if (trial.ok) { kept.push(...cand.k); sol = trial; }
   }
   const pos = sol.value;
@@ -330,6 +416,9 @@ export function layout(project: Project, opts: { spacing?: number; place?: Place
         for (let i = 0; i + 1 < s.length; i++) prewired.push([s[i]!, s[i + 1]!]);
       }
       requests.push({ net: n.id, terminals: terms, prewired, noRoute: true });
+    } else if (opts.previous && opts.reuseRoutes !== false && opts.previous.routes[n.id]?.terminals === signature(terms)) {
+      // Incremental mode: a net whose drawn terminals did not move keeps its route.
+      requests.push({ net: n.id, terminals: terms, prewired: opts.previous.routes[n.id]!.runs.flatMap((w) => unitEdges(w)), noRoute: true });
     } else requests.push({ net: n.id, terminals: terms, ...(opts.prewire?.[n.id] ? { prewired: opts.prewire[n.id]!.flatMap((w) => unitEdges(w)) } : {}) });
   }
   requests.sort((a, b) => Number(!a.noRoute) - Number(!b.noRoute) || a.terminals.length - b.terminals.length || cmpStr(netKey(netById.get(a.net)!, vc), netKey(netById.get(b.net)!, vc)));
@@ -341,7 +430,7 @@ export function layout(project: Project, opts: { spacing?: number; place?: Place
   const failed = routed.flatMap((r) => r.failed.map((f) => `${f} (net ${r.net})`));
   if (failed.length && spacing < 6 && !place) {
     notes.push(`routing failed for ${failed.join(", ")}; retrying with spacing +2 G`);
-    const again = layout(project, { spacing: spacing + 2 });
+    const again = layout(project, { ...opts, spacing: (opts.spacing ?? 0) + 2 });
     again.notes.unshift(...notes);
     return again;
   }
@@ -398,10 +487,43 @@ export function layout(project: Project, opts: { spacing?: number; place?: Place
   const sheet = { x: bounds.x - MARGIN, y: bounds.y - MARGIN, w: bounds.w + 2 * MARGIN, h: bounds.h + 2 * MARGIN };
   const render: RenderModel = { electrical: el, art, bounds: sheet, meta: project.meta?.title ? { title: project.meta.title } : {} };
   const lowConfidence = notes.some((n) => n.includes("low confidence"));
-  return { status: failed.length ? "budget_exhausted" : lowConfidence ? "valid_low_confidence" : "valid", render, pinDefs: defs, issues: failed.map((f) => `could not route ${f}`), notes };
+  // Step 8: a drawing is valid only if verification layers 1 and 2 pass on the render model.
+  if (!failed.length) {
+    const q = checkDrawing(circuit, defs, render);
+    if (!q.valid) {
+      const why = [...q.connections.errors.map((e) => e.message), ...q.overlaps.map((o) => o.message)];
+      return { status: "budget_exhausted", render, pinDefs: defs, issues: why.map((w) => `check: ${w}`), notes, state: stateOf() };
+    }
+  }
+  return { status: failed.length ? "budget_exhausted" : lowConfidence ? "valid_low_confidence" : "valid", render, pinDefs: defs, issues: failed.map((f) => `could not route ${f}`), notes, state: stateOf() };
+
+  function stateOf(): LayoutState {
+  const state: LayoutState = { parts: {}, routes: {} };
+  for (const id of ids) {
+    const P = placed.get(id)!;
+    const entry: LayoutState["parts"][string] = { at: at(id), orient: P.orient };
+    if (P.sym.kind === "ic") {
+      const side = (d: Dir): Side => (d === "left" ? "left" : d === "right" ? "right" : d === "up" ? "top" : "bottom");
+      const sides: Partial<Record<Side, string[]>> = {};
+      for (const p of [...P.sym.pins].sort((a, b) => a.at[1] - b.at[1] || a.at[0] - b.at[0])) (sides[side(p.dir)] ??= []).push(p.number);
+      entry.sides = sides;
+    }
+    state.parts[id] = entry;
+  }
+  for (const r of routed) {
+    const req = requests.find((q) => q.net === r.net)!;
+    state.routes[r.net] = { terminals: signature(req.terminals), runs: mergeRuns(r.edges), ...(portNet.has(r.net) ? { ports: true as const } : {}) };
+  }
+  return state;
+  }
 }
 
 // ---------------------------------------------------------------------------
+
+/** Drawn terminals of a net with positions and directions; equal signatures mean the same pins in the same places. */
+function signature(terms: readonly { id: string; at: Pt; dir: Dir }[]): string {
+  return terms.map((t) => `${t.id}@${t.at[0]},${t.at[1]},${t.dir}`).sort(cmpStr).join(";");
+}
 
 function partOfTerm(t: string): string { return t.slice(0, t.indexOf("[")); }
 
@@ -494,7 +616,7 @@ function displayValue(type: string, raw: string): string {
   return `${n} ${p}${sym}`;
 }
 
-function labelFor(part: Circuit["parts"][0], sym: SymbolDef, o: Orient, ko: Box, avoid: Box[]): Placed["labels"] {
+function labelFor(part: Circuit["parts"][0], sym: SymbolDef, o: Orient, ko: Box, avoid: Box[], side?: string): Placed["labels"] {
   if (sym.kind === "port") return [];
   const lines = [part.id];
   const value = part.props?.value ?? part.props?.label ?? part.props?.color;
@@ -505,6 +627,7 @@ function labelFor(part: Circuit["parts"][0], sym: SymbolDef, o: Orient, ko: Box,
   const prefer = sym.kind === "ic"
     ? ["above-left", "above-right", "below-left", "below-right", "above-left-out", "above-right-out", "below-left-out", "below-right-out", "left", "right"]
     : vertical ? (sym.kind === "source" ? ["left", "right"] : ["right", "left"]) : sym.labelPrefer;
+  const order = side ? [side, ...prefer.filter((x) => x !== side)] : prefer; // label-side override first (SPEC 6.4)
   const gap = 0.4;
   const cands: Record<string, { box: Box; align: "start" | "middle" | "end" }> = {
     above: { box: { x: ko.x + ko.w / 2 - w / 2, y: ko.y - gap - h, w, h }, align: "middle" },
@@ -520,11 +643,11 @@ function labelFor(part: Circuit["parts"][0], sym: SymbolDef, o: Orient, ko: Box,
     "below-left-out": { box: { x: ko.x + 1 - w, y: ko.y + ko.h + gap, w, h }, align: "end" },
     "below-right-out": { box: { x: ko.x + ko.w - 1, y: ko.y + ko.h + gap, w, h }, align: "start" },
   };
-  for (const side of prefer) {
-    const c = cands[side]!;
+  for (const pick of order) {
+    const c = cands[pick]!;
     if (!avoid.some((b) => boxesOverlap(gridBox(c.box), b))) return [{ box: c.box, lines, align: c.align }];
   }
-  const c = cands[prefer[0]!]!;
+  const c = cands[order[0]!]!;
   return [{ box: c.box, lines, align: c.align }];
 }
 

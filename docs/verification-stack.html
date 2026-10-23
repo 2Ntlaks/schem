@@ -107,7 +107,7 @@ section { display: grid; gap: 14px; }
     <div class="meta">
       <div><span class="label">Sheet</span><b>2 of 2</b></div>
       <div><span class="label">Date</span><b>2026-10-23</b></div>
-      <div><span class="label">Tests</span><b>203 passing</b></div>
+      <div><span class="label">Tests</span><b>232 passing</b></div>
     </div>
   </header>
 
@@ -147,7 +147,7 @@ section { display: grid; gap: 14px; }
         <p>Rule checks for what engineers expect: ground points down, supply up, signal flows left to right, rail-to-ground parts vertical, decoupling capacitor next to its pin.</p>
         <span class="catches">catches: upside-down ground, signal flowing backwards, a pull-up drawn sideways</span>
       </div>
-      <div class="state"><span class="chip built">built</span><span class="chip next">next</span><small>supply and ground direction, flow, vertical rails, pull-ups, series lines, decoupling: each break is a finding. Tested fixes come with the Phase 0b findings harness</small></div>
+      <div class="state"><span class="chip built">built</span><small>supply and ground direction, upright sources, flow, vertical rails, pull-ups, series lines, decoupling: each break is a finding, and the findings harness offers a fix only after trying it</small></div>
     </div>
     <div class="layer">
       <div class="num">4</div>
@@ -172,7 +172,7 @@ section { display: grid; gap: 14px; }
         <p>Thousands of circuits generated from real patterns (dividers, pull-ups, op-amp stages, transistor drivers, boards with sensors). The same circuit written in a different order must give the same drawing. A small edit must only move nearby parts. Windows and Linux must produce identical files.</p>
         <span class="catches">catches: crashes, rare layouts that break, drawings that jump around after one edit</span>
       </div>
-      <div class="state"><span class="chip built">built</span><span class="chip next">next</span><small>300 generated circuits per test run (1,000 checked once); reorder and respelling give identical drawings; Windows/Linux check in CI. Edit stability waits for incremental mode (Phase 0b)</small></div>
+      <div class="state"><span class="chip built">built</span><small>300 generated circuits per test run (1,000 checked once); reorder and respelling give identical drawings; Windows and Linux identical in CI; edits move only nearby parts (all development edit scripts, and at least 85% of random edits)</small></div>
     </div>
     <div class="layer">
       <div class="num">6</div>
