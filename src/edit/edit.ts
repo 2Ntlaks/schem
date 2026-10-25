@@ -2,13 +2,14 @@
 // checked by verification layers 1-2, and saved only if the result is valid (D4).
 
 import { createHash } from "node:crypto";
-import { cmpStr, type Pt, type Rot } from "../geom/geom.js";
-import { CircuitError, type Circuit } from "../core/model.js";
+import { cmpStr, xformDir, xformPt, type Orient, type Pt, type Rot } from "../geom/geom.js";
+import { canonical as canonicalEp, CircuitError, netKind, type Circuit, type Net, type PinDefs } from "../core/model.js";
 import { applyOps, type CircuitOp } from "../core/ops.js";
 import { resolveEndpoint } from "../core/validate.js";
-import type { Hint, HintPriority, Intent, LayoutState, Side } from "../core/intent.js";
+import { hintParts, type Hint, type HintPriority, type Intent, type LayoutState, type Side } from "../core/intent.js";
 import { layout, pinDefsOf, type LayoutResult, type Project, type Status } from "../layout/layout.js";
 import { checkDrawing, type DrawingCheck } from "../quality/index.js";
+import { BUILTIN, ORIENTS, type SymPin } from "../symbols/library.js";
 import { changeReport, type ChangeReport } from "./report.js";
 
 export type VisualOp =
@@ -47,6 +48,8 @@ export interface EditResult {
   mode?: EditMode;
   /** Parts and nets the edit involved (SPEC 9.5 table, computed from the before/after difference). */
   affected: { parts: string[]; nets: string[] };
+  /** Hints removed with a removed part (SPEC 11.3, rev C.3); explicit removeHint ids are not listed. */
+  removedHints?: string[];
   issues: string[];
   revision: string;
   layoutToken?: string;
@@ -83,9 +86,12 @@ export function edit(req: EditRequest): EditResult {
     if (e instanceof EditError) return unchanged("invalid_input", [e.message]);
     throw e;
   }
+  // removePart takes the part's lock, label side and hints with it (SPEC 11.3, rev C.3).
+  const unpruned = intent;
   intent = pruned(intent, circuit);
+  const removedHints = (unpruned.hints ?? []).map((h) => h.id).filter((id) => !(intent.hints ?? []).some((h) => h.id === id));
   const project: Project = { ...before, circuit, intent };
-  const affected = affectedBy(before.circuit, circuit, before.intent ?? {}, intent, req.ops);
+  const affected = affectedBy(before.circuit, circuit, before.intent ?? {}, unpruned, req.ops, previous);
 
   // 2. Lay out: keep routes, then reroute, then the whole sheet (SPEC 9.5 widening, 0b version).
   const attempts: Array<{ mode: EditMode; run: () => LayoutResult }> = [];
@@ -104,16 +110,30 @@ export function edit(req: EditRequest): EditResult {
     if (!q.valid) { issues.push(`${a.mode}: drawing failed checks (${[...q.connections.errors, ...q.overlaps].map((i) => i.code).join(", ")})`); continue; }
     const locked = new Set((intent.locks ?? []).map((l) => l.part));
     return {
-      saved: true, status: r.status, project, layout: r, check: q, mode: a.mode, affected, issues,
+      saved: true, status: r.status, project, layout: r, check: q, mode: a.mode, affected, removedHints, issues,
       ...(previous ? { report: changeReport(previous, r.state!, new Set(affected.parts), new Set(affected.nets), locked) } : {}),
       revision: revision(project), layoutToken: layoutToken(project, r.state!),
     };
   }
   const status = last?.status && !last.status.startsWith("valid") ? last.status : "budget_exhausted";
-  return { ...unchanged(status, [`edit rejected: no valid layout (D4). ${issues.join("; ")}`]), affected };
+  return { ...unchanged(status, [`edit rejected: no valid layout (D4). ${issues.join("; ")}`]), affected, removedHints };
 }
 
 class EditError extends Error {}
+
+/**
+ * The first orientation (in ORIENTS order) that puts every listed pin of a fixed symbol on its side,
+ * in the listed order (top to bottom on left and right, left to right on top and bottom).
+ */
+function orientationFor(pins: SymPin[], sides: Partial<Record<Side, string[]>>): Orient | undefined {
+  const facing: Record<Side, string> = { left: "left", right: "right", top: "up", bottom: "down" };
+  return ORIENTS.find((o) => (Object.entries(sides) as Array<[Side, string[]]>).every(([side, nums]) => {
+    const placed = nums.map((n) => pins.find((p) => p.number === n)!).map((p) => ({ at: xformPt(p.at, [0, 0], o), dir: xformDir(p.dir, o) }));
+    if (!placed.every((p) => p.dir === facing[side])) return false;
+    const axis = side === "left" || side === "right" ? 1 : 0;
+    return placed.every((p, i) => i === 0 || placed[i - 1]!.at[axis] < p.at[axis]);
+  }));
+}
 
 function applyVisual(intent: Intent, v: VisualOp, circuit: Circuit, previous: LayoutState | undefined): Intent {
   const out: Intent = structuredClone(intent);
@@ -139,6 +159,7 @@ function applyVisual(intent: Intent, v: VisualOp, circuit: Circuit, previous: La
     case "setOrientation": exists(v.part); upsert((h) => h.type === "orient" && h.part === v.part, (id) => ({ id, type: "orient", part: v.part, rot: v.rot, flip: v.flip ?? false, priority: "normal" })); break;
     case "setPinSides": {
       exists(v.part);
+      const part = circuit.parts.find((p) => p.id === v.part)!;
       const defs = pinDefsOf(circuit);
       const num = (ref: string) => {
         if (defs[v.part]?.some((p) => p.number === ref)) return ref;
@@ -148,6 +169,13 @@ function applyVisual(intent: Intent, v: VisualOp, circuit: Circuit, previous: La
       };
       const sides: Partial<Record<Side, string[]>> = {};
       for (const s of ["left", "right", "top", "bottom"] as const) if (v[s]) sides[s] = v[s]!.map(num);
+      // SPEC 11.3 (rev C.3): only generated boxes (ic, header, modules) have pin sides. On a fixed
+      // symbol the edit is rejected, naming the setOrientation that gives the same arrangement.
+      const fixed = BUILTIN[part.type];
+      if (fixed && !part.pins) {
+        const o = orientationFor(fixed.pins, sides);
+        throw new EditError(`E270 setPinSides: ${v.part} is the fixed "${part.type}" symbol; only generated boxes (ic, header, modules) have pin sides. ${o ? `The same arrangement is setOrientation { part: "${v.part}", rot: ${o.rot}, flip: ${o.flip} }.` : "No orientation of this symbol gives that arrangement."}`);
+      }
       upsert((h) => h.type === "pinSides" && h.part === v.part, (id) => ({ id, type: "pinSides", part: v.part, sides, priority: "normal" }));
       break;
     }
@@ -174,8 +202,7 @@ function pruned(intent: Intent, circuit: Circuit): Intent {
   if (intent.locks) out.locks = intent.locks.filter((l) => ids.has(l.part));
   if (intent.hints) out.hints = intent.hints.flatMap((h): Hint[] => {
     if (h.type === "align") { const parts = h.parts.filter((p) => ids.has(p)); return parts.length >= 2 ? [{ ...h, parts }] : []; }
-    if (h.type === "relative") return ids.has(h.part) && ids.has(h.of) ? [h] : [];
-    return ids.has(h.part) ? [h] : [];
+    return hintParts(h).every((p) => ids.has(p)) ? [h] : [];
   });
   if (intent.overrides?.labelSide) out.overrides = { ...intent.overrides, labelSide: Object.fromEntries(Object.entries(intent.overrides.labelSide).filter(([p]) => ids.has(p))) };
   return out;
@@ -185,7 +212,8 @@ function renamed(intent: Intent, previous: LayoutState | undefined, from: string
   const r = (p: string) => (p === from ? to : p);
   const out: Intent = structuredClone(intent);
   out.locks = out.locks?.map((l) => ({ ...l, part: r(l.part) }));
-  out.hints = out.hints?.map((h) => (h.type === "align" ? { ...h, parts: h.parts.map(r) } : h.type === "relative" ? { ...h, part: r(h.part), of: r(h.of) } : { ...h, part: r(h.part) }));
+  const rp = (e: string) => (e.startsWith(from) && /^[[{.]/.test(e.slice(from.length)) ? to + e.slice(from.length) : e);
+  out.hints = out.hints?.map((h) => (h.type === "align" ? { ...h, parts: h.parts.map(r) } : h.type === "relative" ? { ...h, part: r(h.part), of: r(h.of) } : h.type === "decouples" ? { ...h, part: r(h.part), pin: rp(h.pin) } : { ...h, part: r(h.part) }));
   if (out.overrides?.labelSide?.[from]) { out.overrides.labelSide[to] = out.overrides.labelSide[from]!; delete out.overrides.labelSide[from]; }
   if (!previous) return [out, previous];
   const prev = structuredClone(previous);
@@ -195,16 +223,32 @@ function renamed(intent: Intent, previous: LayoutState | undefined, from: string
 }
 
 /** SPEC 9.5 "which parts an operation affects", computed from the difference the operations made. */
-function affectedBy(c1: Circuit, c2: Circuit, i1: Intent, i2: Intent, ops: EditOp[]): { parts: string[]; nets: string[] } {
+function affectedBy(c1: Circuit, c2: Circuit, i1: Intent, i2: Intent, ops: EditOp[], previous?: LayoutState): { parts: string[]; nets: string[] } {
   const parts = new Set<string>();
   const nets = new Set<string>();
   const partOf = (e: string) => e.slice(0, e.search(/[[{.]/));
+  // Port-drawn nets (SPEC 9.5, rev C.3) do not spread "affected": only parts whose own endpoints
+  // changed count. Which nets are port-drawn comes from the previous layout; a net it does not have
+  // uses the layout's rule (a named power or ground net with three or more endpoints).
+  const d1 = pinDefsOf(c1), d2 = pinDefsOf(c2);
+  const canon = (e: string, d: PinDefs) => { const r = resolveEndpoint(e, d); return r.ok ? canonicalEp(r.ep) : e; };
+  const portDrawn = (n: Net) => {
+    const prev = previous?.routes[n.id];
+    if (prev) return prev.ports === true;
+    const k = netKind(n);
+    return (k === "power" || k === "ground") && n.name !== undefined && new Set(n.endpoints.map((e) => canon(e, d2))).size >= 3;
+  };
   const net1 = new Map(c1.nets.map((n) => [n.id, [...n.endpoints].sort(cmpStr).join(" ")]));
   const net2 = new Map(c2.nets.map((n) => [n.id, [...n.endpoints].sort(cmpStr).join(" ")]));
   for (const n of [...c1.nets, ...c2.nets]) {
     const a = net1.get(n.id), b = net2.get(n.id);
     const n1 = c1.nets.find((x) => x.id === n.id), n2 = c2.nets.find((x) => x.id === n.id);
-    if (a !== b || n1?.name !== n2?.name) { nets.add(n.id); for (const e of [...(n1?.endpoints ?? []), ...(n2?.endpoints ?? [])]) parts.add(partOf(e)); }
+    if (a === b && n1?.name === n2?.name) continue;
+    nets.add(n.id);
+    if (n1 && n2 && n1.name === n2.name && portDrawn(n1)) {
+      const e1 = new Set(n1.endpoints.map((e) => canon(e, d1))), e2 = new Set(n2.endpoints.map((e) => canon(e, d2)));
+      for (const e of [...e1].filter((x) => !e2.has(x)).concat([...e2].filter((x) => !e1.has(x)))) parts.add(partOf(e));
+    } else for (const e of [...(n1?.endpoints ?? []), ...(n2?.endpoints ?? [])]) parts.add(partOf(e));
   }
   const p1 = new Map(c1.parts.map((p) => [p.id, JSON.stringify(p)]));
   for (const p of c2.parts) if (p1.get(p.id) !== JSON.stringify(p)) parts.add(p.id);
@@ -218,7 +262,7 @@ function affectedBy(c1: Circuit, c2: Circuit, i1: Intent, i2: Intent, ops: EditO
   const h1 = new Map((i1.hints ?? []).map((h) => [h.id, JSON.stringify(h)]));
   for (const h of [...(i1.hints ?? []), ...(i2.hints ?? [])]) {
     if (h1.get(h.id) === JSON.stringify((i2.hints ?? []).find((x) => x.id === h.id))) continue;
-    if (h.type === "align") h.parts.forEach((p) => parts.add(p)); else { parts.add(h.part); if (h.type === "relative") parts.add(h.of); }
+    for (const p of hintParts(h)) parts.add(p);
   }
   const present = new Set(c2.parts.map((p) => p.id));
   for (const n of c2.nets) if (n.endpoints.some((e) => parts.has(partOf(e)))) nets.add(n.id);
