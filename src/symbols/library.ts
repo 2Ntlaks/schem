@@ -276,11 +276,14 @@ const BUZZER: SymbolDef = {
   ],
   align: [3, 0],
   graphics: [
+    // Leads end at the two sides of a box body, so nothing conductor-like runs between them;
+    // the sounder dome stands on the box.
     { d: "M0 0 H1.5 M4.5 0 H6" },
-    { d: "M1.5 0 H4.5 A1.5 1.5 0 0 0 1.5 0 Z" },
-    { d: "M0.55 -0.8 H1.15 M0.85 -1.1 V-0.5" },
+    { d: "M1.5 -0.7 H4.5 V0.7 H1.5 Z" },
+    { d: "M1.9 -0.7 A1.1 1.1 0 0 1 4.1 -0.7" },
+    { d: "M0.45 -0.8 H1.05 M0.75 -1.1 V-0.5" },
   ],
-  art: { x: 0, y: -1.5, w: 6, h: 1.5 },
+  art: { x: 0, y: -1.8, w: 6, h: 2.5 },
   labelPrefer: ["below", "above", "right", "left"],
 };
 
