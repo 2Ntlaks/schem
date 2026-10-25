@@ -12,7 +12,7 @@ export type CircuitOp =
   | { op: "setNoConnect"; terminal: string; nc: boolean }
   | { op: "renamePart"; from: string; to: string }
   | { op: "removePart"; part: string }
-  | { op: "addPart"; part: { id: string; type: string; props?: Record<string, string> }; pins?: PinDef[] }
+  | { op: "addPart"; part: { id: string; type: string; props?: Record<string, string>; title?: string }; pins?: PinDef[] }
   | { op: "setProp"; part: string; key: string; value: string | null };
 
 /**

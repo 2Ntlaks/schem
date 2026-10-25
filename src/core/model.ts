@@ -15,7 +15,8 @@ export interface PinDef {
   representative?: boolean;
 }
 
-export interface Part { id: string; type: string; props?: Record<string, string>; pins?: PinDef[] }
+/** `title`: a module's display name from its definition, set in memory by the loader and never saved. */
+export interface Part { id: string; type: string; props?: Record<string, string>; pins?: PinDef[]; title?: string }
 
 export interface Net {
   id: string;

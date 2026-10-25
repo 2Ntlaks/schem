@@ -189,6 +189,7 @@ export function loadProject(input: string | unknown, opts: LoadOptions = {}): Lo
       if (def === undefined) { err("E202", `part ${id}: unknown module "${type}". Known modules: ${Object.keys(library).sort(cmpNatural).join(", ")}.`, id); continue; }
       if (checkModuleDef(def, type).length) continue; // already reported
       part.pins = modulePins(def);
+      part.title = def.name;
       if (def.controller && part.props?.controller === undefined) part.props = { ...(part.props ?? {}), controller: "true" };
       pinDefs[id] = modulePins(def);
     } else if (part.pins) pinDefs[id] = ownPins(part);

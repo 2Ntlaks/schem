@@ -10,7 +10,7 @@ import { checkDrawing } from "../src/quality/index.js";
 import { toSvg } from "../src/render/svg.js";
 import { TEMPLATES } from "../src/layout/templates/index.js";
 import type { DrawnPin } from "../src/render/model.js";
-import { DIVIDER, INVERTING, LED_GPIO, LED_SINK, NONINVERTING, PULLS, TEMPLATE_CIRCUITS } from "./support/template-circuits.js";
+import { BRIDGE, DIVIDER, HBRIDGE_BJT, INVERTING, LED_GPIO, LED_SINK, LOW_SIDE, NONINVERTING, PULLS, TEMPLATE_CIRCUITS } from "./support/template-circuits.js";
 
 const dir = join(import.meta.dirname, "..", "cases");
 const load = (f: string) => JSON.parse(readFileSync(join(dir, f), "utf8")) as Project;
@@ -152,14 +152,48 @@ describe("the other templates", () => {
     expect([q.valid, q.metrics.crossings, q.conventions, q.breaches]).toEqual([true, 0, [], []]);
   });
 
+  it("bridge rectifier: two vertical diode legs side by side, AC in from the left at the midpoints, + on top", () => {
+    const { r, q } = run(BRIDGE);
+    expect(r.state!.templates).toContain("bridge-rectifier@1:D1,D2,D3,D4");
+    const [d1k, d2k, d1a, d3k, d3a, d2a, d4k] = [pinAt(r, "D1", "K"), pinAt(r, "D2", "K"), pinAt(r, "D1", "A"), pinAt(r, "D3", "K"), pinAt(r, "D3", "A"), pinAt(r, "D2", "A"), pinAt(r, "D4", "K")];
+    expect([d1a.at[0] === d3k.at[0], d2a.at[0] === d4k.at[0]]).toEqual([true, true]);
+    expect([d1k.at[1] === d2k.at[1], d1k.at[0] < d2k.at[0], d1k.at[1] < d3a.at[1]]).toEqual([true, true, true]);
+    expect(Math.max(pinAt(r, "V1", "1").at[0], pinAt(r, "V1", "2").at[0])).toBeLessThan(d1k.at[0]);
+    expect([q.valid, q.conventions]).toEqual([true, []]);
+  });
+
+  it("H-bridge (BJT, without base-emitter resistors): high side above low side, load between the midpoints, drives outward", () => {
+    const { r, q } = run(HBRIDGE_BJT);
+    expect(r.state!.templates).toEqual(["h-bridge-pnp-npn@1:M1,Q1,Q2,Q3,Q4,R1,R2,R3,R4,U1"]);
+    for (const [hi, lo] of [["Q1", "Q2"], ["Q3", "Q4"]] as const) {
+      const [h, l] = [pinAt(r, hi, "C"), pinAt(r, lo, "C")];
+      expect([h.at[0] === l.at[0], h.at[1] < l.at[1]], `${hi} above ${lo}`).toEqual([true, true]);
+    }
+    const [m1, m2] = [pinAt(r, "M1", "1"), pinAt(r, "M1", "2")];
+    expect([m1.at[1] === m2.at[1], m1.at[0] > pinAt(r, "Q1", "C").at[0], m2.at[0] < pinAt(r, "Q3", "C").at[0]]).toEqual([true, true, true]);
+    expect([pinAt(r, "R1", "2").at[0] < pinAt(r, "Q1", "B").at[0], pinAt(r, "R3", "2").at[0] > pinAt(r, "Q3", "B").at[0]]).toEqual([true, true]);
+    expect([q.valid, q.conventions, q.breaches]).toEqual([true, [], []]);
+  });
+
+  it("low-side switch (without a pull-down): load above the transistor, base resistor in line on the left, flyback diode beside the load", () => {
+    const { r, q } = run(LOW_SIDE);
+    expect(r.state!.templates).toEqual(["low-side-npn-two-pin@1:D1,M1,Q1,R1"]);
+    const [m2, qc, qb, rb] = [pinAt(r, "M1", "2"), pinAt(r, "Q1", "C"), pinAt(r, "Q1", "B"), pinAt(r, "R1", "2")];
+    expect([m2.at[0] === qc.at[0], m2.at[1] < qc.at[1]]).toEqual([true, true]);
+    expect([rb.at[1] === qb.at[1], rb.at[0] < qb.at[0]]).toEqual([true, true]);
+    const [dk, m1] = [pinAt(r, "D1", "K"), pinAt(r, "M1", "1")];
+    expect([dk.at[1] === m1.at[1], dk.at[0] < m1.at[0]]).toEqual([true, true]);
+    expect([q.valid, q.metrics.crossings, q.conventions, q.breaches]).toEqual([true, 0, [], []]);
+  });
+
   it("a battery loop (case 1) matches no template: a series loop is drawn as a loop", () => {
     expect(layout(load("case01-led.json")).state!.templates).toBeUndefined();
   });
 });
 
 describe("template mechanics", () => {
-  it("stubs (symbols not yet in the library) are never matched", () => {
-    expect(TEMPLATES.filter((t) => t.status === "stub").map((t) => t.id).sort()).toEqual(["bridge-rectifier", "decoupling", "h-bridge", "low-side-switch"]);
+  it("every template is switched on: no stubs remain (decoupling is src/layout/decoupling.ts, not a template)", () => {
+    expect(TEMPLATES.filter((t) => t.status === "stub").map((t) => t.id)).toEqual([]);
   });
 
   it("priorities: the I2C template takes the bus pull-ups before the pull-up template", () => {

@@ -123,6 +123,85 @@ export const LED_SINK: Project = {
   },
 };
 
+/** Full-wave bridge rectifier from an AC source, with a smoothing capacitor and a load. */
+export const BRIDGE: Project = {
+  meta: { title: "Bridge rectifier" },
+  circuit: {
+    parts: [
+      { id: "V1", type: "ac-source", props: { value: "12V" } },
+      { id: "D1", type: "diode", props: { partNumber: "1N4007" } },
+      { id: "D2", type: "diode", props: { partNumber: "1N4007" } },
+      { id: "D3", type: "diode", props: { partNumber: "1N4007" } },
+      { id: "D4", type: "diode", props: { partNumber: "1N4007" } },
+      { id: "C1", type: "polarised-capacitor", props: { value: "1000u" } },
+      { id: "RL", type: "resistor", props: { value: "1k" } },
+    ],
+    nets: [
+      { id: "n1", name: "AC1", endpoints: ["V1.1", "D1[A]", "D3[K]"] },
+      { id: "n2", name: "AC2", endpoints: ["V1.2", "D2[A]", "D4[K]"] },
+      { id: "n3", name: "VDC", kind: "signal", endpoints: ["D1[K]", "D2[K]", "C1.+", "RL.1"] },
+      { id: "n4", name: "GND", endpoints: ["D3[A]", "D4[A]", "C1.-", "RL.2"] },
+    ],
+  },
+};
+
+/** A motor driven both ways by a BJT H-bridge (PNP high side, NPN low side), each base through a resistor. */
+export const HBRIDGE_BJT: Project = {
+  meta: { title: "BJT H-bridge" },
+  circuit: {
+    parts: [
+      ic("U1", "MCU", [["1", "GND", "ground"], ["2", "IN1", "output"], ["3", "IN2", "output"], ["4", "IN3", "output"], ["5", "IN4", "output"]], { controller: "true" }),
+      { id: "R1", type: "resistor", props: { value: "1k" } },
+      { id: "R2", type: "resistor", props: { value: "1k" } },
+      { id: "R3", type: "resistor", props: { value: "1k" } },
+      { id: "R4", type: "resistor", props: { value: "1k" } },
+      { id: "Q1", type: "pnp", props: { partNumber: "TIP125" } },
+      { id: "Q2", type: "npn", props: { partNumber: "TIP120" } },
+      { id: "Q3", type: "pnp", props: { partNumber: "TIP125" } },
+      { id: "Q4", type: "npn", props: { partNumber: "TIP120" } },
+      { id: "M1", type: "motor", props: { label: "6 V motor" } },
+      { id: "B1", type: "battery", props: { value: "6V" } },
+    ],
+    nets: [
+      { id: "n1", name: "6V", endpoints: ["B1.+", "Q1[E]", "Q3[E]"] },
+      { id: "n2", name: "GND", endpoints: ["B1.-", "Q2[E]", "Q4[E]", "U1.GND"] },
+      { id: "n3", name: "OUTA", endpoints: ["Q1[C]", "Q2[C]", "M1.1"] },
+      { id: "n4", name: "OUTB", endpoints: ["Q3[C]", "Q4[C]", "M1.2"] },
+      { id: "n5", endpoints: ["U1.IN1", "R1.1"] },
+      { id: "n6", endpoints: ["U1.IN2", "R2.1"] },
+      { id: "n7", endpoints: ["U1.IN3", "R3.1"] },
+      { id: "n8", endpoints: ["U1.IN4", "R4.1"] },
+      { id: "n9", endpoints: ["R1.2", "Q1[B]"] },
+      { id: "n10", endpoints: ["R2.2", "Q2[B]"] },
+      { id: "n11", endpoints: ["R3.2", "Q3[B]"] },
+      { id: "n12", endpoints: ["R4.2", "Q4[B]"] },
+    ],
+  },
+};
+
+/** A motor switched on its low side by an NPN transistor from a GPIO, with a flyback diode across the motor. */
+export const LOW_SIDE: Project = {
+  meta: { title: "Low-side motor switch" },
+  circuit: {
+    parts: [
+      ic("U1", "MCU", [["1", "GND", "ground"], ["2", "PWM", "output"]], { controller: "true" }),
+      { id: "R1", type: "resistor", props: { value: "1k" } },
+      { id: "Q1", type: "npn", props: { partNumber: "2N2222A" } },
+      { id: "M1", type: "motor", props: { label: "12 V fan" } },
+      { id: "D1", type: "diode", props: { partNumber: "1N4001" } },
+      { id: "B1", type: "battery", props: { value: "12V" } },
+    ],
+    nets: [
+      { id: "n1", name: "12V", endpoints: ["B1.+", "M1.1", "D1[K]"] },
+      { id: "n2", endpoints: ["M1.2", "D1[A]", "Q1[C]"] },
+      { id: "n3", name: "GND", endpoints: ["B1.-", "Q1[E]", "U1.GND"] },
+      { id: "n4", endpoints: ["U1.PWM", "R1.1"] },
+      { id: "n5", endpoints: ["R1.2", "Q1[B]"] },
+    ],
+  },
+};
+
 export const TEMPLATE_CIRCUITS: Record<string, Project> = {
   "noninverting": NONINVERTING, "inverting": INVERTING, "divider": DIVIDER, "pulls": PULLS, "led-gpio": LED_GPIO, "led-sink": LED_SINK,
+  "bridge": BRIDGE, "hbridge-bjt": HBRIDGE_BJT, "low-side": LOW_SIDE,
 };

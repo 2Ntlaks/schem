@@ -742,7 +742,7 @@ function displayValue(type: string, raw: string): string {
 function labelFor(part: Circuit["parts"][0], sym: SymbolDef, o: Orient, ko: Box, avoid: Box[], side?: string): Placed["labels"] {
   if (sym.kind === "port") return [];
   const lines = [part.id];
-  const value = part.props?.value ?? part.props?.label ?? part.props?.color ?? part.props?.partNumber;
+  const value = part.props?.value ?? part.props?.label ?? part.props?.color ?? part.props?.partNumber ?? part.title;
   if (value) lines.push(sym.kind === "ic" ? value : displayValue(part.type, value));
   const w = Math.max(...lines.map((l) => measure(l, LABEL_SIZE).width / 10));
   const h = lines.length * LINE;

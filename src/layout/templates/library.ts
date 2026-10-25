@@ -274,6 +274,10 @@ function hBridge(hi: "pmos" | "pnp", lo: "nmos" | "npn"): Template {
       interior.push(
         rel("y", pin(s, net(g)), "=", ctrl, 0, "gate resistor in line with the gate"),
         rel("y", pin(p, net(g)), "=", ctrl, railDir === "up" ? -2 : 2, "gate-source resistor from the gate wire to its rail"),
+        // Without a gate-source resistor this keeps the gate resistor itself off the transistor.
+        sign > 0
+          ? rel("x", ctrl, ">=", pin(s, net(g)), 2, "a wire between the gate resistor and the gate")
+          : rel("x", pin(s, net(g)), ">=", ctrl, 2, "a wire between the gate and the gate resistor"),
         ...(sign > 0 ? [
           rel("x", pin(p, net(g)), ">=", pin(s, net(g)), 2, "node between the gate resistor and the gate"),
           rel("x", ctrl, ">=", pin(p, net(g)), 2, "node left of the gate"),
@@ -362,6 +366,7 @@ function lowSide(q: "npn" | "nmos", load: "relay" | "two-pin"): Template {
       rel("x", env("fly", "right"), "<=", box("load", "left"), -1, "flyback diode just left of the load"),
       rel("x", pin("fly", net("SW")), ">=", box("load", "left"), -4, "flyback diode close to the load"),
       rel("y", pin("rb", net("CTL")), "=", pin("q", T.ctrl), 0, "drive resistor in line with the control pin"),
+      rel("x", pin("q", T.ctrl), ">=", pin("rb", net("CTL")), 2, "a wire between the drive resistor and the control pin (also without a pull-down)"),
       rel("y", pin("pd", net("CTL")), "=", pin("q", T.ctrl), 2, "pull-down from the control wire to ground"),
       rel("x", pin("pd", net("CTL")), ">=", pin("rb", net("CTL")), 2, "node between the drive resistor and the control pin"),
       rel("x", pin("q", T.ctrl), ">=", pin("pd", net("CTL")), 2, "node left of the control pin"),
