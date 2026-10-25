@@ -2,6 +2,8 @@
 // inventory proposed with the frozen cases, and draws in a small realistic circuit that lays
 // out `valid` and passes verification layers 1 and 2, deterministically.
 
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { layout, pinDefsOf } from "../src/layout/layout.js";
 import { checkDrawing } from "../src/quality/index.js";
@@ -13,24 +15,12 @@ import type { PinDef } from "../src/core/model.js";
 import type { DrawnPin } from "../src/render/model.js";
 import { SYMBOL_CIRCUITS } from "./support/symbol-circuits.js";
 
-/** Pin inventories from phase0/proposed-symbols.json (agent B, frozen with the cases), copied verbatim. */
-const PROPOSED: Record<string, PinDef[]> = {
-  "polarised-capacitor": [{"number":"+","name":"+","role":"passive","aliases":["pos","p"],"chain":"in"},{"number":"-","name":"-","role":"passive","aliases":["neg","n"],"chain":"out"}],
-  "potentiometer": [{"number":"1","name":"1","role":"passive"},{"number":"2","name":"wiper","role":"passive","aliases":["W","w"]},{"number":"3","name":"3","role":"passive"}],
-  "diode": [{"number":"A","name":"anode","role":"passive","aliases":["a","+"],"chain":"in"},{"number":"K","name":"cathode","role":"passive","aliases":["k","-"],"chain":"out"}],
-  "npn": [{"number":"B","name":"base","role":"passive","aliases":["b"]},{"number":"C","name":"collector","role":"passive","aliases":["c"]},{"number":"E","name":"emitter","role":"passive","aliases":["e"]}],
-  "pnp": [{"number":"B","name":"base","role":"passive","aliases":["b"]},{"number":"C","name":"collector","role":"passive","aliases":["c"]},{"number":"E","name":"emitter","role":"passive","aliases":["e"]}],
-  "nmos": [{"number":"G","name":"gate","role":"passive","aliases":["g"]},{"number":"D","name":"drain","role":"passive","aliases":["d"]},{"number":"S","name":"source","role":"passive","aliases":["s"]}],
-  "pmos": [{"number":"G","name":"gate","role":"passive","aliases":["g"]},{"number":"D","name":"drain","role":"passive","aliases":["d"]},{"number":"S","name":"source","role":"passive","aliases":["s"]}],
-  "spst": [{"number":"1","name":"1","role":"passive","chain":"in"},{"number":"2","name":"2","role":"passive","chain":"out"}],
-  "pushbutton": [{"number":"1","name":"1","role":"passive","chain":"in"},{"number":"2","name":"2","role":"passive","chain":"out"}],
-  "buzzer": [{"number":"+","name":"+","role":"passive","aliases":["pos","p"],"chain":"in"},{"number":"-","name":"-","role":"passive","aliases":["neg","n"],"chain":"out"}],
-  "motor": [{"number":"1","name":"1","role":"passive","aliases":["+"]},{"number":"2","name":"2","role":"passive","aliases":["-"]}],
-  "relay": [{"number":"A1","name":"A1","role":"passive"},{"number":"A2","name":"A2","role":"passive"},{"number":"11","name":"COM","role":"passive"},{"number":"12","name":"NC","role":"passive"},{"number":"14","name":"NO","role":"passive"}],
-  "fuse": [{"number":"1","name":"1","role":"passive","chain":"in"},{"number":"2","name":"2","role":"passive","chain":"out"}],
-  "ac-source": [{"number":"1","name":"1","role":"passive"},{"number":"2","name":"2","role":"passive"}],
-  "header": [],
-};
+/**
+ * Pin inventories proposed with the frozen cases (agent B), read from the real file so that
+ * a drift between it and the library is caught. Read only: phase0/ is never edited.
+ */
+const PROPOSAL = JSON.parse(readFileSync(join(import.meta.dirname, "..", "phase0", "proposed-symbols.json"), "utf8")) as { types: Record<string, { pins: PinDef[] }> };
+const PROPOSED: Record<string, PinDef[]> = Object.fromEntries(Object.entries(PROPOSAL.types).map(([t, v]) => [t, v.pins]));
 
 describe("symbol library: loader check (SPEC 7.1)", () => {
   for (const s of Object.values(BUILTIN)) {
@@ -56,6 +46,8 @@ describe("symbol library: loader check (SPEC 7.1)", () => {
 });
 
 describe("symbol library: pin inventories match phase0/proposed-symbols.json", () => {
+  it("the proposal lists the 15 Phase 0b types", () => expect(Object.keys(PROPOSED).length).toBe(15));
+
   for (const [type, pins] of Object.entries(PROPOSED)) {
     it(type, () => {
       if (type === "header") {
