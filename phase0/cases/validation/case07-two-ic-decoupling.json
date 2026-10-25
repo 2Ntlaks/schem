@@ -1,0 +1,527 @@
+{
+  "schema": "schem/1.0",
+  "meta": {
+    "title": "Case 7: two ICs, each with 2 decoupling capacitors",
+    "created": "2026-10-23",
+    "nextNetId": 6,
+    "nextHintId": 5
+  },
+  "circuit": {
+    "parts": [
+      {
+        "id": "J1",
+        "type": "header",
+        "props": {
+          "label": "5V IN"
+        },
+        "pins": [
+          {
+            "number": "1",
+            "name": "5V",
+            "role": "passive"
+          },
+          {
+            "number": "2",
+            "name": "GND",
+            "role": "ground"
+          }
+        ]
+      },
+      {
+        "id": "U1",
+        "type": "ic",
+        "props": {
+          "label": "ATmega328P",
+          "partNumber": "ATMEGA328P-PU",
+          "controller": "true"
+        },
+        "pins": [
+          {
+            "number": "1",
+            "name": "RESET",
+            "role": "input",
+            "aliases": [
+              "PC6",
+              "PCINT14"
+            ]
+          },
+          {
+            "number": "2",
+            "name": "PD0",
+            "role": "bidir",
+            "aliases": [
+              "RXD",
+              "PCINT16"
+            ]
+          },
+          {
+            "number": "3",
+            "name": "PD1",
+            "role": "bidir",
+            "aliases": [
+              "TXD",
+              "PCINT17"
+            ]
+          },
+          {
+            "number": "4",
+            "name": "PD2",
+            "role": "bidir",
+            "aliases": [
+              "INT0",
+              "PCINT18"
+            ]
+          },
+          {
+            "number": "5",
+            "name": "PD3",
+            "role": "bidir",
+            "aliases": [
+              "OC2B",
+              "INT1",
+              "PCINT19"
+            ]
+          },
+          {
+            "number": "6",
+            "name": "PD4",
+            "role": "bidir",
+            "aliases": [
+              "XCK",
+              "T0",
+              "PCINT20"
+            ]
+          },
+          {
+            "number": "7",
+            "name": "VCC",
+            "role": "power_in"
+          },
+          {
+            "number": "8",
+            "name": "GND",
+            "role": "ground"
+          },
+          {
+            "number": "9",
+            "name": "PB6",
+            "role": "bidir",
+            "aliases": [
+              "XTAL1",
+              "TOSC1",
+              "PCINT6"
+            ]
+          },
+          {
+            "number": "10",
+            "name": "PB7",
+            "role": "bidir",
+            "aliases": [
+              "XTAL2",
+              "TOSC2",
+              "PCINT7"
+            ]
+          },
+          {
+            "number": "11",
+            "name": "PD5",
+            "role": "bidir",
+            "aliases": [
+              "OC0B",
+              "T1",
+              "PCINT21"
+            ]
+          },
+          {
+            "number": "12",
+            "name": "PD6",
+            "role": "bidir",
+            "aliases": [
+              "OC0A",
+              "AIN0",
+              "PCINT22"
+            ]
+          },
+          {
+            "number": "13",
+            "name": "PD7",
+            "role": "bidir",
+            "aliases": [
+              "AIN1",
+              "PCINT23"
+            ]
+          },
+          {
+            "number": "14",
+            "name": "PB0",
+            "role": "bidir",
+            "aliases": [
+              "CLKO",
+              "ICP1",
+              "PCINT0"
+            ]
+          },
+          {
+            "number": "15",
+            "name": "PB1",
+            "role": "bidir",
+            "aliases": [
+              "OC1A",
+              "PCINT1"
+            ]
+          },
+          {
+            "number": "16",
+            "name": "PB2",
+            "role": "bidir",
+            "aliases": [
+              "SS",
+              "OC1B",
+              "PCINT2"
+            ],
+            "iface": [
+              "spi.ss"
+            ]
+          },
+          {
+            "number": "17",
+            "name": "PB3",
+            "role": "bidir",
+            "aliases": [
+              "MOSI",
+              "OC2A",
+              "PCINT3"
+            ],
+            "iface": [
+              "spi.mosi"
+            ]
+          },
+          {
+            "number": "18",
+            "name": "PB4",
+            "role": "bidir",
+            "aliases": [
+              "MISO",
+              "PCINT4"
+            ],
+            "iface": [
+              "spi.miso"
+            ]
+          },
+          {
+            "number": "19",
+            "name": "PB5",
+            "role": "bidir",
+            "aliases": [
+              "SCK",
+              "PCINT5"
+            ],
+            "iface": [
+              "spi.sck"
+            ]
+          },
+          {
+            "number": "20",
+            "name": "AVCC",
+            "role": "power_in"
+          },
+          {
+            "number": "21",
+            "name": "AREF",
+            "role": "input"
+          },
+          {
+            "number": "22",
+            "name": "GND",
+            "role": "ground"
+          },
+          {
+            "number": "23",
+            "name": "PC0",
+            "role": "bidir",
+            "aliases": [
+              "ADC0",
+              "PCINT8"
+            ]
+          },
+          {
+            "number": "24",
+            "name": "PC1",
+            "role": "bidir",
+            "aliases": [
+              "ADC1",
+              "PCINT9"
+            ]
+          },
+          {
+            "number": "25",
+            "name": "PC2",
+            "role": "bidir",
+            "aliases": [
+              "ADC2",
+              "PCINT10"
+            ]
+          },
+          {
+            "number": "26",
+            "name": "PC3",
+            "role": "bidir",
+            "aliases": [
+              "ADC3",
+              "PCINT11"
+            ]
+          },
+          {
+            "number": "27",
+            "name": "PC4",
+            "role": "bidir",
+            "aliases": [
+              "ADC4",
+              "SDA",
+              "PCINT12"
+            ],
+            "iface": [
+              "i2c.sda"
+            ]
+          },
+          {
+            "number": "28",
+            "name": "PC5",
+            "role": "bidir",
+            "aliases": [
+              "ADC5",
+              "SCL",
+              "PCINT13"
+            ],
+            "iface": [
+              "i2c.scl"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "U2",
+        "type": "ic",
+        "props": {
+          "label": "24LC256",
+          "partNumber": "24LC256-I/P"
+        },
+        "pins": [
+          {
+            "number": "1",
+            "name": "A0",
+            "role": "input"
+          },
+          {
+            "number": "2",
+            "name": "A1",
+            "role": "input"
+          },
+          {
+            "number": "3",
+            "name": "A2",
+            "role": "input"
+          },
+          {
+            "number": "4",
+            "name": "VSS",
+            "role": "ground"
+          },
+          {
+            "number": "5",
+            "name": "SDA",
+            "role": "bidir",
+            "iface": [
+              "i2c.sda"
+            ]
+          },
+          {
+            "number": "6",
+            "name": "SCL",
+            "role": "input",
+            "iface": [
+              "i2c.scl"
+            ]
+          },
+          {
+            "number": "7",
+            "name": "WP",
+            "role": "input"
+          },
+          {
+            "number": "8",
+            "name": "VCC",
+            "role": "power_in"
+          }
+        ]
+      },
+      {
+        "id": "C1",
+        "type": "capacitor",
+        "props": {
+          "value": "100n"
+        }
+      },
+      {
+        "id": "C2",
+        "type": "capacitor",
+        "props": {
+          "value": "100n"
+        }
+      },
+      {
+        "id": "C3",
+        "type": "capacitor",
+        "props": {
+          "value": "100n"
+        }
+      },
+      {
+        "id": "C4",
+        "type": "capacitor",
+        "props": {
+          "value": "10u"
+        }
+      },
+      {
+        "id": "R1",
+        "type": "resistor",
+        "props": {
+          "value": "10k"
+        }
+      },
+      {
+        "id": "R2",
+        "type": "resistor",
+        "props": {
+          "value": "4.7k"
+        }
+      },
+      {
+        "id": "R3",
+        "type": "resistor",
+        "props": {
+          "value": "4.7k"
+        }
+      }
+    ],
+    "nets": [
+      {
+        "id": "n1",
+        "name": "5V",
+        "endpoints": [
+          "C1[1]",
+          "C2[1]",
+          "C3[1]",
+          "C4[1]",
+          "J1[1]",
+          "R1[1]",
+          "R2[1]",
+          "R3[1]",
+          "U1[7]",
+          "U1[20]",
+          "U2[8]"
+        ]
+      },
+      {
+        "id": "n2",
+        "name": "GND",
+        "endpoints": [
+          "C1[2]",
+          "C2[2]",
+          "C3[2]",
+          "C4[2]",
+          "J1[2]",
+          "U1[8]",
+          "U1[22]",
+          "U2[1]",
+          "U2[2]",
+          "U2[3]",
+          "U2[4]",
+          "U2[7]"
+        ]
+      },
+      {
+        "id": "n3",
+        "name": "RESET",
+        "endpoints": [
+          "R1[2]",
+          "U1[1]"
+        ]
+      },
+      {
+        "id": "n4",
+        "name": "SDA",
+        "endpoints": [
+          "R2[2]",
+          "U1[27]",
+          "U2[5]"
+        ]
+      },
+      {
+        "id": "n5",
+        "name": "SCL",
+        "endpoints": [
+          "R3[2]",
+          "U1[28]",
+          "U2[6]"
+        ]
+      }
+    ],
+    "nc": []
+  },
+  "intent": {
+    "hints": [
+      {
+        "id": "h1",
+        "type": "decouples",
+        "part": "C1",
+        "pin": "U1[7]",
+        "priority": "normal"
+      },
+      {
+        "id": "h2",
+        "type": "decouples",
+        "part": "C2",
+        "pin": "U1[20]",
+        "priority": "normal"
+      },
+      {
+        "id": "h3",
+        "type": "decouples",
+        "part": "C3",
+        "pin": "U2[8]",
+        "priority": "normal"
+      },
+      {
+        "id": "h4",
+        "type": "decouples",
+        "part": "C4",
+        "pin": "U2[8]",
+        "priority": "normal"
+      }
+    ],
+    "locks": [],
+    "overrides": {},
+    "style": {
+      "theme": "clean",
+      "symbols": "ieee"
+    }
+  },
+  "assets": {
+    "library": "schem-symbols@phase0b-proposal",
+    "definitions": {}
+  },
+  "ext": {
+    "phase0": {
+      "case": 7,
+      "set": "validation",
+      "author": "agent B (independent case author)",
+      "source": "ATmega328P-PU (internal oscillator) with a 24LC256 I2C EEPROM at address 0x50; 100 nF on VCC and on AVCC of the ATmega, 100 nF + 10 uF on the EEPROM VCC; 10k reset pull-up; 4.7k I2C pull-ups; 2-pin power header",
+      "pinSources": {
+        "U1": "Microchip ATmega48A/PA/88A/PA/168A/PA/328/P datasheet DS40002061B, Pin Configurations, 28 SPDIP",
+        "U2": "Microchip 24AA256/24LC256/24FC256 datasheet DS20001203Y, Package Types, 8-lead PDIP"
+      }
+    }
+  }
+}

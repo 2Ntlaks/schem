@@ -1,0 +1,274 @@
+{
+  "schema": "schem/1.0",
+  "meta": {
+    "title": "Case 4: H-bridge, 4 MOSFETs, motor, gate resistors",
+    "created": "2026-10-23",
+    "nextNetId": 13,
+    "nextHintId": 1
+  },
+  "circuit": {
+    "parts": [
+      {
+        "id": "B1",
+        "type": "battery",
+        "props": {
+          "value": "12V"
+        }
+      },
+      {
+        "id": "Q1",
+        "type": "pmos",
+        "props": {
+          "partNumber": "IRF9540N"
+        }
+      },
+      {
+        "id": "Q2",
+        "type": "nmos",
+        "props": {
+          "partNumber": "IRF540N"
+        }
+      },
+      {
+        "id": "Q3",
+        "type": "pmos",
+        "props": {
+          "partNumber": "IRF9540N"
+        }
+      },
+      {
+        "id": "Q4",
+        "type": "nmos",
+        "props": {
+          "partNumber": "IRF540N"
+        }
+      },
+      {
+        "id": "M1",
+        "type": "motor",
+        "props": {
+          "label": "12 V DC motor"
+        }
+      },
+      {
+        "id": "R1",
+        "type": "resistor",
+        "props": {
+          "value": "100"
+        }
+      },
+      {
+        "id": "R2",
+        "type": "resistor",
+        "props": {
+          "value": "100"
+        }
+      },
+      {
+        "id": "R3",
+        "type": "resistor",
+        "props": {
+          "value": "100"
+        }
+      },
+      {
+        "id": "R4",
+        "type": "resistor",
+        "props": {
+          "value": "100"
+        }
+      },
+      {
+        "id": "R5",
+        "type": "resistor",
+        "props": {
+          "value": "10k"
+        }
+      },
+      {
+        "id": "R6",
+        "type": "resistor",
+        "props": {
+          "value": "10k"
+        }
+      },
+      {
+        "id": "R7",
+        "type": "resistor",
+        "props": {
+          "value": "10k"
+        }
+      },
+      {
+        "id": "R8",
+        "type": "resistor",
+        "props": {
+          "value": "10k"
+        }
+      },
+      {
+        "id": "J1",
+        "type": "header",
+        "props": {
+          "label": "DRIVE"
+        },
+        "pins": [
+          {
+            "number": "1",
+            "name": "HA",
+            "role": "passive"
+          },
+          {
+            "number": "2",
+            "name": "LA",
+            "role": "passive"
+          },
+          {
+            "number": "3",
+            "name": "HB",
+            "role": "passive"
+          },
+          {
+            "number": "4",
+            "name": "LB",
+            "role": "passive"
+          },
+          {
+            "number": "5",
+            "name": "GND",
+            "role": "ground"
+          }
+        ]
+      }
+    ],
+    "nets": [
+      {
+        "id": "n1",
+        "name": "12V",
+        "endpoints": [
+          "B1[+]",
+          "Q1[S]",
+          "Q3[S]",
+          "R5[1]",
+          "R7[1]"
+        ]
+      },
+      {
+        "id": "n2",
+        "name": "GND",
+        "endpoints": [
+          "B1[-]",
+          "J1[5]",
+          "Q2[S]",
+          "Q4[S]",
+          "R6[2]",
+          "R8[2]"
+        ]
+      },
+      {
+        "id": "n3",
+        "name": "OUTA",
+        "endpoints": [
+          "M1[1]",
+          "Q1[D]",
+          "Q2[D]"
+        ]
+      },
+      {
+        "id": "n4",
+        "name": "OUTB",
+        "endpoints": [
+          "M1[2]",
+          "Q3[D]",
+          "Q4[D]"
+        ]
+      },
+      {
+        "id": "n5",
+        "endpoints": [
+          "Q1[G]",
+          "R1[2]",
+          "R5[2]"
+        ]
+      },
+      {
+        "id": "n6",
+        "endpoints": [
+          "Q2[G]",
+          "R2[2]",
+          "R6[1]"
+        ]
+      },
+      {
+        "id": "n7",
+        "endpoints": [
+          "Q3[G]",
+          "R3[2]",
+          "R7[2]"
+        ]
+      },
+      {
+        "id": "n8",
+        "endpoints": [
+          "Q4[G]",
+          "R4[2]",
+          "R8[1]"
+        ]
+      },
+      {
+        "id": "n9",
+        "name": "HA",
+        "endpoints": [
+          "J1[1]",
+          "R1[1]"
+        ]
+      },
+      {
+        "id": "n10",
+        "name": "LA",
+        "endpoints": [
+          "J1[2]",
+          "R2[1]"
+        ]
+      },
+      {
+        "id": "n11",
+        "name": "HB",
+        "endpoints": [
+          "J1[3]",
+          "R3[1]"
+        ]
+      },
+      {
+        "id": "n12",
+        "name": "LB",
+        "endpoints": [
+          "J1[4]",
+          "R4[1]"
+        ]
+      }
+    ],
+    "nc": []
+  },
+  "intent": {
+    "hints": [],
+    "locks": [],
+    "overrides": {},
+    "style": {
+      "theme": "clean",
+      "symbols": "ieee"
+    }
+  },
+  "assets": {
+    "library": "schem-symbols@phase0b-proposal",
+    "definitions": {}
+  },
+  "ext": {
+    "phase0": {
+      "case": 4,
+      "set": "validation",
+      "author": "agent B (independent case author)",
+      "source": "discrete complementary H-bridge: IRF9540N high side, IRF540N low side, 100 ohm gate resistors, 10k gate-source resistors, 4 drive inputs on a header"
+    }
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "schema": "schem-edit/phase0b",
+  "case": "test/case11-uno-lcd-dht22.json",
+  "edit": "pin-sides",
+  "description": "DHT22 U1: DATA and the no-connect pin 3 on the right side, DATA above pin 3.",
+  "ops": [
+    {
+      "op": "setPinSides",
+      "part": "U1",
+      "right": [
+        "U1[2]",
+        "U1[3]"
+      ]
+    }
+  ],
+  "expect": {
+    "ok": true,
+    "affectedParts": [
+      "U1"
+    ]
+  }
+}

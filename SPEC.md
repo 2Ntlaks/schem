@@ -2,14 +2,14 @@
 
 | | |
 |---|---|
-| Status | **rev C.2**: Phase 0a built; its deviations and the open "fix before 0b" items folded in |
-| Date | 2026-10-23 |
+| Status | **rev C.3**: Phase 0b edit operations, incremental mode and findings harness folded in; the case author's open questions ruled |
+| Date | 2026-10-25 |
 | Working name | `schem` (placeholder for the CLI and package names, final name to be decided) |
 | Author | Project owner, drafted with Claude Code |
 | Reviews | rev A: `archive/SPEC-REVIEW-revA.md`, rev B: `archive/SPEC-REVIEW-revB.md`, rev C: `archive/SPEC-REVIEW-revC.md` |
-| Previous | `archive/SPEC-revA.md`, `archive/SPEC-revB.md`, `archive/SPEC-revC1.md` |
+| Previous | `archive/SPEC-revA.md`, `archive/SPEC-revB.md`, `archive/SPEC-revC1.md`, `archive/SPEC-revC2.md` |
 
-Section 18 maps every rev B finding (N01-N22, F31 and the over-corrections) to what changed, then lists the rev C.1 amendments and the rev C.2 changes. The rev A finding map is in `archive/SPEC-revB.md` section 18. Section numbers are kept from earlier revisions.
+Section 18 maps every rev B finding (N01-N22, F31 and the over-corrections) to what changed, then lists the rev C.1 amendments and the rev C.2 and C.3 changes. The rev C.3 rulings the owner confirmed are listed in section 16. The rev A finding map is in `archive/SPEC-revB.md` section 18. Section numbers are kept from earlier revisions.
 
 ---
 
@@ -143,7 +143,7 @@ flowchart LR
 | `id` | Reference designator, unique, the part's key. `^[A-Za-z][A-Za-z0-9_]*$`. `renamePart` rewrites every reference in circuit and intent in one validated transaction. Files with unknown semantic fields refuse renames (section 6.6). |
 | `type` | Symbol or module id. |
 | `props` | Raw values as written (section 6.7) plus type-specific fields. |
-| `pins` | Only for `ic` and custom parts (section 7.3). |
+| `pins` | Only for `ic`, `header` and custom parts (section 7.3). A header's pin count and names change per instance, so it declares its pins inline like `ic` (rev C.3). |
 
 **Terminal** (a physical pin, defined by the symbol or by `pins`)
 
@@ -159,11 +159,11 @@ flowchart LR
 
 **Endpoints.** A net member is one of:
 - a **terminal**, written `U1[38]` (canonical) or `U1.GPIO4` (by name or alias, when exactly one terminal matches);
-- a **group**, written `U1{GND}` (canonical) or `U1.GND` when the name matches only terminals of one group. A group endpoint is a **logical** connection: it says "this net reaches the part's internally connected GND", without choosing a physical pin. It is drawn at a deterministic representative terminal (the lowest pin number in natural order), and the part's note says so ("GND: pins 14, 29, 38, connected inside").
+- a **group**, written `U1{GND}` (canonical) or `U1.GND` when the name matches only terminals of one group. A group endpoint is a **logical** connection: it says "this net reaches the part's internally connected GND", without choosing a physical pin. It is drawn at a deterministic representative terminal (below), and the part's note says so ("GND: pins 14, 29, 38, connected inside").
 
 An ambiguous name is an error listing the candidates by number.
 
-**"In a net" means as written** (rev C.1). A terminal is in a net only if that terminal itself, or its group as a group endpoint, is written in the net. Equivalence classes (below) are used only for invariant 1, merging and the verifier's comparison. (Invariant 2 is checked as written, so a no-connect mark on a member of a connected group is allowed.) A group member that is not written and whose group is connected is simply hidden: no supply warning. The representative of a group is its **lowest-numbered member that is not marked no-connect**; a group whose members are all no-connect cannot be used as an endpoint (`E225`).
+**"In a net" means as written** (rev C.1). A terminal is in a net only if that terminal itself, or its group as a group endpoint, is written in the net. Equivalence classes (below) are used only for invariant 1, merging and the verifier's comparison. (Invariant 2 is checked as written, so a no-connect mark on a member of a connected group is allowed.) A group member that is not written and whose group is connected is simply hidden: no supply warning. The representative of a group is the member the module definition names in `representatives` (section 7.3) if that member is not marked no-connect; otherwise its **lowest-numbered member that is not marked no-connect**. A group whose members are all no-connect cannot be used as an endpoint (`E225`). (Rev C.3: by natural order alone, the Arduino Uno's GND group lands on the USB chip's programming header.)
 
 **Electrical equivalence.** For validation, every endpoint is expanded to its **equivalence class**: a terminal in a group belongs to the class of its group; any other terminal is its own class. All rules in 6.3 are checked on classes, so:
 - `U1{GND}` in net n1 and `U1[14]` (a member of that group) in net n2 is an error: the part already joins them internally, so the two nets would be shorted.
@@ -178,7 +178,7 @@ An ambiguous name is an error listing the candidates by number.
 
 - **Storage identity.** `id` is assigned once from `meta.nextNetId` and never changes. It is used only to refer to the net in edits and overrides. **Layout never uses it for ordering** (section 9.6). When the DSL is compiled, new nets get their ids in canonical-key order (section 9.6), not in line order, so reordering `net` lines gives the same ids and the same output (rev C.2). Layout output that names a net (`layout.routes[].net`, `data-net`) uses this id.
 - **Names** are optional, unique, changeable (`renameNet`).
-- **Kind:** `signal`, `power`, `ground`. Names such as `GND`, `VCC`, `VDD`, `3V3`, `5V`, `VIN`, `VBAT`, `+12V` default to `power`/`ground`; explicit `kind` wins.
+- **Kind:** `signal`, `power`, `ground`. Explicit `kind` wins. Otherwise, ignoring case: `GND`, `AGND`, `DGND`, `PGND`, `VSS`, `0V`, `GROUND` default to `ground`; `VCC`, `VDD`, `VIN`, `VBAT`, `VPP`, `VBUS`, `PWR`, `V+`, `VEE`, `V-` and signed voltages (`5V`, `+12V`, `3V3`, `-12V`, `-5V`) default to `power`. A power net named with a leading `-`, or `VEE` or `V-`, is a **negative supply**: it is placed in the ground band and its supply symbol points down (rev C.3). A negative rail named `VSS` needs `kind: "power"`.
 - **Domain:** optional string. Ground nets with different domains are never merged and must be visibly distinguishable (section 9.2 step 3).
 - **No-connect:** `circuit.nc` lists terminals with no external connection. Allowed on a member of a group even when the group is connected (the pin itself carries no wire). Not allowed on a group endpoint or on any terminal that is in a net.
 
@@ -216,6 +216,8 @@ The first rule that fails decides the error code.
 | `group` | `group "Power supply" U1 C1 C2` | members form one block |
 | `decouples` | `hint C3 decouples U1.VCC` | assigns the capacitor to that pin's decoupling slot |
 | `pinSides` | `hint U1 pins-left U1[3] U1[4] pins-right OUT` | fixes side and order of those pins |
+
+In JSON each hint carries the same fields by name, for example `{ "id": "h1", "type": "decouples", "part": "C1", "pin": "U1[7]", "priority": "normal" }`, where `pin` is a canonical terminal. Phase 0b solves `relative`, `align`, `orient` and `pinSides` hints, locks and label-side overrides. `near`, `flow`, `group` and `decouples` take effect only through templates (section 9.4), and are built with them.
 
 **Precedence:** locks > strict hints > high hints > template constraints > normal hints. A normal hint that conflicts with a template is dropped and a finding says so ("use priority=high to override the template").
 
@@ -274,11 +276,12 @@ The first rule that fails decides the error code.
 }
 ```
 
-- **`assets.definitions`** holds the full definition of every symbol and module used, built-in or custom. The file renders the same even after the library changes or is missing. `schem update-assets` adopts newer built-in definitions in one transaction: pins are matched by number; if a used pin number disappears, the update is rejected with the list.
+- **`assets.definitions`** holds the full definition of every symbol and module used, built-in or custom. The file renders the same even after the library changes or is missing. A hand-written file may leave out built-in definitions (the Phase 0b cases embed only their modules): the loader takes them from the library and the next save embeds them (rev C.3). `schem update-assets` adopts newer built-in definitions in one transaction: pins are matched by number; if a used pin number disappears, the update is rejected with the list.
 - **`layout.basis`** hashes the canonical circuit, intent, asset definitions, font bytes and shaping settings, templates, theme, options and engine version.
 - **`layout.fingerprints`**: geometry-only hashes (positions, orientations, routes, labels) of the last 10 layouts, for repeat detection (section 10.3).
 - Route branches have **no stable identity in v1**. Wire waypoint overrides are out of scope until branch matching across edits is designed.
 - **Canonical serialisation:** UTF-8, LF, 2-space indent, fixed key order, endpoints sorted canonically, integers for grid geometry. `schem fmt` is idempotent.
+- **Phase 0a shape** (rev C.3): a file with only `meta` and `circuit`, endpoints in name form (`R1.1`), still loads, as a project with empty intent. The next save writes the full shape.
 
 ### 6.6 Versioning
 
@@ -359,21 +362,26 @@ Meta, intent, style and layout are excluded. For the agent evaluation, a variant
 
 **Phase 1 (sized to D2):** resistor, potentiometer, capacitor, polarised capacitor, inductor, crystal, fuse; diode, Zener, Schottky, LED; NPN, PNP, N-MOSFET, P-MOSFET; op-amp (3-pin and 5-pin), comparator; battery, DC voltage source, AC source, current source; ground, chassis ground, supply (arrow, bar); SPST, push button, relay (one symbol), motor, lamp, buzzer; net label, header connector, no-connect mark; generic `ic` box.
 
+**Discrete semiconductors** use symbol pin letters (`B`/`C`/`E`, `G`/`D`/`S`, `A`/`K`), not package numbers, because package pinouts differ between makers; the part number goes in `props.partNumber` (rev C.3). The pin inventories of the Phase 1 symbols start from `phase0/proposed-symbols.json`, which the frozen cases use.
+
 **Style:** one symbol style in Phase 1 (IEEE/US by default, owner to confirm in section 16). IEC variants in Phase 2. Logic gates, transformer, SPDT, meters, speakers and more in Phase 2 by demand.
 
 ### 7.3 Generic ICs and modules
 
 ```
-part U1 ic "ESP32-DevKitC" pins: 1:3V3/power_in 2:EN/input 14:GND/ground@gnd 29:GND/ground@gnd \
+part U1 ic "MCU board" pins:     1:3V3/power_in 2:EN/input 14:GND/ground@gnd 29:GND/ground@gnd \
                                  21:GPIO21/bidir 22:GPIO22/bidir
 part U2 ic "Sensor" pins: VIN GND SDA SCL
 ```
 
-- **Pin declaration:** `[NUMBER:]NAME[/ROLE][@GROUP]`. Without a number, pins are numbered 1, 2, 3 … in the order written. Without a role: `ground` for names matching `GND|VSS|AGND|DGND`, `power_in` for `VCC|VDD|VIN|3V3|5V|V+|VBAT`, otherwise `bidir`. Without a group: none.
+- **Pin declaration** (on `ic` and `header` parts): `[NUMBER:]NAME[/ROLE][@GROUP]`. Without a number, pins are numbered 1, 2, 3 … in the order written. Without a role: `ground` for names matching `GND|VSS|AGND|DGND`, `power_in` for `VCC|VDD|VIN|3V3|5V|V+|VBAT`, otherwise `bidir`. Without a group: none.
 - **Logical inventory vs visible pins.** All pins exist in the model. Pins that are in a net, marked no-connect, or explicitly shown are drawn; other pins are hidden by default (`style.showUnusedPins: false`). The part note gives the hidden count.
-- **Unconnected supplies are reported.** A `power_in` or `ground` pin in no net is always a warning, whether drawn or hidden.
+- **Unconnected supplies are reported.** A `power_in` or `ground` pin in no net is always a warning, whether drawn or hidden. Module pins are exempt (below).
+- **Controller.** `props.controller: "true"` on an `ic` or custom part counts like a module's `controller` flag in flow inference (section 9.2 step 2) (rev C.3).
 - **Box shape is fixed before placement**, from an ordered candidate list of pin-side assignments (power top, ground bottom, upstream pins left, downstream right, then variants). Repair may try the next candidate. Side pins are 2 G apart; top and bottom pins are spaced by their name widths (at least 2 G) so the names never run together (rev C.2).
-- **Modules** (`module:esp32-devkitc-v4`, `module:arduino-uno-r3`, `module:raspberry-pi-pico`, sensor breakouts) carry real pin numbers, names, aliases, groups, roles, interface roles, a `controller` flag for microcontroller boards, and the documentation URL and revision they come from. Aliases follow the board's own documentation exactly (on the ESP32-DevKitC V4, header label `D2` is GPIO9). Board revisions are separate module ids. **Phase 1 ships only the modules the corpus uses.**
+- **Modules** (`module:esp32-devkitc-v4`, `module:arduino-uno-r3`, `module:raspberry-pi-pico`, sensor breakouts) carry real pin numbers, names, aliases, groups, roles, interface roles, a `controller` flag for microcontroller boards, and the documentation URL and revision they come from. Pin numbers and aliases follow the board's own documentation exactly (the ESP32-DevKitC V4 numbers each header, so its GND pins are `J2-14`, `J3-1` and `J3-7`; header label `D2` is GPIO9). Where the documentation gives no numbers, pins are numbered 1..N in the order it lists them, and `doc.pinNumbering` says so. Board revisions are separate module ids. **Phase 1 ships only the modules the corpus uses.**
+- **Module definition shape** (rev C.3): `{ id, version, kind: "module", name, refPrefix, controller, doc: { title, url, revision, retrieved, pinNumbering, notes }, pins: [ { number, name, role, aliases?, group?, iface? } ], representatives? }`. `representatives` maps a group name to its preferred representative pin number (section 6.2). A module has no geometry: it is drawn as a generated box, like `ic`.
+- **Board supply pins** (rev C.3): roles are fixed per module, taken from the documentation for the board's usual supply (USB on development boards): a regulator output is `power_out`, a supply input `power_in`. v1 has no `power_bidir` role and no per-part role override. Because a board has several alternative supply pins and is often powered by an undrawn USB cable, an unconnected supply pin on a module is not reported.
 
 ## 8. Text DSL
 
@@ -483,7 +491,7 @@ Results are ranked **lexicographically** by these groups.
 6. All electrical geometry on grid; all locks honoured exactly.
 
 **Group 2: conventions** (counted)
-7. Supply at the top, ground at the bottom; ground symbols point down, supply symbols up.
+7. Supply at the top, ground and negative supplies at the bottom; ground and negative supply symbols point down, other supply symbols up.
 8. Signal flow left to right where known.
 9. T junctions with a dot; no four-way junctions.
 10. Two-pin parts between a supply and ground drawn vertical.
@@ -526,7 +534,7 @@ flowchart TB
 
 **Step 2: Flow inference**, on the block graph, in this order:
 1. **Nets ignored for flow:** ground nets, and power nets drawn as ports. A power net drawn as a wire (a power path, or a power net with two endpoints) carries flow, so in a wired battery loop the parts after the battery still rank after it (rev C.2).
-2. **Sources:** blocks containing a source part, a part with `flow: input`, a connector hinted `input`, or a `controller` module. A pin role `output` or `power_out` does **not** make its block a source: an op-amp's OUT pin would otherwise make the op-amp a source and reverse the ranks of its own input resistors (rev C.2). A template may set the ranks of its blocks explicitly (Appendix A.2).
+2. **Sources:** blocks containing a source part, a part with `flow: input`, a connector hinted `input`, a `controller` module, or a part with `props.controller: "true"`. A pin role `output` or `power_out` does **not** make its block a source: an op-amp's OUT pin would otherwise make the op-amp a source and reverse the ranks of its own input resistors (rev C.2). A template may set the ranks of its blocks explicitly (Appendix A.2).
 3. **Ranks:** breadth-first distance from the set of sources, visiting neighbours in canonical-key order. Blocks hinted `output` get the highest rank. Blocks not reached get ranks by a second pass starting from their lowest canonical key, placed after the reached blocks.
 3a. **Taps** (rev C.2): a two-pin part with exactly one wired pin and one pin drawn as a port (a pull-up or pull-down) is placed half a column upstream of its rank, so it sits between the driver and the receivers of its wired net.
 4. **Feedback:** after ranking, an edge between blocks whose ranks are not increasing in the direction of signal flow is a feedback edge. Feedback inside a template region is handled by the template.
@@ -537,6 +545,7 @@ flowchart TB
 - **Power domains are inferred without deleting any edge:** a net is power-connected if it is `power`/`ground`, or if it is reached from such a net through a series **power-path element** (fuse, switch, regulator, diode or inductor whose other side is power-connected, or a high-side transistor's switched side).
 - Power-path parts and the nets between them are drawn as **wires**, with supply symbols only at the outer ends, so the current path stays visible. A power-path net with no name gets a visible generated name only if it must become a port; otherwise it stays a wire.
 - Every other connection to a `power`/`ground` net starts as a **port candidate**. Port symbols (with their size and orientation) are added to the measurement in step 4, so their space is reserved.
+- A named power or ground net with **one endpoint** is drawn as one port on that pin (a lone `-12V` symbol on a tail resistor is normal drafting), and is not reported as a one-endpoint net (rev C.3).
 - Ports require a visible name: the default ground (`GND`, no domain) shows only the symbol; every other power or ground port shows its net name, and its domain if set. A net with no name cannot be drawn with ports. The render model still carries the implied text `GND` for the default ground port, so the verifier compares names the same way for every port; nothing extra is drawn (rev C.2).
 - Signal nets: wires, unless overridden to `label` (requires a named net; drawn as net labels, never as supply symbols).
 
@@ -558,6 +567,7 @@ flowchart TB
 - **Constraint solve.** Positions are found by solving two separate systems of **difference constraints**, one for x and one for y, each of the form `a - b ≥ c` or `a - b = c` with integers:
   - column order: `left(next) - right(prev) ≥ gap`, where the channel gap between columns i and i+1 is **2 + the number of wired nets with endpoints on both sides of the channel + the number of wired nets whose endpoints all lie in column i or all in column i+1** (an upper bound on the vertical tracks the router needs there; rev C.1, internal nets added in rev C.2);
   - order within a column: `top(next) - bottom(prev) ≥ 2 + the number of wired nets passing through the column` (endpoints both left and right of it; rev C.2);
+  - both gaps grow by the `setSpacing` amount (section 11.3); in incremental mode some column pairs are exempt (section 9.5);
   - bands: supply band above signal above ground;
   - hints at their priorities (section 6.4), alignment on alignment points;
   - region envelopes as rigid blocks;
@@ -579,7 +589,7 @@ flowchart TB
 
 **Step 7b: Power presentation, final.** A port candidate becomes a wire when, after routing, the endpoint is within 3 G (Manhattan) of another endpoint of the same net with a free straight or one-bend path, and that wire would cross nothing. Fixed threshold, applied in canonical order. The other endpoint keeps its port, so the two must not share a ray (rev C.2): **either** both port symbols are replaced by one wire between the two pins plus one port at the wire's far end, **or** the new wire joins the other endpoint's port stub at a T (with a dot). The rerouted pair is re-checked against the forbidden geometry; if neither form fits, both stay ports.
 
-**Step 8: Verify** the render model (section 9.7).
+**Step 8: Verify** the render model: verification layers 1 (section 9.7) and 2 (no overlaps, on grid, text inside the sheet; section 13 item 3a). A drawing that fails either is `budget_exhausted` with the reasons, never `valid` (rev C.3).
 
 **Step 9: Repair.** (Phase 0a has only the last item: if routing fails, all spacing +2 G and lay out again, at most 3 times; rev C.2.) On failure, or severe Group 2 breaks, try the next candidate in a fixed list: next IC pin-side candidate, next orientation of a part next to the failure, the alternative template match, next label side, spacing +1 G around the failure. Budget: 8 rounds. **Budgets are counts, never wall-clock time.** A separate timeout (default 30 s) only aborts with `budget_exhausted`; it never selects a different result.
 
@@ -597,7 +607,7 @@ flowchart TB
 
 ### 9.3 Basic electrical checks
 
-Warnings: pin in no net and not marked no-connect (supply pins always reported); net with one endpoint; polarised part with both pins on one net; an IC's power pins on different domains; unparseable value.
+Warnings: pin in no net and not marked no-connect (supply pins always reported, except on modules, section 7.3); signal net with one endpoint; polarised part with both pins on one net; an IC's power pins on different domains; unparseable value.
 Errors: section 6.3 invariants, duplicate reference, unknown type, unknown or ambiguous pin.
 
 ### 9.4 Pattern templates
@@ -614,7 +624,7 @@ v1 templates (D2), in priority order:
 | Bridge rectifier | four diodes forming a full bridge | orthogonal convention: two vertical diode legs side by side; AC inputs at leg midpoints on the left; + output top, - output bottom |
 | I2C bus with pull-ups | two nets with `i2c.sda` / `i2c.scl` interface roles; resistor from each to one supply | worked example in Appendix A |
 | Low-side switch | transistor with load to supply on collector/drain, emitter/source to ground, resistor into base/gate | load above transistor on one vertical; drive resistor horizontal on the left; flyback diode parallel to load |
-| Decoupling (child slot) | capacitor between an IC power pin's net and ground; `decouples` hint wins; otherwise, if several ICs share the net, nearest in flow order (low confidence) | vertical, next to the pin, short wire to the pin |
+| Decoupling (child slot) | capacitor between an IC power pin's net and ground; `decouples` hint wins; otherwise, if several ICs share the net, nearest in flow order (low confidence) | vertical, next to the pin, short wire to the pin. Several capacitors in one pin's slot stand side by side, the smallest capacitance nearest the pin (ties and unparsed values by canonical key; rev C.3) |
 | Voltage divider | two resistors in series between a supply and ground with a tap | one vertical column; tap to the right |
 | RC / RL filter | series element on a signal path; shunt element to ground | series horizontal; shunt vertical |
 | Pull-up / pull-down | resistor between a signal net and a supply or ground | vertical from the rail to the signal wire |
@@ -629,18 +639,26 @@ Low confidence in v1: differential pair, current mirror, Sallen-Key and other co
 | Operation | Affected parts |
 |---|---|
 | `setProp` (value or label text) | the part |
-| `place`, `setOrientation`, `lock`, `setLabelSide`, `setPinSides` | the part |
-| `align`, hints | the parts named |
-| `setNetStyle`, `connect`, `disconnect`, `mergeNets` | all parts on the nets involved |
-| `addPart` | the new part and parts on the nets it joins |
-| `removePart` | parts on the nets it was on |
-| `setSpacing`, style, theme, `update-assets` | whole sheet (canonical solve with displacement cost) |
+| `place`, `setOrientation`, `lock`, `setLabelSide`, `setPinSides` | the part (`place`: also the part it is placed against) |
+| `align`, `setHint`, `removeHint` | the parts the hint names, before and after |
+| `setNetStyle` | all parts on the net |
+| `connect`, `disconnect`, `mergeNets` | all parts on the nets involved, except port-drawn nets (below) |
+| `addPart` | the new part and parts on the nets it joins, except port-drawn nets |
+| `removePart` | parts on the nets it was on, except port-drawn nets |
+| `setSpacing`, `relayout canonical`, style, theme, `update-assets` | whole sheet (canonical layout, locks honoured) |
 
-**Repair region:** the union of the affected parts' boxes before and after the edit, plus the boxes of their regions, expanded by 2 G. Everything outside is frozen: parts keep position and orientation; wire fragments outside the region are kept, and the points where they cross the region boundary become fixed terminals. Steps 5-9 run inside the region with an added cost for moving a part from its previous position (an extra term in the ordering cost and a soft equality constraint to the old position at lowest priority in the solve).
+**Port-drawn nets** (rev C.3) are power and ground nets drawn only with port symbols (section 9.2 step 3). They do not spread "affected": a capacitor added to GND does not make every part on GND affected. Their stubs move with their parts, which the displacement figures already count. The frozen `expect.affectedParts` lists in `phase0/cases/edits/` follow the rev C.2 table; gate 4 uses this rule, recomputed by the harness.
 
-**Widening:** if no valid result, grow the region by 4 G, at most 3 times; then the whole sheet with locks honoured and displacement cost on; then reject the edit (D4).
+**Incremental layout** (rev C.3, as built in Phase 0b). The whole pipeline runs, with the previous layout (`layout` in the file) as a soft anchor:
+- Parts that are not affected keep their previous orientation and IC pin sides.
+- **Order:** in each column, parts from the previous layout keep their previous top-to-bottom order; new parts keep the slots the barycentre sweeps give them.
+- **Solve:** every part from the previous layout gets a soft equality to its previous position, at the two lowest priorities, below normal hints and alignment: `prev` for untouched parts, `prevAffected` (lower) for affected ones. When a positive cycle forces a drop, affected parts give way before untouched ones.
+- **Column separation:** two parts from the previous layout whose rows did not overlap (with 1 G to spare) get no column-order constraint, so a longer label in one row does not push whole columns sideways.
+- **Routes:** a wired net whose drawn terminals (pin, position and direction) did not change keeps its previous route, handed to the router as pre-routed segments.
 
-**Change report:** for every part, displacement after removing any whole-sheet shift, rotation and flip changes; nets whose routes changed; how far the region widened. **"Untouched" parts** for stability measurement are parts not affected by the operation (table above).
+**Fallbacks,** in order, each checked by step 8: incremental with kept routes; incremental with every net rerouted; a canonical layout with locks and hints; then reject the edit (D4). A geometric repair region with frozen wire fragments is not used; it comes back only if a gate needs it.
+
+**Change report:** the mode used (incremental, incremental with reroute, canonical); the whole-sheet shift (the most common move of untouched parts), removed before measuring; for every part, displacement and rotation or flip changes; nets whose routes changed, split into nets the edit involved, other nets, and port-drawn nets (`portStubs`). **"Untouched" parts** for stability measurement are parts not affected by the operation (table above).
 
 ### 9.6 Determinism
 
@@ -695,7 +713,7 @@ No-connect marks are not ports and never join anything.
 
 **Names and kinds (rev C.1):** every port or label must match the net its piece belongs to: visible text = net name, domain mark = net domain, symbol class = net kind (ground symbol for `ground`, supply symbol for `power`, net label for `signal`). A port on an unnamed net is invalid. So a `5V` net drawn with "3V3" symbols fails.
 
-**Single-endpoint nets** are drawn as an unconnected pin, with the electrical warning only.
+**Single-endpoint nets:** a signal net is drawn as an unconnected pin, with the electrical warning only; a named power or ground net is drawn as one port (section 9.2 step 3).
 
 ## 10. Critic
 
@@ -733,6 +751,8 @@ No-connect marks are not ports and never join anything.
 ```
 
 - At most 5 candidate fixes are dry-run per check (applied in memory, laid out, verified, compared). Dry runs do not generate fixes of their own.
+- **Score order** for the comparison (rev C.3): validity (layers 1-2), convention breaks, readability breaches (layer 4 limits), crossings, bends, wire length.
+- **Phase 0b candidates** (the minimal harness): rotate a part (rules 7 and 10, and sources with `+` up); align a row (rule 11); place left or right (rule 8); place next to the chip (rule 13); for a readability breach at a point, turn a nearby two-pin part, reverse a nearby chip side, or spacing ×1.5.
 - A fix is offered only if the result is valid and **lexicographically better**; if it improves one group but worsens a higher one, it is offered only with `tradeoff` naming what gets worse.
 - `changesCircuit` is computed with `circuitEquals` (section 6.9), never asserted.
 - Fixes are tied to the layout they were checked on: applying one requires `expectedLayout` (section 11.1).
@@ -777,7 +797,7 @@ Stop when status is `valid` and `findings.warn` is 0 (the total count, not the d
 
 ### 11.3 Edit operations
 
-Applied in order as one transaction: validated, applied in memory, laid out, verified. **Only a valid result is saved** (D4).
+Applied in order as one transaction: validated, applied in memory, laid out, verified (layers 1-2, section 9.2 step 8). **Only a valid result is saved** (D4).
 
 **Visual operations** are setters on intent, each with a fixed target, so the same call twice gives the same file:
 
@@ -787,15 +807,22 @@ Applied in order as one transaction: validated, applied in memory, laid out, ver
 | `setOrientation` `{part, rot, flip}` | the orientation constraint of `part` (absolute values) |
 | `lock` / `unlock` `{part, at?}` | the lock of `part` |
 | `align` `{axis, parts}` | the alignment hint for that exact set of parts and axis |
-| `setPinSides` `{part, left?, right?, top?, bottom?}` | the pin-side hint of `part` |
+| `setPinSides` `{part, left?, right?, top?, bottom?}` | the pin-side hint of `part` (rules below) |
 | `setNetStyle` `{net, endpoint?, style}` | that net or endpoint's presentation |
 | `setLabelSide` `{part, side}` | the label side of `part` |
-| `setSpacing` `{factor}` | the sheet spacing factor (absolute) |
+| `setSpacing` `{factor}` | the sheet spacing factor (absolute, 1 to 4): factor f adds round((f - 1) × 4) G to every column and row gap (section 9.2 step 6); the edit lays out canonically |
 | `setHint` `{id?, hint}` | upsert: replaces the hint with that `id`, or adds a new one and returns its id |
 | `removeHint` `{id}`, `clearOverride` `{path}` | removal |
 | `relayout` `{mode}` | `incremental` or `canonical` |
 
+**`setPinSides` rules** (rev C.3):
+- Each list runs top to bottom (left and right sides) or left to right (top and bottom). A pin is written as a number, a name or alias, or `U1[3]` / `U1.OUT`.
+- Listed pins come first on their side, in the given order. Pins not listed keep their default side (section 7.3) and follow the listed ones. A listed pin that is not drawn is ignored; a name that is not a pin of the part is an error.
+- Only generated boxes (`ic`, `header`, modules) have pin sides. On a fixed symbol (an op-amp, a transistor) the edit is **rejected** (D4) with an error that names the `setOrientation` giving the same arrangement, if one exists (for an op-amp, IN+ above IN- is `rot 180, flip true`). A mirror is not applied silently: it would make `setPinSides` write the part's orientation, which belongs to `setOrientation`, and an agent re-reading the file would not find the pin sides it asked for.
+
 **Circuit operations:** `addPart`, `removePart`, `renamePart {from, to}`, `setProp {part, key, value}`, `connect {endpoints, name?}`, `disconnect {endpoint}`, `renameNet {net, name}`, `mergeNets {nets, keep, sameSupply?}`, `setNoConnect {terminal, nc}`.
+
+**`removePart` and intent** (rev C.3): in the same transaction, the part's lock, label-side override and every hint naming it are removed; an `align` hint keeps its other parts if at least two remain. The response lists the removed hint ids.
 
 **Undo (convenience, not a guarantee).** Before each save, the previous file is copied to `.schem-history/<file>/<n>.schem.json` (last 20). `schem undo` restores the newest snapshot as a normal edit (new revision). The folder may be deleted at any time; nothing else depends on it.
 
@@ -815,6 +842,8 @@ schem components [query] [--limit 20]
 schem update-assets <file>
 schem watch <file> -o out.svg            ignores its own writes
 ```
+
+**`ops.json`** (rev C.3) is a JSON object with an `ops` array, applied in order as one transaction, and optional `expectedRevision` and `expectedLayout`. Other top-level fields (`schema`, `case`, `description`, `expect` in the Phase 0b edit scripts) are ignored. A bare array of operations is also accepted.
 
 `--json` for machine output. Exit codes: 0 valid, 1 not valid or input errors, 2 usage, 3 internal, 4 conflict.
 
@@ -931,10 +960,12 @@ Phase 2 themes: `textbook`, `dark`, `blueprint`, `mono-print`. Themes are JSON a
 | 8 | Differential pair with current-mirror load (low confidence allowed) | validation |
 | 9 | 555 astable with LED output | **test** |
 | 10 | Bridge rectifier + smoothing capacitor + 7805 regulator | **test** |
-| 11 | Owner's real hardware project, about 30 parts | **test** |
-| 12 | Owner's second real project | **test** |
+| 11 | Arduino Uno + I2C 16×2 LCD + DHT22 + buzzer + push button (substitute, 24 parts) | **test** |
+| 12 | ESP32 + MOSFET LED-strip driver + buck converter module + status LED (substitute) | **test** |
 
-Cases 1, 3 and 5 were developed during Phase 0a, so gate 3 below (validation set) is biased in their favour; the test-set figures in gate 2 decide. If the owner has not supplied cases 11 and 12 when Phase 0b starts, they are replaced by: (11) Arduino Uno + I2C 16×2 LCD + DHT22 + buzzer + push button; (12) ESP32 + MOSFET LED-strip driver + buck converter module + status LED.
+Cases 1, 3 and 5 were developed during Phase 0a, so gate 3 below (validation set) is biased in their favour; the test-set figures in gate 2 decide. The owner supplied no projects before the freeze (2026-10-23), so cases 11 and 12 are the substitutes above.
+
+**Case 5** (rev C.3) is a byte-for-byte copy of the Phase 0a case: its ESP32 is an `ic` with invented pins 1-4 and a `power_in` 3V3 pin, not the DevKitC's real numbers. It stays as frozen for the gates, because changing a frozen case after work has started breaks the freeze. A corrected copy using `module:esp32-devkitc-v4` may be added to the development set (`cases/`); it counts for no gate.
 
 **Edit scripts** (cases 3, 5, 7, 11), each applied separately: change one value to a 3× longer text; add a part on an existing net; remove a part; change one IC's pin sides.
 
@@ -946,9 +977,9 @@ Cases 1, 3 and 5 were developed during Phase 0a, so gate 3 below (validation set
 1. Verifier passes on 12 of 12; status `valid` or `valid_low_confidence` (low confidence allowed on case 8 only).
 2. Blind owner rating of 4+ ("would publish"), recorded twice: **without edits**, and **after at most one agent edit call** (≤3 visual operations, no absolute coordinates, chosen by the agent from findings). Pass: after-edit 4+ on at least 9 of 12, including at least 3 of the 4 test cases.
 3. Same metric on the validation set alone: at least 7 of 8 (used to choose the ordering candidate).
-4. Stability, on each edit script: locked parts move 0; untouched parts move on average ≤ 2 G and at most 6 G; no untouched part changes orientation; route changes limited to affected nets plus at most one other.
+4. Stability, on each edit script: locked parts move 0; untouched parts (section 9.5) move on average ≤ 2 G and at most 6 G; no untouched part changes orientation; route changes limited to affected nets plus at most one other. Port-drawn nets are not counted as route changes (`portStubs`, section 9.5): their stubs move with their parts, which the displacement figures already count. On case 3, a rejected `setPinSides` (section 11.3) counts as a pass with nothing moved.
 5. Rated better than or equal to the best baseline on at least 8 of 12.
-6. Case 11 meets the 30-part performance target.
+6. The 30-part performance target (section 13 item 11) is met on case 11 (24 parts) and on one generated 30-part circuit (section 13 item 7, fixed seed, at most 150 pins), since no frozen case has 30 parts.
 
 "Blind" means shuffled images with no indication of tool or candidate.
 
@@ -980,8 +1011,17 @@ More modules; drafting netlists from Arduino / ESP-IDF / MicroPython pin definit
 2. Licence: MIT or Apache-2.0?
 3. Phase 1 symbol style: IEEE/US (zigzag resistor, proposed) or IEC (box resistor)?
 4. Web editor (phase 3): hosted site, local app, or both?
-5. Which two of your hardware projects are test cases 11 and 12? (Not supplied by the 0b freeze on 2026-10-23, so the section 15 substitutes are used unless the owner supplies them before the freeze is committed.)
+5. Which of your hardware projects should join the Phase 1 test set? (None was supplied by the 0b freeze on 2026-10-23, so Phase 0b uses the section 15 substitutes.)
 6. Is an HTTP API wanted, or are CLI + MCP enough?
+
+Rev C.3 rulings, confirmed by the owner on 2026-10-25 as recommended:
+
+7. **`setPinSides` on a fixed symbol** (case 3's op-amp, 11.3): reject with an error naming the equivalent `setOrientation`. Not a silent mirror.
+8. **Affected parts** (9.5): port-drawn power and ground nets do not make their parts affected; gate 4 uses this rule.
+9. **Group representative** (6.2, 7.3): a module may name a preferred representative per group; otherwise the lowest-numbered member.
+10. **Board supply pins** (7.3): fixed roles from the board's usual (USB) supply; no `power_bidir`; no unconnected-supply warning on module pins.
+11. **Gate 6** (15): measure on case 11 (24 parts) and on one generated 30-part circuit.
+12. **Case 5** (15): keep the frozen copy for the gates; a corrected DevKitC copy may join the development set only.
 
 ## 17. Notes for the reviewer (rev C)
 
@@ -1058,6 +1098,26 @@ Mark each comment **blocker for 0a**, **fix before 0b**, or **later**, with a se
 | Generated IC boxes space top and bottom pins by name width; a supply or ground symbol on a side pin gets a stub long enough to clear the box | names ran together ("SCLSDAVIN"); a side-pin supply symbol overlapped its own chip (both found by layer 2 on A.2) | 7.3, 9.2 step 3 |
 | Sheet bounds start from the drawing, not the origin | every 0a drawing had a 3 G band of extra margin at the top and left (found by layer 4) | 12.1 |
 | Verification layers 2-6 named; 0b preconditions; validation-set bias noted | owner's verification plan | 13 item 3a, 15 |
+
+### Rev C.3 changes (from `docs/PHASE0B-NOTES.md` and `phase0/HANDOFF.md`)
+
+| Change | Where | Built |
+|---|---|---|
+| Incremental mode: soft anchors to previous positions (`prev`, `prevAffected`), kept column order, column-separation exemption, kept routes; fallbacks instead of a repair region | 9.5, 9.2 step 6 | yes |
+| Change report: mode, whole-sheet shift, `portStubs`; gate 4 ignores port-drawn nets | 9.5, 15 gate 4 | yes |
+| `setSpacing` adds round((f - 1) × 4) G per gap, lays out canonically | 11.3, 9.2 step 6 | yes |
+| Step 8 runs layers 1 and 2; a failing drawing is `budget_exhausted` | 9.2 step 8, 11.3 | yes |
+| Findings score order and Phase 0b fix candidates | 10.2 | yes |
+| `near`, `flow`, `group`, `decouples` hints act through templates; JSON hint shape | 6.4 | with templates |
+| `setPinSides` order, unlisted pins; rejected on fixed symbols | 11.3 | order yes, rejection no |
+| `removePart` removes intent naming the part | 11.3 | yes (no id list yet) |
+| Affected parts leave out port-drawn nets | 9.5 | no |
+| Module shape, `representatives`, fixed supply roles, real header numbering | 6.2, 7.3, 9.3 | no |
+| `pins` on `header`; `props.controller` on `ic`; symbol pin letters for discretes | 6.2, 7.2, 7.3, 9.2 step 2 | controller yes |
+| Two capacitors in one decoupling slot | 9.4 | with templates |
+| Negative supply names and placement; one-endpoint power nets as one port | 6.3, 9.1 rule 7, 9.2 step 3, 9.7 | no |
+| Built-ins may be left out of `assets`; Phase 0a file shape loads; `ops.json` shape | 6.5, 11.4 | 0a shape yes |
+| Case 11 and 12 substitutes named; case 5 kept as frozen; gate 6 adds a generated 30-part circuit | 15 | n/a |
 
 ## Appendix A: worked block graphs
 

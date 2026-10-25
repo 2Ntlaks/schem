@@ -1,0 +1,20 @@
+{
+  "schema": "schem-edit/phase0b",
+  "case": "validation/case05-i2c.json",
+  "edit": "longer-value",
+  "description": "Pull-up R1 value text from \"4.7k\" (4 characters) to \"4.7k 1% 0603\" (12), displayed as written (W320).",
+  "ops": [
+    {
+      "op": "setProp",
+      "part": "R1",
+      "key": "value",
+      "value": "4.7k 1% 0603"
+    }
+  ],
+  "expect": {
+    "ok": true,
+    "affectedParts": [
+      "R1"
+    ]
+  }
+}

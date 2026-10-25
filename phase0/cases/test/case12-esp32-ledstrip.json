@@ -1,0 +1,574 @@
+{
+  "schema": "schem/1.0",
+  "meta": {
+    "title": "Case 12: ESP32 + MOSFET LED-strip driver + buck converter module + status LED",
+    "created": "2026-10-23",
+    "nextNetId": 10,
+    "nextHintId": 1
+  },
+  "circuit": {
+    "parts": [
+      {
+        "id": "J1",
+        "type": "header",
+        "props": {
+          "label": "12V IN"
+        },
+        "pins": [
+          {
+            "number": "1",
+            "name": "+",
+            "role": "passive"
+          },
+          {
+            "number": "2",
+            "name": "-",
+            "role": "ground"
+          }
+        ]
+      },
+      {
+        "id": "F1",
+        "type": "fuse",
+        "props": {
+          "value": "3A"
+        }
+      },
+      {
+        "id": "C1",
+        "type": "polarised-capacitor",
+        "props": {
+          "value": "470u"
+        }
+      },
+      {
+        "id": "U2",
+        "type": "module:pololu-d24v10f5"
+      },
+      {
+        "id": "U1",
+        "type": "module:esp32-devkitc-v4"
+      },
+      {
+        "id": "R1",
+        "type": "resistor",
+        "props": {
+          "value": "100"
+        }
+      },
+      {
+        "id": "R2",
+        "type": "resistor",
+        "props": {
+          "value": "10k"
+        }
+      },
+      {
+        "id": "Q1",
+        "type": "nmos",
+        "props": {
+          "partNumber": "AO3400A"
+        }
+      },
+      {
+        "id": "J2",
+        "type": "header",
+        "props": {
+          "label": "LED STRIP"
+        },
+        "pins": [
+          {
+            "number": "1",
+            "name": "+12V",
+            "role": "passive"
+          },
+          {
+            "number": "2",
+            "name": "-",
+            "role": "passive"
+          }
+        ]
+      },
+      {
+        "id": "R3",
+        "type": "resistor",
+        "props": {
+          "value": "330"
+        }
+      },
+      {
+        "id": "D1",
+        "type": "led",
+        "props": {
+          "color": "green"
+        }
+      }
+    ],
+    "nets": [
+      {
+        "id": "n1",
+        "endpoints": [
+          "F1[1]",
+          "J1[1]"
+        ]
+      },
+      {
+        "id": "n2",
+        "name": "12V",
+        "endpoints": [
+          "C1[+]",
+          "F1[2]",
+          "J2[1]",
+          "U2[3]"
+        ]
+      },
+      {
+        "id": "n3",
+        "name": "GND",
+        "endpoints": [
+          "C1[-]",
+          "D1[K]",
+          "J1[2]",
+          "Q1[S]",
+          "R2[2]",
+          "U1{GND}",
+          "U2[4]"
+        ]
+      },
+      {
+        "id": "n4",
+        "name": "5V",
+        "endpoints": [
+          "U1[J2-19]",
+          "U2[5]"
+        ]
+      },
+      {
+        "id": "n5",
+        "name": "PWM",
+        "endpoints": [
+          "R1[1]",
+          "U1[J2-9]"
+        ]
+      },
+      {
+        "id": "n6",
+        "endpoints": [
+          "Q1[G]",
+          "R1[2]",
+          "R2[1]"
+        ]
+      },
+      {
+        "id": "n7",
+        "name": "STRIP-",
+        "endpoints": [
+          "J2[2]",
+          "Q1[D]"
+        ]
+      },
+      {
+        "id": "n8",
+        "name": "STATUS",
+        "endpoints": [
+          "R3[1]",
+          "U1[J3-13]"
+        ]
+      },
+      {
+        "id": "n9",
+        "endpoints": [
+          "D1[A]",
+          "R3[2]"
+        ]
+      }
+    ],
+    "nc": []
+  },
+  "intent": {
+    "hints": [],
+    "locks": [],
+    "overrides": {},
+    "style": {
+      "theme": "clean",
+      "symbols": "ieee"
+    }
+  },
+  "assets": {
+    "library": "schem-symbols@phase0b-proposal",
+    "definitions": {
+      "module:esp32-devkitc-v4": {
+        "id": "module:esp32-devkitc-v4",
+        "version": 1,
+        "kind": "module",
+        "name": "ESP32-DevKitC V4",
+        "refPrefix": "U",
+        "controller": true,
+        "doc": {
+          "title": "ESP32-DevKitC V4 User Guide, section Header Block (tables J2 and J3)",
+          "url": "https://docs.espressif.com/projects/esp-dev-kits/en/latest/esp32/esp32-devkitc/user_guide.html",
+          "revision": "board ESP32-DevKitC V4 (page 'latest' as retrieved; photo shows ESP32-WROOM-32E)",
+          "retrieved": "2026-10-23",
+          "pinNumbering": "J2-n and J3-n are the header and the 'No.' column of the user guide's J2 and J3 tables.",
+          "notes": "GND is on J2-14, J3-1 and J3-7 (one ground on the board, so group GND). D0-D3, CLK and CMD (GPIO6-11) connect to the SPI flash; the guide says to avoid them. Roles: P -> 3V3 power_out (on-board regulator output) and 5V power_in (board supply input); I -> input; I/O -> bidir; G -> ground. No interface roles: any GPIO can carry I2C or SPI through the GPIO matrix, so the board documentation assigns none."
+        },
+        "pins": [
+          {
+            "number": "J2-1",
+            "name": "3V3",
+            "role": "power_out"
+          },
+          {
+            "number": "J2-2",
+            "name": "EN",
+            "role": "input",
+            "aliases": [
+              "CHIP_PU"
+            ]
+          },
+          {
+            "number": "J2-3",
+            "name": "VP",
+            "role": "input",
+            "aliases": [
+              "GPIO36",
+              "S_VP"
+            ]
+          },
+          {
+            "number": "J2-4",
+            "name": "VN",
+            "role": "input",
+            "aliases": [
+              "GPIO39",
+              "S_VN"
+            ]
+          },
+          {
+            "number": "J2-5",
+            "name": "IO34",
+            "role": "input",
+            "aliases": [
+              "GPIO34"
+            ]
+          },
+          {
+            "number": "J2-6",
+            "name": "IO35",
+            "role": "input",
+            "aliases": [
+              "GPIO35"
+            ]
+          },
+          {
+            "number": "J2-7",
+            "name": "IO32",
+            "role": "bidir",
+            "aliases": [
+              "GPIO32"
+            ]
+          },
+          {
+            "number": "J2-8",
+            "name": "IO33",
+            "role": "bidir",
+            "aliases": [
+              "GPIO33"
+            ]
+          },
+          {
+            "number": "J2-9",
+            "name": "IO25",
+            "role": "bidir",
+            "aliases": [
+              "GPIO25",
+              "DAC_1"
+            ]
+          },
+          {
+            "number": "J2-10",
+            "name": "IO26",
+            "role": "bidir",
+            "aliases": [
+              "GPIO26",
+              "DAC_2"
+            ]
+          },
+          {
+            "number": "J2-11",
+            "name": "IO27",
+            "role": "bidir",
+            "aliases": [
+              "GPIO27"
+            ]
+          },
+          {
+            "number": "J2-12",
+            "name": "IO14",
+            "role": "bidir",
+            "aliases": [
+              "GPIO14",
+              "MTMS"
+            ]
+          },
+          {
+            "number": "J2-13",
+            "name": "IO12",
+            "role": "bidir",
+            "aliases": [
+              "GPIO12",
+              "MTDI"
+            ]
+          },
+          {
+            "number": "J2-14",
+            "name": "GND",
+            "role": "ground",
+            "group": "GND"
+          },
+          {
+            "number": "J2-15",
+            "name": "IO13",
+            "role": "bidir",
+            "aliases": [
+              "GPIO13",
+              "MTCK"
+            ]
+          },
+          {
+            "number": "J2-16",
+            "name": "D2",
+            "role": "bidir",
+            "aliases": [
+              "GPIO9"
+            ]
+          },
+          {
+            "number": "J2-17",
+            "name": "D3",
+            "role": "bidir",
+            "aliases": [
+              "GPIO10"
+            ]
+          },
+          {
+            "number": "J2-18",
+            "name": "CMD",
+            "role": "bidir",
+            "aliases": [
+              "GPIO11"
+            ]
+          },
+          {
+            "number": "J2-19",
+            "name": "5V",
+            "role": "power_in"
+          },
+          {
+            "number": "J3-1",
+            "name": "GND",
+            "role": "ground",
+            "group": "GND"
+          },
+          {
+            "number": "J3-2",
+            "name": "IO23",
+            "role": "bidir",
+            "aliases": [
+              "GPIO23"
+            ]
+          },
+          {
+            "number": "J3-3",
+            "name": "IO22",
+            "role": "bidir",
+            "aliases": [
+              "GPIO22"
+            ]
+          },
+          {
+            "number": "J3-4",
+            "name": "TX",
+            "role": "bidir",
+            "aliases": [
+              "GPIO1",
+              "U0TXD"
+            ]
+          },
+          {
+            "number": "J3-5",
+            "name": "RX",
+            "role": "bidir",
+            "aliases": [
+              "GPIO3",
+              "U0RXD"
+            ]
+          },
+          {
+            "number": "J3-6",
+            "name": "IO21",
+            "role": "bidir",
+            "aliases": [
+              "GPIO21"
+            ]
+          },
+          {
+            "number": "J3-7",
+            "name": "GND",
+            "role": "ground",
+            "group": "GND"
+          },
+          {
+            "number": "J3-8",
+            "name": "IO19",
+            "role": "bidir",
+            "aliases": [
+              "GPIO19"
+            ]
+          },
+          {
+            "number": "J3-9",
+            "name": "IO18",
+            "role": "bidir",
+            "aliases": [
+              "GPIO18"
+            ]
+          },
+          {
+            "number": "J3-10",
+            "name": "IO5",
+            "role": "bidir",
+            "aliases": [
+              "GPIO5"
+            ]
+          },
+          {
+            "number": "J3-11",
+            "name": "IO17",
+            "role": "bidir",
+            "aliases": [
+              "GPIO17"
+            ]
+          },
+          {
+            "number": "J3-12",
+            "name": "IO16",
+            "role": "bidir",
+            "aliases": [
+              "GPIO16"
+            ]
+          },
+          {
+            "number": "J3-13",
+            "name": "IO4",
+            "role": "bidir",
+            "aliases": [
+              "GPIO4"
+            ]
+          },
+          {
+            "number": "J3-14",
+            "name": "IO0",
+            "role": "bidir",
+            "aliases": [
+              "GPIO0",
+              "BOOT"
+            ]
+          },
+          {
+            "number": "J3-15",
+            "name": "IO2",
+            "role": "bidir",
+            "aliases": [
+              "GPIO2"
+            ]
+          },
+          {
+            "number": "J3-16",
+            "name": "IO15",
+            "role": "bidir",
+            "aliases": [
+              "GPIO15",
+              "MTDO"
+            ]
+          },
+          {
+            "number": "J3-17",
+            "name": "D1",
+            "role": "bidir",
+            "aliases": [
+              "GPIO8"
+            ]
+          },
+          {
+            "number": "J3-18",
+            "name": "D0",
+            "role": "bidir",
+            "aliases": [
+              "GPIO7"
+            ]
+          },
+          {
+            "number": "J3-19",
+            "name": "CLK",
+            "role": "bidir",
+            "aliases": [
+              "GPIO6"
+            ]
+          }
+        ]
+      },
+      "module:pololu-d24v10f5": {
+        "id": "module:pololu-d24v10f5",
+        "version": 1,
+        "kind": "module",
+        "name": "Pololu D24V10F5 5V 1A step-down regulator",
+        "refPrefix": "U",
+        "controller": false,
+        "doc": {
+          "title": "Pololu item #2831, 5V, 1A Step-Down Voltage Regulator D24V10F5, section Connections",
+          "url": "https://www.pololu.com/product/2831",
+          "revision": "D24V10F5 (product page as retrieved)",
+          "retrieved": "2026-10-23",
+          "pinNumbering": "The product page names five connections (PG, SHDN, VIN, GND, VOUT) without numbers; they are numbered 1-5 in the order the Connections section lists them.",
+          "notes": "SHDN has a built-in 100 kOhm pull-up to VIN and may be left unconnected; PG is an open-drain output. Input 5.1-36 V, output fixed 5 V."
+        },
+        "pins": [
+          {
+            "number": "1",
+            "name": "PG",
+            "role": "output"
+          },
+          {
+            "number": "2",
+            "name": "SHDN",
+            "role": "input"
+          },
+          {
+            "number": "3",
+            "name": "VIN",
+            "role": "power_in"
+          },
+          {
+            "number": "4",
+            "name": "GND",
+            "role": "ground"
+          },
+          {
+            "number": "5",
+            "name": "VOUT",
+            "role": "power_out"
+          }
+        ]
+      }
+    }
+  },
+  "ext": {
+    "phase0": {
+      "case": 12,
+      "set": "test",
+      "author": "agent B (independent case author)",
+      "source": "SPEC 15 substitute for the owner's second project: 12 V input with 3 A fuse and 470 uF bulk; Pololu D24V10F5 makes 5 V for the ESP32-DevKitC V4; IO25 drives an AO3400A low-side switch (Rds(on) specified at Vgs 2.5 V) (100 ohm gate, 10k pull-down) for a 12 V LED strip; status LED on IO4"
+    }
+  }
+}

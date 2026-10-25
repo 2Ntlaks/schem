@@ -1,0 +1,771 @@
+{
+  "schema": "schem/1.0",
+  "meta": {
+    "title": "Case 11: Arduino Uno + I2C 16x2 LCD + DHT22 + buzzer + push button",
+    "created": "2026-10-23",
+    "nextNetId": 18,
+    "nextHintId": 1
+  },
+  "circuit": {
+    "parts": [
+      {
+        "id": "A1",
+        "type": "module:arduino-uno-r3"
+      },
+      {
+        "id": "J1",
+        "type": "header",
+        "props": {
+          "label": "9V DC IN"
+        },
+        "pins": [
+          {
+            "number": "1",
+            "name": "+",
+            "role": "passive"
+          },
+          {
+            "number": "2",
+            "name": "-",
+            "role": "ground"
+          }
+        ]
+      },
+      {
+        "id": "SW1",
+        "type": "spst",
+        "props": {
+          "label": "POWER"
+        }
+      },
+      {
+        "id": "D1",
+        "type": "diode",
+        "props": {
+          "partNumber": "1N4007"
+        }
+      },
+      {
+        "id": "C1",
+        "type": "polarised-capacitor",
+        "props": {
+          "value": "100u"
+        }
+      },
+      {
+        "id": "LCD1",
+        "type": "module:waveshare-lcd1602-i2c"
+      },
+      {
+        "id": "C2",
+        "type": "capacitor",
+        "props": {
+          "value": "100n"
+        }
+      },
+      {
+        "id": "U1",
+        "type": "ic",
+        "props": {
+          "label": "DHT22",
+          "partNumber": "AM2302"
+        },
+        "pins": [
+          {
+            "number": "1",
+            "name": "VDD",
+            "role": "power_in"
+          },
+          {
+            "number": "2",
+            "name": "DATA",
+            "role": "bidir"
+          },
+          {
+            "number": "3",
+            "name": "NULL",
+            "role": "nc"
+          },
+          {
+            "number": "4",
+            "name": "GND",
+            "role": "ground"
+          }
+        ]
+      },
+      {
+        "id": "R1",
+        "type": "resistor",
+        "props": {
+          "value": "10k"
+        }
+      },
+      {
+        "id": "C3",
+        "type": "capacitor",
+        "props": {
+          "value": "100n"
+        }
+      },
+      {
+        "id": "BZ1",
+        "type": "buzzer",
+        "props": {
+          "label": "5 V active buzzer"
+        }
+      },
+      {
+        "id": "Q1",
+        "type": "npn",
+        "props": {
+          "partNumber": "2N2222A"
+        }
+      },
+      {
+        "id": "R2",
+        "type": "resistor",
+        "props": {
+          "value": "1k"
+        }
+      },
+      {
+        "id": "R3",
+        "type": "resistor",
+        "props": {
+          "value": "10k"
+        }
+      },
+      {
+        "id": "D2",
+        "type": "diode",
+        "props": {
+          "partNumber": "1N4148"
+        }
+      },
+      {
+        "id": "SW2",
+        "type": "pushbutton",
+        "props": {
+          "label": "SET"
+        }
+      },
+      {
+        "id": "R4",
+        "type": "resistor",
+        "props": {
+          "value": "10k"
+        }
+      },
+      {
+        "id": "C4",
+        "type": "capacitor",
+        "props": {
+          "value": "100n"
+        }
+      },
+      {
+        "id": "D3",
+        "type": "led",
+        "props": {
+          "color": "green"
+        }
+      },
+      {
+        "id": "R5",
+        "type": "resistor",
+        "props": {
+          "value": "330"
+        }
+      },
+      {
+        "id": "D4",
+        "type": "led",
+        "props": {
+          "color": "red"
+        }
+      },
+      {
+        "id": "R6",
+        "type": "resistor",
+        "props": {
+          "value": "330"
+        }
+      },
+      {
+        "id": "RV1",
+        "type": "potentiometer",
+        "props": {
+          "value": "10k"
+        }
+      },
+      {
+        "id": "C5",
+        "type": "capacitor",
+        "props": {
+          "value": "100n"
+        }
+      }
+    ],
+    "nets": [
+      {
+        "id": "n1",
+        "endpoints": [
+          "J1[1]",
+          "SW1[1]"
+        ]
+      },
+      {
+        "id": "n2",
+        "endpoints": [
+          "D1[A]",
+          "SW1[2]"
+        ]
+      },
+      {
+        "id": "n3",
+        "name": "VIN",
+        "endpoints": [
+          "A1[JA-8]",
+          "C1[+]",
+          "D1[K]"
+        ]
+      },
+      {
+        "id": "n4",
+        "name": "5V",
+        "endpoints": [
+          "A1[JA-5]",
+          "BZ1[+]",
+          "C2[1]",
+          "C3[1]",
+          "D2[K]",
+          "LCD1[1]",
+          "R1[1]",
+          "RV1[1]",
+          "SW2[1]",
+          "U1[1]"
+        ]
+      },
+      {
+        "id": "n5",
+        "name": "GND",
+        "endpoints": [
+          "A1[JA-6]",
+          "C1[-]",
+          "C2[2]",
+          "C3[2]",
+          "C4[2]",
+          "C5[2]",
+          "D3[K]",
+          "D4[K]",
+          "J1[2]",
+          "LCD1[2]",
+          "Q1[E]",
+          "R3[2]",
+          "R4[2]",
+          "RV1[3]",
+          "U1[4]"
+        ]
+      },
+      {
+        "id": "n6",
+        "name": "SDA",
+        "endpoints": [
+          "A1[JD-17]",
+          "LCD1[4]"
+        ]
+      },
+      {
+        "id": "n7",
+        "name": "SCL",
+        "endpoints": [
+          "A1[JD-18]",
+          "LCD1[3]"
+        ]
+      },
+      {
+        "id": "n8",
+        "name": "DHT",
+        "endpoints": [
+          "A1[JD-3]",
+          "R1[2]",
+          "U1[2]"
+        ]
+      },
+      {
+        "id": "n9",
+        "name": "BUZZ",
+        "endpoints": [
+          "A1[JD-9]",
+          "R2[1]"
+        ]
+      },
+      {
+        "id": "n10",
+        "endpoints": [
+          "Q1[B]",
+          "R2[2]",
+          "R3[1]"
+        ]
+      },
+      {
+        "id": "n11",
+        "endpoints": [
+          "BZ1[-]",
+          "D2[A]",
+          "Q1[C]"
+        ]
+      },
+      {
+        "id": "n12",
+        "name": "BTN",
+        "endpoints": [
+          "A1[JD-4]",
+          "C4[1]",
+          "R4[1]",
+          "SW2[2]"
+        ]
+      },
+      {
+        "id": "n13",
+        "name": "LED_OK",
+        "endpoints": [
+          "A1[JD-6]",
+          "R5[1]"
+        ]
+      },
+      {
+        "id": "n14",
+        "endpoints": [
+          "D3[A]",
+          "R5[2]"
+        ]
+      },
+      {
+        "id": "n15",
+        "name": "LED_ALARM",
+        "endpoints": [
+          "A1[JD-7]",
+          "R6[1]"
+        ]
+      },
+      {
+        "id": "n16",
+        "endpoints": [
+          "D4[A]",
+          "R6[2]"
+        ]
+      },
+      {
+        "id": "n17",
+        "name": "THRESH",
+        "endpoints": [
+          "A1[JA-9]",
+          "C5[1]",
+          "RV1[2]"
+        ]
+      }
+    ],
+    "nc": [
+      "U1[3]"
+    ]
+  },
+  "intent": {
+    "hints": [],
+    "locks": [],
+    "overrides": {},
+    "style": {
+      "theme": "clean",
+      "symbols": "ieee"
+    }
+  },
+  "assets": {
+    "library": "schem-symbols@phase0b-proposal",
+    "definitions": {
+      "module:arduino-uno-r3": {
+        "id": "module:arduino-uno-r3",
+        "version": 1,
+        "kind": "module",
+        "name": "Arduino UNO R3",
+        "refPrefix": "A",
+        "controller": true,
+        "doc": {
+          "title": "Arduino UNO R3 (SKU A000066): product reference manual section 5 Connector Pinouts (5.1 JANALOG, 5.2 JDIGITAL), and the Full Pinout PDF (pages 1, 3 and 4)",
+          "url": "https://docs.arduino.cc/resources/datasheets/A000066-datasheet.pdf",
+          "url2": "https://docs.arduino.cc/resources/pinouts/A000066-full-pinout.pdf",
+          "revision": "UNO R3 (A000066); datasheet footer 'Modified: 21/10/2026'; full pinout 'Last update: 6 Oct, 2022'",
+          "retrieved": "2026-10-23",
+          "pinNumbering": "JA-n is pin n of connector JANALOG (power header then analog header, 14 pins) and JD-n pin n of JDIGITAL (18 pins), as numbered in the datasheet tables. ICSP-n and ICSP1-n are the 6-pin ICSP headers of the ATmega328P and the ATmega16U2, numbered as on pinout page 4.",
+          "notes": "The datasheet lists JDIGITAL 17 and 18 as 'A4/SD4' and 'A5/SD5' ('Analog input 4/I2C Data line (duplicated)'); the pinout labels them D18/SDA and D19/SCL, so each is grouped with A4 or A5. IOREF is 'connected to 5V' (datasheet), so it shares group 5V with +5V and ICSP-2. GND pins JA-6, JA-7, JD-15, ICSP-6 and ICSP1-6 form group GND; ICSP1-2 is also +5V. ICSP-1/3/4 are the ATmega328P's CIPO/SCK/COPI (D12/D13/D11) and ICSP-5 its RESET, so they are grouped with those header pins. ICSP1-1/3/4/5 belong to the ATmega16U2 USB bridge and are not connected to the user headers. Digital numbers D14-D19 of the analog pins are aliases on A0-A5. The pinout notes that CIPO/COPI were previously called MISO/MOSI; both names are aliases. Roles: +5V, +3V3 and IOREF power_out (board regulator outputs), VIN power_in."
+        },
+        "pins": [
+          {
+            "number": "JA-1",
+            "name": "NC",
+            "role": "nc"
+          },
+          {
+            "number": "JA-2",
+            "name": "IOREF",
+            "role": "power_out",
+            "group": "5V"
+          },
+          {
+            "number": "JA-3",
+            "name": "RESET",
+            "role": "input",
+            "group": "RESET"
+          },
+          {
+            "number": "JA-4",
+            "name": "+3V3",
+            "role": "power_out",
+            "aliases": [
+              "3V3"
+            ]
+          },
+          {
+            "number": "JA-5",
+            "name": "+5V",
+            "role": "power_out",
+            "aliases": [
+              "5V"
+            ],
+            "group": "5V"
+          },
+          {
+            "number": "JA-6",
+            "name": "GND",
+            "role": "ground",
+            "group": "GND"
+          },
+          {
+            "number": "JA-7",
+            "name": "GND",
+            "role": "ground",
+            "group": "GND"
+          },
+          {
+            "number": "JA-8",
+            "name": "VIN",
+            "role": "power_in"
+          },
+          {
+            "number": "JA-9",
+            "name": "A0",
+            "role": "bidir",
+            "aliases": [
+              "D14"
+            ]
+          },
+          {
+            "number": "JA-10",
+            "name": "A1",
+            "role": "bidir",
+            "aliases": [
+              "D15"
+            ]
+          },
+          {
+            "number": "JA-11",
+            "name": "A2",
+            "role": "bidir",
+            "aliases": [
+              "D16"
+            ]
+          },
+          {
+            "number": "JA-12",
+            "name": "A3",
+            "role": "bidir",
+            "aliases": [
+              "D17"
+            ]
+          },
+          {
+            "number": "JA-13",
+            "name": "A4",
+            "role": "bidir",
+            "aliases": [
+              "D18"
+            ],
+            "group": "A4_SDA",
+            "iface": [
+              "i2c.sda"
+            ]
+          },
+          {
+            "number": "JA-14",
+            "name": "A5",
+            "role": "bidir",
+            "aliases": [
+              "D19"
+            ],
+            "group": "A5_SCL",
+            "iface": [
+              "i2c.scl"
+            ]
+          },
+          {
+            "number": "JD-1",
+            "name": "D0",
+            "role": "bidir",
+            "aliases": [
+              "RX"
+            ]
+          },
+          {
+            "number": "JD-2",
+            "name": "D1",
+            "role": "bidir",
+            "aliases": [
+              "TX"
+            ]
+          },
+          {
+            "number": "JD-3",
+            "name": "D2",
+            "role": "bidir"
+          },
+          {
+            "number": "JD-4",
+            "name": "D3",
+            "role": "bidir"
+          },
+          {
+            "number": "JD-5",
+            "name": "D4",
+            "role": "bidir"
+          },
+          {
+            "number": "JD-6",
+            "name": "D5",
+            "role": "bidir"
+          },
+          {
+            "number": "JD-7",
+            "name": "D6",
+            "role": "bidir"
+          },
+          {
+            "number": "JD-8",
+            "name": "D7",
+            "role": "bidir"
+          },
+          {
+            "number": "JD-9",
+            "name": "D8",
+            "role": "bidir"
+          },
+          {
+            "number": "JD-10",
+            "name": "D9",
+            "role": "bidir"
+          },
+          {
+            "number": "JD-11",
+            "name": "D10",
+            "role": "bidir",
+            "aliases": [
+              "SS"
+            ],
+            "iface": [
+              "spi.ss"
+            ]
+          },
+          {
+            "number": "JD-12",
+            "name": "D11",
+            "role": "bidir",
+            "aliases": [
+              "COPI",
+              "MOSI"
+            ],
+            "group": "D11_COPI",
+            "iface": [
+              "spi.mosi"
+            ]
+          },
+          {
+            "number": "JD-13",
+            "name": "D12",
+            "role": "bidir",
+            "aliases": [
+              "CIPO",
+              "MISO"
+            ],
+            "group": "D12_CIPO",
+            "iface": [
+              "spi.miso"
+            ]
+          },
+          {
+            "number": "JD-14",
+            "name": "D13",
+            "role": "bidir",
+            "aliases": [
+              "SCK",
+              "LED_BUILTIN"
+            ],
+            "group": "D13_SCK",
+            "iface": [
+              "spi.sck"
+            ]
+          },
+          {
+            "number": "JD-15",
+            "name": "GND",
+            "role": "ground",
+            "group": "GND"
+          },
+          {
+            "number": "JD-16",
+            "name": "AREF",
+            "role": "input"
+          },
+          {
+            "number": "JD-17",
+            "name": "SDA",
+            "role": "bidir",
+            "group": "A4_SDA",
+            "iface": [
+              "i2c.sda"
+            ]
+          },
+          {
+            "number": "JD-18",
+            "name": "SCL",
+            "role": "bidir",
+            "group": "A5_SCL",
+            "iface": [
+              "i2c.scl"
+            ]
+          },
+          {
+            "number": "ICSP-1",
+            "name": "CIPO",
+            "role": "bidir",
+            "group": "D12_CIPO"
+          },
+          {
+            "number": "ICSP-2",
+            "name": "+5V",
+            "role": "power_out",
+            "group": "5V"
+          },
+          {
+            "number": "ICSP-3",
+            "name": "SCK",
+            "role": "bidir",
+            "group": "D13_SCK"
+          },
+          {
+            "number": "ICSP-4",
+            "name": "COPI",
+            "role": "bidir",
+            "group": "D11_COPI"
+          },
+          {
+            "number": "ICSP-5",
+            "name": "RESET",
+            "role": "input",
+            "group": "RESET"
+          },
+          {
+            "number": "ICSP-6",
+            "name": "GND",
+            "role": "ground",
+            "group": "GND"
+          },
+          {
+            "number": "ICSP1-1",
+            "name": "CIPO",
+            "role": "bidir"
+          },
+          {
+            "number": "ICSP1-2",
+            "name": "+5V",
+            "role": "power_out",
+            "group": "5V"
+          },
+          {
+            "number": "ICSP1-3",
+            "name": "SCK",
+            "role": "bidir"
+          },
+          {
+            "number": "ICSP1-4",
+            "name": "COPI",
+            "role": "bidir"
+          },
+          {
+            "number": "ICSP1-5",
+            "name": "RESET",
+            "role": "input"
+          },
+          {
+            "number": "ICSP1-6",
+            "name": "GND",
+            "role": "ground",
+            "group": "GND"
+          }
+        ]
+      },
+      "module:waveshare-lcd1602-i2c": {
+        "id": "module:waveshare-lcd1602-i2c",
+        "version": 1,
+        "kind": "module",
+        "name": "Waveshare LCD1602 I2C Module (16x2)",
+        "refPrefix": "LCD",
+        "controller": false,
+        "doc": {
+          "title": "Waveshare wiki: LCD1602 I2C Module, Interface Description",
+          "url": "https://www.waveshare.com/wiki/LCD1602_I2C_Module",
+          "revision": "wiki page oldid=88233 (no hardware revision is published); control chip AiP31068L; 3.3 V/5 V",
+          "retrieved": "2026-10-23",
+          "pinNumbering": "The wiki names the four interface pins (VCC, GND, SCL, SDA) without numbers; they are numbered 1-4 in the wiki's listed order.",
+          "notes": "Roles from the wiki descriptions: VCC '3.3V/5V power input', GND 'Ground', SCL 'I2C clock', SDA 'I2C data'."
+        },
+        "pins": [
+          {
+            "number": "1",
+            "name": "VCC",
+            "role": "power_in"
+          },
+          {
+            "number": "2",
+            "name": "GND",
+            "role": "ground"
+          },
+          {
+            "number": "3",
+            "name": "SCL",
+            "role": "input",
+            "iface": [
+              "i2c.scl"
+            ]
+          },
+          {
+            "number": "4",
+            "name": "SDA",
+            "role": "bidir",
+            "iface": [
+              "i2c.sda"
+            ]
+          }
+        ]
+      }
+    }
+  },
+  "ext": {
+    "phase0": {
+      "case": 11,
+      "set": "test",
+      "author": "agent B (independent case author)",
+      "source": "SPEC 15 substitute for the owner's project: temperature alarm. 9 V DC input through a power switch and 1N4007 to VIN; Waveshare LCD1602 I2C (the module has its own I2C pull-ups); DHT22 on D2 with 10k pull-up; active buzzer on D8 via 2N2222A; push button on D3 with 10k pull-down and 100 nF; green/red status LEDs on D5/D6; 10k threshold pot on A0",
+      "pinSources": {
+        "U1": "Aosong DHT22 (AM2302) datasheet, Pin table ('1 VDD, 2 DATA, 3 NULL, 4 GND'): https://www.sparkfun.com/datasheets/Sensors/Temperature/DHT22.pdf"
+      }
+    }
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "schema": "schem-edit/phase0b",
+  "case": "test/case11-uno-lcd-dht22.json",
+  "edit": "longer-value",
+  "description": "DHT22 pull-up R1 value text from \"10k\" (3 characters) to \"10k 1/4 W\" (9), displayed as written (W320).",
+  "ops": [
+    {
+      "op": "setProp",
+      "part": "R1",
+      "key": "value",
+      "value": "10k 1/4 W"
+    }
+  ],
+  "expect": {
+    "ok": true,
+    "affectedParts": [
+      "R1"
+    ]
+  }
+}

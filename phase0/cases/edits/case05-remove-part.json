@@ -1,0 +1,21 @@
+{
+  "schema": "schem-edit/phase0b",
+  "case": "validation/case05-i2c.json",
+  "edit": "remove-part",
+  "description": "Remove the second sensor U3; SDA, SCL, 3V3 and GND keep their other endpoints.",
+  "ops": [
+    {
+      "op": "removePart",
+      "part": "U3"
+    }
+  ],
+  "expect": {
+    "ok": true,
+    "affectedParts": [
+      "R1",
+      "R2",
+      "U1",
+      "U2"
+    ]
+  }
+}

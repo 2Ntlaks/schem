@@ -1,0 +1,24 @@
+{
+  "meta": { "title": "Case 3: inverting summing amplifier" },
+  "circuit": {
+    "parts": [
+      { "id": "V1", "type": "vsource", "props": { "value": "1V" } },
+      { "id": "V2", "type": "vsource", "props": { "value": "0.5V" } },
+      { "id": "V3", "type": "vsource", "props": { "value": "0.2V" } },
+      { "id": "R1", "type": "resistor", "props": { "value": "10k" } },
+      { "id": "R2", "type": "resistor", "props": { "value": "10k" } },
+      { "id": "R3", "type": "resistor", "props": { "value": "10k" } },
+      { "id": "Rf", "type": "resistor", "props": { "value": "20k" } },
+      { "id": "U1", "type": "opamp" },
+      { "id": "RL", "type": "resistor", "props": { "value": "2k2" } }
+    ],
+    "nets": [
+      { "id": "n1", "endpoints": ["V1.+", "R1.1"] },
+      { "id": "n2", "endpoints": ["V2.+", "R2.1"] },
+      { "id": "n3", "endpoints": ["V3.+", "R3.1"] },
+      { "id": "n4", "name": "SUM", "endpoints": ["R1.2", "R2.2", "R3.2", "U1.IN-", "Rf.1"] },
+      { "id": "n5", "name": "OUT", "endpoints": ["U1.OUT", "Rf.2", "RL.1"] },
+      { "id": "n6", "name": "GND", "endpoints": ["V1.-", "V2.-", "V3.-", "U1.IN+", "RL.2"] }
+    ]
+  }
+}

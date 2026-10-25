@@ -1,0 +1,22 @@
+{
+  "schema": "schem-edit/phase0b",
+  "case": "validation/case03-summing.json",
+  "edit": "remove-part",
+  "description": "Remove the load resistor RL (OUT and GND keep their other endpoints).",
+  "ops": [
+    {
+      "op": "removePart",
+      "part": "RL"
+    }
+  ],
+  "expect": {
+    "ok": true,
+    "affectedParts": [
+      "Rf",
+      "U1",
+      "V1",
+      "V2",
+      "V3"
+    ]
+  }
+}

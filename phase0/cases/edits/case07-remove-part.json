@@ -1,0 +1,30 @@
+{
+  "schema": "schem-edit/phase0b",
+  "case": "validation/case07-two-ic-decoupling.json",
+  "edit": "remove-part",
+  "description": "Remove the 10 uF bulk capacitor C4 on the EEPROM supply. Its decouples hint h4 is removed first in the same transaction, so no hint refers to a missing part.",
+  "ops": [
+    {
+      "op": "removeHint",
+      "id": "h4"
+    },
+    {
+      "op": "removePart",
+      "part": "C4"
+    }
+  ],
+  "expect": {
+    "ok": true,
+    "affectedParts": [
+      "C1",
+      "C2",
+      "C3",
+      "J1",
+      "R1",
+      "R2",
+      "R3",
+      "U1",
+      "U2"
+    ]
+  }
+}

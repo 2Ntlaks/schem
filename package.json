@@ -10,7 +10,9 @@
   "scripts": {
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
-    "draw": "tsx scripts/draw.ts"
+    "draw": "tsx scripts/draw.ts",
+    "phase0": "tsx scripts/phase0.ts",
+    "draw:symbols": "tsx scripts/symbols.ts"
   },
   "devDependencies": {
     "@types/node": "22.10.2",

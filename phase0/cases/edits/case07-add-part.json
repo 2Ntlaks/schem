@@ -1,0 +1,46 @@
+{
+  "schema": "schem-edit/phase0b",
+  "case": "validation/case07-two-ic-decoupling.json",
+  "edit": "add-part",
+  "description": "Add a 4.7 nF reset filter capacitor C5 from RESET to GND (both existing nets), as in Microchip AN AVR042.",
+  "ops": [
+    {
+      "op": "addPart",
+      "part": {
+        "id": "C5",
+        "type": "capacitor",
+        "props": {
+          "value": "4.7n"
+        }
+      }
+    },
+    {
+      "op": "connect",
+      "endpoints": [
+        "C5[1]",
+        "U1[1]"
+      ]
+    },
+    {
+      "op": "connect",
+      "endpoints": [
+        "C5[2]",
+        "U1[8]"
+      ]
+    }
+  ],
+  "expect": {
+    "ok": true,
+    "affectedParts": [
+      "C1",
+      "C2",
+      "C3",
+      "C4",
+      "C5",
+      "J1",
+      "R1",
+      "U1",
+      "U2"
+    ]
+  }
+}

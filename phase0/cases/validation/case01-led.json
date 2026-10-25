@@ -1,0 +1,15 @@
+{
+  "meta": { "title": "Case 1: LED indicator" },
+  "circuit": {
+    "parts": [
+      { "id": "B1", "type": "battery", "props": { "value": "9V" } },
+      { "id": "R1", "type": "resistor", "props": { "value": "470" } },
+      { "id": "D1", "type": "led", "props": { "color": "red" } }
+    ],
+    "nets": [
+      { "id": "n1", "name": "PWR", "endpoints": ["B1.+", "R1.1"] },
+      { "id": "n2", "endpoints": ["R1.2", "D1.anode"] },
+      { "id": "n3", "name": "GND", "endpoints": ["D1.cathode", "B1.-"] }
+    ]
+  }
+}

@@ -8,7 +8,8 @@ import { obstacleFromLabel, type Obstacle } from "../geom/forbidden.js";
 import { canonical, netKind, type Circuit, type Net, type PinDef, type PinDefs } from "../core/model.js";
 import { groupRepresentative, validate, type ValidCircuit } from "../core/validate.js";
 import { parseQuantity, quantityOf } from "../core/quantity.js";
-import { BUILTIN, checkSymbol, icSymbol, keepOut, type SymbolDef } from "../symbols/library.js";
+import { BUILTIN, checkSymbol, HEADER, icSymbol, keepOut, type SymbolDef } from "../symbols/library.js";
+import { defaultOrient, headerFor, headerPins } from "./kinds.js";
 import { measure } from "../text/font.js";
 import { eq, solveWithDrops, X0, type Constraint } from "./solver.js";
 import { route, type NetRequest } from "./router.js";
@@ -74,6 +75,7 @@ export function pinDefsOf(circuit: Circuit): PinDefs {
     const sym = BUILTIN[p.type];
     if (sym) defs[p.id] = sym.pins.map(({ at: _a, dir: _d, ...rest }) => rest);
     else if (p.type === "ic" || p.type.startsWith("module:")) defs[p.id] = (p.pins ?? []).map(defaultRole);
+    else if (p.type === HEADER) defs[p.id] = headerPins(p.pins ?? []);
   }
   return defs;
 }
@@ -227,6 +229,10 @@ export function layout(project: Project, opts: LayoutOptions = {}): LayoutResult
       sym = BUILTIN[part.type]!;
       if (sym.kind === "source") orient = { rot: 90, flip: false }; // "+" (left pin) up
       else if (sym.kind === "two-pin") orient = twoPinOrient(sym, id, drawnNet, netById, portNet, netCol);
+      else orient = defaultOrient(sym, id, { drawnNet, netById, portNet, col, netCol }) ?? orient;
+    } else if (part.type === HEADER) {
+      sym = headerFor(defs[id]!);
+      orient = defaultOrient(sym, id, { drawnNet, netById, portNet, col, netCol }) ?? orient;
     } else {
       sym = icFor(id, defs[id]!, drawnNet, netById, ncSet, col, netCol, opts.place?.[id]?.sides ?? sidesHint.get(id) ?? prevOf(id)?.sides ?? (tr ? templateSides(tr, id) : undefined));
     }
@@ -555,6 +561,11 @@ export function layout(project: Project, opts: LayoutOptions = {}): LayoutResult
         else art.push({ t: "text", x: a[0], y: a[1] - inset, text: name, size: PIN_SIZE, anchor: "middle", baseline: "bottom", owner: `pin:${id}[${p.number}]` });
       }
     }
+    // Fixed symbol text (terminal numbers, header pin names): upright, centred on its transformed point.
+    for (const t of P.sym.texts ?? []) {
+      const c = xformPt(t.at, o, P.orient);
+      art.push({ t: "text", x: c[0], y: c[1], text: t.text, size: t.size, anchor: "middle", baseline: "middle", owner: `pin:${id}[${t.pin}]` });
+    }
     for (const l of P.labels) {
       const b = shift(l.box, o);
       l.lines.forEach((line, i) => {
@@ -727,7 +738,7 @@ function displayValue(type: string, raw: string): string {
 function labelFor(part: Circuit["parts"][0], sym: SymbolDef, o: Orient, ko: Box, avoid: Box[], side?: string): Placed["labels"] {
   if (sym.kind === "port") return [];
   const lines = [part.id];
-  const value = part.props?.value ?? part.props?.label ?? part.props?.color;
+  const value = part.props?.value ?? part.props?.label ?? part.props?.color ?? part.props?.partNumber;
   if (value) lines.push(sym.kind === "ic" ? value : displayValue(part.type, value));
   const w = Math.max(...lines.map((l) => measure(l, LABEL_SIZE).width / 10));
   const h = lines.length * LINE;

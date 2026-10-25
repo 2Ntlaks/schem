@@ -55,12 +55,14 @@ export function classOf(ep: Endpoint, pinDefs: PinDefs): string {
   return g !== undefined ? `${ep.part}{${g}}` : canonical(ep);
 }
 
-/** Representative terminal of a group: lowest-numbered member not marked no-connect (SPEC 6.2, rev C.1). */
+/**
+ * Representative terminal of a group (SPEC 6.2, rev C.3): the member the module names as preferred,
+ * if it is not marked no-connect; otherwise the lowest-numbered member not marked no-connect.
+ */
 export function groupRepresentative(part: string, group: string, pinDefs: PinDefs, nc: ReadonlySet<string> = new Set()): string | undefined {
-  return (pinDefs[part] ?? [])
-    .filter((p) => p.group === group && !nc.has(`${part}[${p.number}]`))
-    .map((p) => p.number)
-    .sort(cmpNatural)[0];
+  const members = (pinDefs[part] ?? []).filter((p) => p.group === group && !nc.has(`${part}[${p.number}]`));
+  const preferred = members.find((p) => p.representative);
+  return preferred ? preferred.number : members.map((p) => p.number).sort(cmpNatural)[0];
 }
 
 export interface ValidCircuit {
