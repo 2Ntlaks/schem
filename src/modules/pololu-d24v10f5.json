@@ -1,0 +1,43 @@
+{
+  "id": "module:pololu-d24v10f5",
+  "version": 1,
+  "kind": "module",
+  "name": "Pololu D24V10F5 5V 1A step-down regulator",
+  "refPrefix": "U",
+  "controller": false,
+  "doc": {
+    "title": "Pololu item #2831, 5V, 1A Step-Down Voltage Regulator D24V10F5, section Connections",
+    "url": "https://www.pololu.com/product/2831",
+    "revision": "D24V10F5 (product page as retrieved)",
+    "retrieved": "2026-10-23",
+    "pinNumbering": "The product page names five connections (PG, SHDN, VIN, GND, VOUT) without numbers; they are numbered 1-5 in the order the Connections section lists them.",
+    "notes": "SHDN has a built-in 100 kOhm pull-up to VIN and may be left unconnected; PG is an open-drain output. Input 5.1-36 V, output fixed 5 V."
+  },
+  "pins": [
+    {
+      "number": "1",
+      "name": "PG",
+      "role": "output"
+    },
+    {
+      "number": "2",
+      "name": "SHDN",
+      "role": "input"
+    },
+    {
+      "number": "3",
+      "name": "VIN",
+      "role": "power_in"
+    },
+    {
+      "number": "4",
+      "name": "GND",
+      "role": "ground"
+    },
+    {
+      "number": "5",
+      "name": "VOUT",
+      "role": "power_out"
+    }
+  ]
+}

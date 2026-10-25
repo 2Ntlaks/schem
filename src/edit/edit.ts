@@ -6,9 +6,10 @@ import { cmpStr, type Pt, type Rot } from "../geom/geom.js";
 import { CircuitError, type Circuit } from "../core/model.js";
 import { applyOps, type CircuitOp } from "../core/ops.js";
 import { resolveEndpoint } from "../core/validate.js";
-import type { Hint, HintPriority, Intent, LayoutState, Side } from "../core/intent.js";
+import { hintParts, type Hint, type HintPriority, type Intent, type LayoutState, type Side } from "../core/intent.js";
 import { layout, pinDefsOf, type LayoutResult, type Project, type Status } from "../layout/layout.js";
 import { checkDrawing, type DrawingCheck } from "../quality/index.js";
+import { BUILTIN } from "../symbols/library.js";
 import { changeReport, type ChangeReport } from "./report.js";
 
 export type VisualOp =
@@ -139,6 +140,9 @@ function applyVisual(intent: Intent, v: VisualOp, circuit: Circuit, previous: La
     case "setOrientation": exists(v.part); upsert((h) => h.type === "orient" && h.part === v.part, (id) => ({ id, type: "orient", part: v.part, rot: v.rot, flip: v.flip ?? false, priority: "normal" })); break;
     case "setPinSides": {
       exists(v.part);
+      // Only generated boxes have pin sides; a fixed symbol keeps its artwork (decision in docs/PHASE0B-NOTES.md).
+      const part = circuit.parts.find((p) => p.id === v.part)!;
+      if (BUILTIN[part.type] && !part.pins) throw new EditError(`E270 setPinSides: ${v.part} is the fixed "${part.type}" symbol, whose pins cannot change sides. Only generated boxes (ic, modules, parts with their own pins) take pin sides; use setOrientation to turn or mirror ${v.part}.`);
       const defs = pinDefsOf(circuit);
       const num = (ref: string) => {
         if (defs[v.part]?.some((p) => p.number === ref)) return ref;
@@ -174,8 +178,7 @@ function pruned(intent: Intent, circuit: Circuit): Intent {
   if (intent.locks) out.locks = intent.locks.filter((l) => ids.has(l.part));
   if (intent.hints) out.hints = intent.hints.flatMap((h): Hint[] => {
     if (h.type === "align") { const parts = h.parts.filter((p) => ids.has(p)); return parts.length >= 2 ? [{ ...h, parts }] : []; }
-    if (h.type === "relative") return ids.has(h.part) && ids.has(h.of) ? [h] : [];
-    return ids.has(h.part) ? [h] : [];
+    return hintParts(h).every((p) => ids.has(p)) ? [h] : [];
   });
   if (intent.overrides?.labelSide) out.overrides = { ...intent.overrides, labelSide: Object.fromEntries(Object.entries(intent.overrides.labelSide).filter(([p]) => ids.has(p))) };
   return out;
@@ -185,7 +188,8 @@ function renamed(intent: Intent, previous: LayoutState | undefined, from: string
   const r = (p: string) => (p === from ? to : p);
   const out: Intent = structuredClone(intent);
   out.locks = out.locks?.map((l) => ({ ...l, part: r(l.part) }));
-  out.hints = out.hints?.map((h) => (h.type === "align" ? { ...h, parts: h.parts.map(r) } : h.type === "relative" ? { ...h, part: r(h.part), of: r(h.of) } : { ...h, part: r(h.part) }));
+  const rp = (e: string) => (e.startsWith(from) && /^[[{.]/.test(e.slice(from.length)) ? to + e.slice(from.length) : e);
+  out.hints = out.hints?.map((h) => (h.type === "align" ? { ...h, parts: h.parts.map(r) } : h.type === "relative" ? { ...h, part: r(h.part), of: r(h.of) } : h.type === "decouples" ? { ...h, part: r(h.part), pin: rp(h.pin) } : { ...h, part: r(h.part) }));
   if (out.overrides?.labelSide?.[from]) { out.overrides.labelSide[to] = out.overrides.labelSide[from]!; delete out.overrides.labelSide[from]; }
   if (!previous) return [out, previous];
   const prev = structuredClone(previous);
@@ -218,7 +222,7 @@ function affectedBy(c1: Circuit, c2: Circuit, i1: Intent, i2: Intent, ops: EditO
   const h1 = new Map((i1.hints ?? []).map((h) => [h.id, JSON.stringify(h)]));
   for (const h of [...(i1.hints ?? []), ...(i2.hints ?? [])]) {
     if (h1.get(h.id) === JSON.stringify((i2.hints ?? []).find((x) => x.id === h.id))) continue;
-    if (h.type === "align") h.parts.forEach((p) => parts.add(p)); else { parts.add(h.part); if (h.type === "relative") parts.add(h.of); }
+    for (const p of hintParts(h)) parts.add(p);
   }
   const present = new Set(c2.parts.map((p) => p.id));
   for (const n of c2.nets) if (n.endpoints.some((e) => parts.has(partOf(e)))) nets.add(n.id);

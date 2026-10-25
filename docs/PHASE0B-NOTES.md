@@ -37,3 +37,48 @@ Status on 2026-10-23: the parts of Phase 0b that do not depend on the frozen cas
 - The edit scripts of the SPEC 15 kinds on the development cases (`tests/support/edit-scripts.ts`): all saved, all incremental, all meet gate 4.
 - 80 generated circuits, one random edit each (`tests/support/random-edits.ts`): every saved edit passes layers 1-2; at least 85% meet gate 4 (about 90% measured on 137 edits). Misses are mostly labels tripled in length or new parts pushing a column aside; that is layout-quality work for the templates.
 - Findings on case 3: fixes found for both readability breaches the owner saw (dots one step apart: reverse R2; wire steps: spacing x1.5). Case 5: no checked fix among 3 candidates for the crossing beside a dot and the squeezed wires; the I2C template (Appendix A.2) is the fix.
+
+## File shape and modules
+
+Built 2026-10-25 for the frozen cases (`phase0/HANDOFF.md`, "What Phase 0b must add", items 2-5). Where the spec is silent, the simplest rule consistent with it was chosen; each such rule is marked **decision**.
+
+| Piece | Where | Tested by |
+|---|---|---|
+| Loader for the SPEC 6.5 file and the Phase 0a shape; canonical save | `src/io/project.ts` | `tests/io.test.ts` |
+| Module library (the four corpus modules, byte-identical to `phase0/modules/`) and the module check | `src/modules/` | `tests/io.test.ts` |
+| `decouples` hints in intent, with their checks | `src/core/intent.ts` | `tests/io.test.ts` |
+| Edit scripts read from a file's `ops` array and applied through `edit()` | `src/io/edit-script.ts` | `tests/io.test.ts` |
+| Phase 0b case run: validation cases, edit scripts, gate 4 numbers | `scripts/phase0.ts` (`npm run phase0`) | run by hand; writes `out/phase0/` |
+
+### Reading and writing files
+
+- **Two shapes.** A file with `schema` is a SPEC 6.5 project file; a file without it is the Phase 0a shape (`meta` + `circuit`, endpoints by name). `schema` must be `schem/MAJOR.MINOR`; a major other than 1 is refused (`E101`).
+- **Saving always writes the SPEC 6.5 form** (decision): key order `schema, meta, circuit, intent, assets, [layout], ext`; parts `id, type, props, pins`; nets `id, name, kind, domain, endpoints`; hints `id, type, <fields>, priority`. Endpoints and no-connect marks are written canonically and sorted in natural order (`U1[7]` before `U1[20]`), which is the order the frozen cases use: cases 2 and 7 load and save back byte for byte. `props`, pins, asset definitions and `ext` keep their own key order. A Phase 0a file is upgraded on save (schema `schem/1.0`, default intent with style `clean` / `ieee`, `assets.library` `schem-symbols@0.0.1` when the file names none).
+- **`meta.nextNetId` / `nextHintId`** (decision): written as the larger of the stored value and the highest id in use plus one. `src/core/ops.ts` still numbers new nets from the highest id in use, so a deleted net's id can come back within one session. Making `connect` read `meta.nextNetId` is left for Phase 1.
+- **`ext`** is copied as read, kept through edits and renames, and never interpreted.
+- **Unknown fields** (SPEC 6.6): any key outside `ext` that this version does not know is listed in `unknownFields` (for example `circuit.parts[R1].tolerance`) with warning `W105`. The file still lays out; edit scripts are refused (`E105`) and `saveProject` throws, because writing would lose the field. `props` are open (type-specific) and never count as unknown.
+- **`layout`** is kept as read (`layoutCache`) and dropped by any edit, since it is a cache.
+- **Unknown hint types** (`near`, `flow`, `group`) are refused at load with the supported list (`E260`) (decision): their JSON shapes are not designed yet, and dropping them silently would lose intent.
+- **Part types.** A fixed symbol (`BUILTIN`) and a module may not carry `pins` (`E203`); `ic` must (`E203`); **any other type with `pins` is a part with its own pins** (decision, AUTHOR-NOTES item 13): this is how `header` loads, with SPEC 7.3 default roles for pins written without one. A type that is none of these is `E201` and listed in `missingTypes`. The layout's `pinDefsOf` reads inline pins only for `ic` and `module:*`, so `npm run phase0` reports `header` as a missing symbol until the symbol work adds it.
+- Error codes added: `E100` not JSON, `E101` schema, `E102` file shape, `E105` edit refused for unknown fields, `E108` operation not supported yet, `E202` module, `E203` pins on a part, `E260` hint shape or id, `E261`/`E262` decouples target, `W263` decouples placement, `E270` pin sides on a fixed symbol, `W105` unknown fields.
+
+### Modules (SPEC 7.3)
+
+- **Definition shape** (decision, AUTHOR-NOTES item 4): `{ id, version, kind: "module", name, refPrefix, controller?, doc: { url, revision, ... }, pins: [ { number, name, role, aliases?, group?, iface?, chain? } ] }`. The check (`E202`) requires the id to equal its key and look like `module:name`, a documentation `url` and `revision`, unique pin numbers usable inside `[...]`, known roles, and aliases unique within the part. No geometry: a module is drawn as a generated box, like `ic`.
+- **Where a definition comes from** (decision): the file's `assets.definitions` first (the file renders the same if the library changes, SPEC 6.5), else the shipped library, in which case the definition is copied into `assets` so the saved file is self-contained. Module definitions no part uses are dropped on save. Non-module entries in `assets.definitions` are kept as read and not interpreted; the engine does not yet write built-in symbol definitions into `assets` (its symbol format is not the SPEC 7.1 shape yet).
+- **In memory a module part is an inline-pin part** (decision): it gets `pins` (a copy of the definition's) and, for a `controller: true` module, `props.controller: "true"` unless the part sets `controller` itself. The layout already reads both, so no layout change was needed. Saving removes both again. Consequences: a part may override the flag with `controller: "false"`; a redundant `controller: "true"` written on a controller module is dropped on save.
+- **`props.controller` on an `ic` counts** (AUTHOR-NOTES item 16): the layout already treats it as a flow source; nothing changed.
+- **Group representative** unchanged: the SPEC 6.2 rule (lowest pin number in natural order that is not no-connect). For the Uno's GND group that is `ICSP1-6` (AUTHOR-NOTES item 9); letting a module name a preferred representative is a spec change for the owner.
+- **`addPart` of a module** in an edit script takes the pins and the definition the same way.
+
+### Hints and edit scripts
+
+- **`decouples`** (AUTHOR-NOTES item 15): `{ id, type: "decouples", part, pin, priority }`. `part` must be a capacitor (`capacitor` or either spelling of the polarised capacitor, `E261`); `pin` must resolve (any endpoint form) to a terminal or group of another part (`E262`); it is written canonically on save. A capacitor that is not on the pin's net, or has no other net, is a warning (`W263`), not an error. Two capacitors on one pin are allowed (item 17). The layout does not use the hint yet (templates).
+- **Edit-file shape** (item 18): `{ schema?, case?, edit?, description?, ops: [...], expect?: { ok: true | false | "either", affectedParts? } }`, or a bare list of operations. Every operation's fields are checked before anything runs (`E102`); `setHint`, `clearOverride` and `setNetStyle` are refused as not built yet (`E108`).
+- **`expect.affectedParts`** is compared with the affected parts `edit()` reports (computed from the before/after difference, SPEC 9.5). Every saved script for cases 3 and 5 matches, and so does every case 7 script with its header drawn as an `ic` (test only).
+- **`setPinSides` on a fixed symbol is rejected** (`E270`) (decision, AUTHOR-NOTES item 21, HANDOFF open question 1). Before, the edit was saved as a hint the layout ignored, which tells an agent nothing. Only generated boxes (`ic`, modules, parts with their own pins) take pin sides; the error points to `setOrientation`. Case 3's script expects `"either"`, so this is a legitimate outcome.
+- **`removePart` with hints that name the part** (item 22, decision): the hints are dropped in the same transaction (the existing `pruned` rule, now also for a `decouples` hint whose capacitor or pin's part is removed), and the script runner reports them as `droppedHints`. `renamePart` rewrites the part in a `decouples` hint's `pin`.
+
+### `npm run phase0`
+
+Reads `phase0/cases/validation/*.json` and the edit scripts for cases 3, 5 and 7, whose file names it builds from the case numbers (it never lists `phase0/cases/edits/`). `--test` adds `phase0/cases/test/` and the case 11 scripts, for the end gate only. A case with a part type the layout cannot draw is reported as `missing symbol: X`; any other failure is reported per case, and the run exits 1 only on a crash or a drawing the verifier rejects. Output: `out/phase0/validation/<case>.svg|png` and `summary.json`; `out/phase0/edits/<script>.before.svg|png`, `.after.svg|png` and `summary.json` with the gate 4 figures. Cases 1, 3 and 5 draw byte-identical SVG and PNG to `npm run draw` on `cases/`.
