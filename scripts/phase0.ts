@@ -7,158 +7,17 @@
 //   npm run phase0 -- --test  also the test set and the case 11 edit scripts (end gate only)
 //
 // A case whose part types the engine cannot draw yet is reported as "missing symbol: X", not a crash.
+// The case and edit runs themselves live in scripts/lib/case-run.ts, shared with `npm run gates`.
 
 import { existsSync, mkdirSync, readdirSync, writeFileSync } from "node:fs";
-import { dirname, join, relative } from "node:path";
-import { fileURLToPath } from "node:url";
-import { cmpNatural, cmpStr } from "../src/geom/geom.js";
-import { layout, pinDefsOf, type LayoutResult } from "../src/layout/layout.js";
-import { checkDrawing, type DrawingCheck } from "../src/quality/index.js";
-import { toSvg } from "../src/render/svg.js";
-import { toPng } from "../src/render/png.js";
-import { readProject, type LoadedProject } from "../src/io/project.js";
-import { applyEditScript, readEditScript } from "../src/io/edit-script.js";
+import { join } from "node:path";
+import { cmpStr } from "../src/geom/geom.js";
+import { CASES, ROOT, editScriptFiles, rel, runCase, runEdit, type CaseSummary, type EditSummary } from "./lib/case-run.js";
 import { phase0Gates } from "./lib/phase0-gates.js";
 
-const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
-const PHASE0 = join(ROOT, "phase0");
-const CASES = join(PHASE0, "cases");
 const OUT = join(ROOT, "out", "phase0");
 const withTest = process.argv.includes("--test");
 const EDIT_CASES = ["03", "05", "07", ...(withTest ? ["11"] : [])];
-const EDIT_KINDS = ["longer-value", "add-part", "remove-part", "pin-sides"];
-
-interface CaseSummary {
-  case: string;
-  set: string;
-  status: string;
-  layout?: string;
-  verifier?: "valid" | "INVALID";
-  overlaps?: number;
-  conventions?: string[];
-  breaches?: string[];
-  metrics?: DrawingCheck["metrics"];
-  missingSymbols: string[];
-  issues: string[];
-  warnings: string[];
-  notes: string[];
-  ms?: number;
-  images?: string[];
-}
-
-interface EditSummary {
-  script: string;
-  case: string;
-  edit?: string;
-  status: string;
-  expectOk?: boolean | "either";
-  asExpected?: boolean;
-  mode?: string;
-  layout?: string;
-  affected?: { expected?: string[]; actual: string[]; match?: boolean };
-  gate4?: {
-    untouched: number; meanMove: number; maxMove: number; turned: string[]; lockedMoved: string[];
-    routesAffected: string[]; routesOther: string[]; portStubs: string[]; breaks: string[]; pass: boolean;
-  };
-  removedHints?: string[];
-  issues: string[];
-  images?: string[];
-}
-
-const rel = (p: string) => relative(ROOT, p).split("\\").join("/");
-
-/** Types in the project the engine cannot draw yet (no symbol, not ic, module or own pins it knows). */
-function missingSymbols(p: LoadedProject): string[] {
-  const defs = pinDefsOf(p.circuit);
-  return [...new Set(p.circuit.parts.filter((x) => !defs[x.id]).map((x) => x.type))].sort(cmpNatural);
-}
-
-function draw(r: LayoutResult, dir: string, name: string): string[] {
-  const svg = toSvg(r.render!);
-  writeFileSync(join(dir, `${name}.svg`), svg);
-  writeFileSync(join(dir, `${name}.png`), toPng(svg));
-  return [rel(join(dir, `${name}.svg`)), rel(join(dir, `${name}.png`))];
-}
-
-function load(path: string): { project?: LoadedProject; status?: string; missing: string[]; issues: string[]; warnings: string[] } {
-  const r = readProject(path);
-  const warnings = r.warnings.map((w) => `${w.code} ${w.message}`);
-  if (r.missingTypes.length) return { status: `missing symbol: ${r.missingTypes.join(", ")}`, missing: r.missingTypes, issues: r.errors.filter((e) => e.code !== "E201").map((e) => `${e.code} ${e.message}`), warnings };
-  if (!r.ok || !r.project) return { status: `load error: ${r.errors[0]?.code ?? "?"}`, missing: [], issues: r.errors.map((e) => `${e.code} ${e.message}`), warnings };
-  const missing = missingSymbols(r.project);
-  if (missing.length) return { project: r.project, status: `missing symbol: ${missing.join(", ")}`, missing, issues: [], warnings };
-  return { project: r.project, missing: [], issues: [], warnings };
-}
-
-function runCase(set: string, file: string, outDir: string): CaseSummary {
-  const name = file.replace(/\.json$/, "");
-  const s: CaseSummary = { case: name, set, status: "", missingSymbols: [], issues: [], warnings: [], notes: [] };
-  try {
-    const l = load(join(CASES, set, file));
-    s.missingSymbols = l.missing; s.issues = l.issues; s.warnings = l.warnings;
-    if (l.status) { s.status = l.status; return s; }
-    const t0 = performance.now();
-    const r = layout(l.project!);
-    s.ms = Math.round(performance.now() - t0);
-    s.layout = r.status;
-    s.notes = r.notes;
-    s.issues.push(...r.issues);
-    if (!r.render) { s.status = r.status; return s; }
-    const q = checkDrawing(l.project!.circuit, r.pinDefs, r.render);
-    s.verifier = q.connections.valid ? "valid" : "INVALID";
-    s.overlaps = q.overlaps.length;
-    s.conventions = q.conventions.map((f) => `${f.id} ${f.message}`);
-    s.breaches = q.breaches.map((b) => b.message);
-    s.metrics = q.metrics;
-    s.issues.push(...q.connections.errors.map((e) => `verifier ${e.code} ${e.message}`), ...q.overlaps.map((o) => `overlap ${o.code} ${o.message}`));
-    s.images = draw(r, outDir, name);
-    s.status = !q.connections.valid ? "INVALID (verifier)" : q.overlaps.length ? "INVALID (overlaps)" : r.status;
-  } catch (e) {
-    s.status = `error: ${(e as Error).message}`;
-  }
-  return s;
-}
-
-function runEdit(scriptFile: string, outDir: string): EditSummary {
-  const name = scriptFile.replace(/\.json$/, "");
-  const s: EditSummary = { script: name, case: "", status: "", issues: [] };
-  try {
-    const parsed = readEditScript(join(CASES, "edits", scriptFile));
-    if (!parsed.ok) { s.status = "script error"; s.issues = parsed.issues.map((i) => `${i.code} ${i.message}`); return s; }
-    const script = parsed.script;
-    s.case = script.case ?? "";
-    if (script.edit) s.edit = script.edit;
-    if (script.expect?.ok !== undefined) s.expectOk = script.expect.ok;
-    if (!script.case || (script.case.startsWith("test/") && !withTest)) { s.status = "skipped (case not in this run)"; return s; }
-    const l = load(join(CASES, script.case));
-    if (l.status) { s.status = l.status; s.issues = l.issues; return s; }
-    const before = layout(l.project!);
-    if (!before.render || !before.state) { s.status = `before: ${before.status}`; s.issues = before.issues; return s; }
-    s.images = draw(before, outDir, `${name}.before`);
-    const run = applyEditScript(l.project!, script, before.state);
-    s.status = run.result.saved ? "saved" : `rejected (${run.result.status})`;
-    s.asExpected = run.asExpected;
-    if (run.result.mode) s.mode = run.result.mode;
-    if (run.result.layout) s.layout = run.result.layout.status;
-    s.affected = run.affected;
-    s.removedHints = run.removedHints;
-    s.issues = run.result.issues;
-    if (run.stability) {
-      const r = run.stability.report;
-      s.gate4 = {
-        untouched: r.untouched.count, meanMove: r.untouched.meanMove, maxMove: r.untouched.maxMove, turned: r.untouched.turned,
-        lockedMoved: r.lockedMoved, routesAffected: r.routesChanged.affected, routesOther: r.routesChanged.other, portStubs: r.routesChanged.portStubs,
-        breaks: run.stability.breaks, pass: run.stability.breaks.length === 0,
-      };
-    }
-    if (run.result.saved && run.result.layout?.render) {
-      s.images.push(...draw(run.result.layout, outDir, `${name}.after`));
-    }
-  } catch (e) {
-    s.status = `error: ${(e as Error).message}`;
-  }
-  return s;
-}
 
 // ---------------------------------------------------------------------------
 
@@ -168,20 +27,20 @@ for (const set of sets) {
   const outDir = join(OUT, set);
   mkdirSync(outDir, { recursive: true });
   const files = readdirSync(join(CASES, set)).filter((f) => f.endsWith(".json")).sort(cmpStr);
-  const rows = files.map((f) => runCase(set, f, outDir));
+  const rows = files.map((f) => runCase(set, f, outDir).summary);
   cases.push(...rows);
-  writeFileSync(join(outDir, "summary.json"), `${JSON.stringify({ set, cases: rows }, null, 2)}\n`);
+  writeFileSync(join(outDir, "summary.json"), `${JSON.stringify({ set, cases: rows.map(({ failed: _f, ...r }) => r) }, null, 2)}\n`);
 }
 
 const editDir = join(OUT, "edits");
 mkdirSync(editDir, { recursive: true });
 const edits: EditSummary[] = [];
-for (const c of EDIT_CASES) for (const k of EDIT_KINDS) {
-  const f = `case${c}-${k}.json`;
+for (const f of editScriptFiles(EDIT_CASES)) {
   if (!existsSync(join(CASES, "edits", f))) { edits.push({ script: f.replace(/\.json$/, ""), case: "", status: "no such script", issues: [] }); continue; }
-  edits.push(runEdit(f, editDir));
+  edits.push(runEdit(f, editDir, { withTest }));
 }
-writeFileSync(join(editDir, "summary.json"), `${JSON.stringify({ edits }, null, 2)}\n`);
+writeFileSync(join(editDir, "summary.json"), `${JSON.stringify({ edits: edits.map(({ failed: _f, ...e }) => e) }, null, 2)}\n`);
+const failures = [...cases, ...edits].filter((x) => x.failed).length;
 
 // Console tables.
 const pad = (s: unknown, n: number) => String(s ?? "").padEnd(n);
@@ -206,4 +65,4 @@ for (const g of gates) {
   for (const failure of g.failures) console.log(`    ${failure}`);
 }
 // Incomplete ratings/holdout evidence is never presented as a passed phase.
-process.exitCode = gates.some((g) => g.status === "fail") ? 1 : 0;
+process.exitCode = failures || gates.some((g) => g.status === "fail") ? 1 : 0;
