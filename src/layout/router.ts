@@ -56,7 +56,9 @@ export function route(requests: NetRequest[], obstacles: Obstacle[], bounds: Box
     while (terms.length) {
       terms.sort((s, t) => distToTree(s, tree) - distToTree(t, tree) || cmpStr(s.id, t.id));
       const t = terms.shift()!;
-      const path = search(t, r.net, tree, occ, usedEdges, pinPoint, approach, obstacles, bounds);
+      // First avoid joining 1 G from a bend or junction of the tree (a step or two dots side by side).
+      const path = search(t, r.net, tree, occ, usedEdges, pinPoint, approach, obstacles, bounds, true)
+        ?? search(t, r.net, tree, occ, usedEdges, pinPoint, approach, obstacles, bounds, false);
       if (!path) { failed.push(t.id); continue; }
       for (let i = 0; i + 1 < path.length; i++) addTreeEdge(path[i]!, path[i + 1]!);
     }
@@ -73,7 +75,7 @@ function distToTree(t: Terminal, tree: Set<string>): number {
 
 function search(
   t: Terminal, net: string, tree: Set<string>, occ: Map<string, Occ>, usedEdges: Map<string, string>,
-  pinPoint: Map<string, string>, approach: Map<string, string>, obstacles: Obstacle[], bounds: Box,
+  pinPoint: Map<string, string>, approach: Map<string, string>, obstacles: Obstacle[], bounds: Box, strict: boolean,
 ): Pt[] | undefined {
   const targets = [...tree].map((k) => k.split(",").map(Number) as unknown as Pt);
   const h = (p: Pt) => { let b = Infinity; for (const q of targets) b = Math.min(b, manhattan(p, q)); return b; };
@@ -108,6 +110,7 @@ function search(
         // Joining: the point must not become a four-way junction.
         const deg = occ.get(qk)?.dirs.size ?? 0;
         if (deg >= 3) continue;
+        if (strict && nearBend(q, net, occ)) continue;
         const path: Pt[] = [q];
         for (let u: S | undefined = s; u; u = u.prev) path.push(u.p);
         path.push(t.at);
@@ -134,6 +137,20 @@ function search(
     }
   }
   return undefined;
+}
+
+/** A straight point of a net's wire whose neighbour on it is a bend or a junction. */
+function nearBend(q: Pt, net: string, occ: Map<string, Occ>): boolean {
+  const o = occ.get(key(q));
+  if (!o || o.net !== net) return false;
+  const ds = [...o.dirs];
+  if (!(ds.length === 2 && opposite(ds[0]!) === ds[1]!)) return false;
+  return ds.some((d) => {
+    const n = occ.get(key(step(q, d)));
+    if (!n || n.net !== net) return false;
+    const nd = [...n.dirs];
+    return nd.length >= 3 || (nd.length === 2 && opposite(nd[0]!) !== nd[1]!);
+  });
 }
 
 function better(a: { f: number; hh: number; d: Dir; p: Pt }, b: { f: number; hh: number; d: Dir; p: Pt }): boolean {

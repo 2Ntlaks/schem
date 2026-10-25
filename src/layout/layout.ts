@@ -14,6 +14,11 @@ import { measure } from "../text/font.js";
 import { eq, solveWithDrops, X0, type Constraint } from "./solver.js";
 import { route, type NetRequest } from "./router.js";
 import { checkDrawing } from "../quality/index.js";
+import {
+  apartPairs, isBoundary, linkConstraints, matchTemplates, solveInterior, templateLabel, templateOrient, templateRanks, templateSides, trunkRuns, TEMPLATES,
+  type Geo, type Interior, type Region,
+} from "./templates/index.js";
+import { edgeForbidden } from "../geom/forbidden.js";
 import type { Art, DrawnPin, DrawnPort, Electrical, RenderModel } from "../render/model.js";
 import type { Intent, LayoutState, Side } from "../core/intent.js";
 
@@ -37,6 +42,8 @@ export interface LayoutResult {
   notes: string[];
   /** Positions, orientations, pin sides and routes, for the next incremental layout. */
   state?: LayoutState;
+  /** The block graph handed to ordering (SPEC 9.2 steps 1-2): template regions and single parts, with ranks. */
+  blocks?: Array<{ id: string; parts: string[]; rank: number; template?: string; links?: string[] }>;
 }
 
 export interface LayoutOptions {
@@ -48,6 +55,11 @@ export interface LayoutOptions {
   affected?: readonly string[];
   /** Keep the previous routes of nets whose drawn terminals did not change (default true). */
   reuseRoutes?: boolean;
+  /**
+   * Pattern templates (SPEC 9.4): on by default (off when `place` is given). `false` turns them off;
+   * `skip` leaves out matches by region key (the step 5 fallback when a region cannot be solved).
+   */
+  templates?: false | { skip: readonly string[] };
 }
 
 const LABEL_SIZE = 12;   // SVG units (1.2 G)
@@ -138,22 +150,54 @@ export function layout(project: Project, opts: LayoutOptions = {}): LayoutResult
   const flowNeighbours = new Map<string, Set<string>>(circuit.parts.map((p) => [p.id, new Set<string>()]));
   for (const n of wired) if (netKind(n) !== "ground") for (const a of partsOfNet.get(n.id)!) for (const b of partsOfNet.get(n.id)!) if (a !== b) flowNeighbours.get(a)!.add(b);
 
-  // Step 2: ranks by breadth-first distance from sources.
   const ids = circuit.parts.map((p) => p.id).sort(cmpStr);
   const partOf = new Map(circuit.parts.map((p) => [p.id, p]));
+
+  // Step 1: templates matched on the full graph (SPEC 9.4). Each region becomes one block.
+  const skip = new Set(opts.templates ? opts.templates.skip : []);
+  const regions = opts.place || opts.templates === false ? [] : matchTemplates({ parts: circuit.parts, defs, drawnNet, netById, portNet }, TEMPLATES, skip);
+  const regionOf = new Map<string, Region>(), linkOf = new Map<string, Region>();
+  for (const r of regions) { for (const p of r.members) regionOf.set(p, r); for (const p of r.links) linkOf.set(p, r); }
+  const blockOf = (id: string) => regionOf.get(id)?.rep ?? id;
+  const membersOf = (b: string) => regionOf.get(b)?.members ?? [b];
+  const reps = ids.filter((id) => blockOf(id) === id);
+  const blockGraph = (adj: Map<string, Set<string>>) => {
+    const g = new Map(reps.map((b) => [b, new Set<string>()]));
+    for (const a of ids) for (const b of adj.get(a)!) if (blockOf(a) !== blockOf(b)) g.get(blockOf(a))!.add(blockOf(b));
+    return g;
+  };
+  const flowBlocks = blockGraph(flowNeighbours);
+
+  // Step 2: ranks of blocks by breadth-first distance from sources; templates may fix ranks.
   const isSource = (id: string) => BUILTIN[partOf.get(id)!.type]?.kind === "source" || partOf.get(id)!.props?.controller === "true" || partOf.get(id)!.props?.flow === "input";
-  const rank = new Map<string, number>();
-  const bfs = (starts: string[], base: number) => {
-    const q = [...starts];
-    for (const s of starts) rank.set(s, base);
-    while (q.length) {
-      const u = q.shift()!;
-      for (const w of [...flowNeighbours.get(u)!].sort(cmpStr)) if (!rank.has(w)) { rank.set(w, rank.get(u)! + 1); q.push(w); }
+  const brank = new Map<string, number>();
+  const spread = (seeds: ReadonlyArray<readonly [string, number]>) => {
+    for (const [s, k] of seeds) if (!brank.has(s)) brank.set(s, k);
+    const done = new Set<string>();
+    for (;;) { // nearest first (rank, then canonical key); every edge adds 1
+      let u: string | undefined;
+      for (const [b, k] of brank) if (!done.has(b) && (u === undefined || k < brank.get(u)! || (k === brank.get(u)! && cmpStr(b, u) < 0))) u = b;
+      if (u === undefined) break;
+      done.add(u);
+      for (const w of flowBlocks.get(u)!) if (!brank.has(w)) brank.set(w, brank.get(u)! + 1);
     }
   };
-  const sources = ids.filter(isSource);
-  bfs(sources.length ? sources : ids.slice(0, 1), 0);
-  for (const id of ids) if (!rank.has(id)) { notes.push(`${id} is not reached from any source; ranked separately (low confidence).`); bfs([id], Math.max(...rank.values(), -1) + 1); }
+  const ranks = (fixed: ReadonlyMap<string, number>, note: boolean) => {
+    brank.clear();
+    const sources = reps.filter((b) => membersOf(b).some(isSource) && !fixed.has(b));
+    spread([...fixed, ...(sources.length || fixed.size ? sources : reps.slice(0, 1)).map((s) => [s, 0] as const)]);
+    for (const b of reps) if (!brank.has(b)) {
+      if (note) notes.push(`${b} is not reached from any source; ranked separately (low confidence).`);
+      spread([[b, Math.max(...brank.values(), -1) + 1]]);
+    }
+  };
+  ranks(new Map(), false);
+  const fixedRank = new Map<string, number>();
+  for (const r of regions) for (const [p, k] of templateRanks(r, (q) => brank.get(blockOf(q))!)) {
+    fixedRank.set(blockOf(p), Math.min(k, fixedRank.get(blockOf(p)) ?? k));
+  }
+  ranks(fixedRank, true);
+  const rank = new Map(ids.map((id) => [id, brank.get(blockOf(id))!]));
 
   // Taps (a two-pin part with one wired pin and one port) sit half a column upstream.
   const pinsOn = (id: string) => [...drawnNet.entries()].filter(([t]) => t.startsWith(`${id}[`)).map(([t, n]) => ({ number: t.slice(id.length + 1, -1), net: n }));
@@ -161,7 +205,7 @@ export function layout(project: Project, opts: LayoutOptions = {}): LayoutResult
   for (const id of ids) {
     const sym = BUILTIN[partOf.get(id)!.type];
     const on = pinsOn(id);
-    const tap = sym?.kind === "two-pin" && on.filter((p) => portNet.has(p.net)).length === 1 && on.filter((p) => !portNet.has(p.net)).length === 1;
+    const tap = membersOf(blockOf(id)).length === 1 && !fixedRank.has(id) && sym?.kind === "two-pin" && on.filter((p) => portNet.has(p.net)).length === 1 && on.filter((p) => !portNet.has(p.net)).length === 1;
     colValue.set(id, rank.get(id)! - (tap && rank.get(id)! > 0 ? 0.5 : 0));
   }
   const colVals = [...new Set(colValue.values())].sort((a, b) => a - b);
@@ -178,6 +222,7 @@ export function layout(project: Project, opts: LayoutOptions = {}): LayoutResult
   for (const id of ids) {
     const part = partOf.get(id)!;
     const col = colOf.get(id)!;
+    const tr = regionOf.get(id) ?? linkOf.get(id);
     let sym: SymbolDef;
     let orient: Orient = { rot: 0, flip: false };
     if (BUILTIN[part.type]) {
@@ -189,14 +234,17 @@ export function layout(project: Project, opts: LayoutOptions = {}): LayoutResult
       sym = headerFor(defs[id]!);
       orient = defaultOrient(sym, id, { drawnNet, netById, portNet, col, netCol }) ?? orient;
     } else {
-      sym = icFor(id, defs[id]!, drawnNet, netById, ncSet, col, netCol, opts.place?.[id]?.sides ?? sidesHint.get(id) ?? prevOf(id)?.sides);
+      // Pin sides: fixed placement, hint, previous layout; else the template's, after the other pins of that side.
+      const given = opts.place?.[id]?.sides ?? sidesHint.get(id) ?? prevOf(id)?.sides;
+      sym = icFor(id, defs[id]!, drawnNet, netById, ncSet, col, netCol, given ?? (tr ? templateSides(tr, id) : undefined), !given);
     }
-    // Orientation precedence: fixed placement, lock, orient hint, previous layout, default.
-    const lockOf = locks.get(id), oh = orientHint.get(id), prev = prevOf(id);
+    // Orientation precedence: fixed placement, lock, orient hint, previous layout, template, default.
+    const lockOf = locks.get(id), oh = orientHint.get(id), prev = prevOf(id), to = tr ? templateOrient(tr, id, sym) : undefined;
     if (opts.place?.[id]?.orient) orient = opts.place[id]!.orient!;
     else if (lockOf) orient = { rot: lockOf.rot, flip: lockOf.flip };
     else if (oh) orient = { rot: oh.rot, flip: oh.flip };
     else if (prev) orient = prev.orient;
+    else if (to) orient = to;
     const ko = xformBox(keepOut(sym), [0, 0], orient);
     const pins = sym.pins
       .filter((p) => drawnNet.has(`${id}[${p.number}]`) || ncSet.has(`${id}[${p.number}]`) || sym.kind !== "ic")
@@ -225,15 +273,27 @@ export function layout(project: Project, opts: LayoutOptions = {}): LayoutResult
     }
     // Labels must keep clear of port symbols and of every pin's approach point.
     const approachBoxes = pins.map((p): Box => { const a = step(p.at, p.dir); return { x: a[0] - 0.5, y: a[1] - 0.5, w: 1, h: 1 }; });
-    const labels = labelFor(part, sym, orient, ko, [...ports.map((q) => q.box), ...approachBoxes], intent.overrides?.labelSide?.[id]);
+    const labels = labelFor(part, sym, orient, ko, [...ports.map((q) => q.box), ...approachBoxes], intent.overrides?.labelSide?.[id] ?? (tr ? templateLabel(tr, id) : undefined));
     let env = ko;
     for (const l of labels) env = unionBox(env, gridBox(l.box));
     for (const q of ports) env = unionBox(env, q.box);
     placed.set(id, { id, sym, orient, col, rank: rank.get(id)!, ko, labels, ports, env, pins });
   }
 
+  // Step 5: region interiors, each solved on its own; a region then moves as one rigid block.
+  const geo = (id: string): Geo => { const P = placed.get(id)!; return { pins: P.pins, ko: P.ko, env: P.env }; };
+  const interior = new Map<Region, Interior>();
+  for (const r of regions) {
+    const res = solveInterior(r, geo);
+    if ("failed" in res) return retry(`template ${r.key} abandoned: ${res.failed}`, { ...opts, templates: { skip: [...skip, r.key] } });
+    interior.set(r, res);
+  }
+  const offsetOf = (id: string): Pt => (regionOf.has(id) ? interior.get(regionOf.get(id)!)!.offsets.get(id)! : [0, 0]);
+  const blockEnv = (b: string): Box => (regionOf.has(b) ? interior.get(regionOf.get(b)!)!.env : placed.get(b)!.env);
+  const blockNeighbours = blockGraph(neighbours);
+
   // Ordering candidate B: barycentre sweeps (fixed count) within each column.
-  const columns: string[][] = colVals.map((_, c) => ids.filter((id) => colOf.get(id) === c));
+  const columns: string[][] = colVals.map((_, c) => reps.filter((id) => colOf.get(id) === c));
   for (let sweep = 0; sweep < 4; sweep++) {
     const forward = sweep % 2 === 0;
     const order = forward ? columns.map((_, i) => i) : columns.map((_, i) => columns.length - 1 - i);
@@ -245,13 +305,15 @@ export function layout(project: Project, opts: LayoutOptions = {}): LayoutResult
       // Position of a neighbour = its index plus where the shared net's pin sits on it,
       // so pins that are higher on a neighbour pull their part higher (fewer crossings).
       const pinFrac = (n: string, self: string) => {
-        const P = placed.get(n)!;
-        const shared = P.pins.filter((p) => { const net = drawnNet.get(`${n}[${p.number}]`); return net !== undefined && partsOfNet.get(net)!.includes(self); });
-        if (!shared.length || P.env.h === 0) return 0.5;
-        return shared.reduce((s, p) => s + (p.at[1] - P.env.y) / P.env.h, 0) / shared.length;
+        const E = blockEnv(n), own = membersOf(self);
+        const shared = membersOf(n).flatMap((m) => placed.get(m)!.pins
+          .filter((p) => { const net = drawnNet.get(`${m}[${p.number}]`); return net !== undefined && partsOfNet.get(net)!.some((q) => own.includes(q)); })
+          .map((p) => p.at[1] + offsetOf(m)[1]));
+        if (!shared.length || E.h === 0) return 0.5;
+        return shared.reduce((s, y) => s + (y - E.y) / E.h, 0) / shared.length;
       };
       const bary = (id: string) => {
-        const ns = [...neighbours.get(id)!].filter((n) => pos.has(n));
+        const ns = [...blockNeighbours.get(id)!].filter((n) => pos.has(n));
         return ns.length ? ns.reduce((s, n) => s + pos.get(n)! + pinFrac(n, id), 0) / ns.length : cur.get(id)! + 0.5;
       };
       columns[c] = [...columns[c]!].sort((a, b) => bary(a) - bary(b) || cur.get(a)! - cur.get(b)! || cmpStr(a, b));
@@ -273,7 +335,9 @@ export function layout(project: Project, opts: LayoutOptions = {}): LayoutResult
     const cs = partsOfNet.get(n.id)!.map((p) => colOf.get(p)!);
     return Math.min(...cs) <= i && Math.max(...cs) >= i + 1;
   }).length;
-  const internal = (c: number) => wired.filter((n) => { const ps = partsOfNet.get(n.id)!; return ps.length >= 2 && ps.every((p) => colOf.get(p) === c); }).length;
+  // Nets inside one template region are routed in its reserved corridors, not in the channels.
+  const inRegion = (netId: string) => { const ps = partsOfNet.get(netId)!; return ps.length >= 2 && regionOf.has(ps[0]!) && ps.every((p) => regionOf.get(p) === regionOf.get(ps[0]!)); };
+  const internal = (c: number) => wired.filter((n) => { const ps = partsOfNet.get(n.id)!; return ps.length >= 2 && !inRegion(n.id) && ps.every((p) => colOf.get(p) === c); }).length;
   const through = (c: number) => wired.filter((n) => { const cs = partsOfNet.get(n.id)!.map((p) => colOf.get(p)!); return Math.min(...cs) < c && Math.max(...cs) > c; }).length;
   const cons: Constraint[] = [];
   const vx = (id: string) => `x:${id}`, vy = (id: string) => `y:${id}`;
@@ -285,7 +349,7 @@ export function layout(project: Project, opts: LayoutOptions = {}): LayoutResult
   for (let c = 0; c + 1 < columns.length; c++) {
     const gap = 2 + spans(c) + internal(c) + internal(c + 1) + spacing;
     for (const a of columns[c]!) for (const b of columns[c + 1]!) {
-      const ea = placed.get(a)!.env, eb = placed.get(b)!.env;
+      const ea = blockEnv(a), eb = blockEnv(b);
       // Incremental mode: two parts that existed before and were not side by side (their rows
       // did not overlap, with 1 G to spare) need no horizontal separation (SPEC 9.5 stability).
       const pa = prevPos(a), pb = prevPos(b);
@@ -293,13 +357,25 @@ export function layout(project: Project, opts: LayoutOptions = {}): LayoutResult
       cons.push({ a: vx(b), b: vx(a), c: gap + ea.x + ea.w - eb.x, priority: "structural", why: `column ${c} before ${c + 1}` });
     }
   }
+  // Parts a template keeps apart sideways (staggered sources) are not stacked.
+  const apart = new Set(regions.flatMap((r) => apartPairs(r).flatMap(([a, b]) => [`${a}|${b}`, `${b}|${a}`])));
   for (let c = 0; c < columns.length; c++) {
     const col = columns[c]!;
     const gapY = 2 + through(c) + spacing;
     for (let i = 0; i + 1 < col.length; i++) {
-      const ea = placed.get(col[i]!)!.env, eb = placed.get(col[i + 1]!)!.env;
+      if (apart.has(`${col[i]}|${col[i + 1]}`)) continue;
+      const ea = blockEnv(col[i]!), eb = blockEnv(col[i + 1]!);
       cons.push({ a: vy(col[i + 1]!), b: vy(col[i]!), c: gapY + ea.y + ea.h - eb.y, priority: "structural", why: `order in column ${c}` });
     }
+  }
+  // Regions are rigid blocks; templates link them to the parts around them (SPEC 9.2 step 6).
+  for (const r of regions) {
+    for (const m of r.members) if (m !== r.rep) {
+      const o = offsetOf(m);
+      cons.push(...eq(vx(m), vx(r.rep), o[0], "structural", `region ${r.key}`), ...eq(vy(m), vy(r.rep), o[1], "structural", `region ${r.key}`));
+    }
+    // Incremental mode: untouched parts staying put wins over the template's links (SPEC 9.5).
+    cons.push(...linkConstraints(r, geo, opts.previous ? "templateSoft" : "template"));
   }
   const vars = ids.flatMap((id) => [vx(id), vy(id)]);
   const known = new Set(ids);
@@ -342,6 +418,7 @@ export function layout(project: Project, opts: LayoutOptions = {}): LayoutResult
     for (const id of ids) cons.push(...eq(vx(id), X0, place[id]!.at[0], "lock", `lock ${id}`), ...eq(vy(id), X0, place[id]!.at[1], "lock", `lock ${id}`));
   }
   let sol = solveWithDrops(vars, cons, 50 + 2 * ids.length);
+  if (!sol.ok && regions.length) return retry(`templates dropped: placement constraints conflict (${sol.cycle.map((k) => k.why).join("; ")})`, { ...opts, templates: false });
   if (!sol.ok) return { status: sol.reason, pinDefs: defs, issues: [`placement constraints conflict: ${sol.cycle.map((k) => k.why).join("; ")}`], notes };
   for (const why of [...new Set(sol.dropped.filter((k) => k.why.startsWith("hint ")).map((k) => k.why))]) notes.push(`dropped ${why} (it conflicts with stronger constraints; use priority high to keep it)`);
   const dropped = new Set(sol.dropped);
@@ -354,6 +431,9 @@ export function layout(project: Project, opts: LayoutOptions = {}): LayoutResult
     for (let i = 0; i < ps.length; i++) for (let j = i + 1; j < ps.length; j++) {
       const [pa, pb] = [pinInfo(ps[i]!, placed), pinInfo(ps[j]!, placed)];
       if (pa.part === pb.part) continue;
+      // Template member pins wired by the template's own runs are not lined up with outside parts.
+      const inner = (t: string, part: string) => regionOf.has(part) && !isBoundary(regionOf.get(part)!, part, t.slice(part.length + 1, -1));
+      if (inner(ps[i]!, pa.part) || inner(ps[j]!, pb.part)) continue;
       const ca = colOf.get(pa.part)!, cb = colOf.get(pb.part)!;
       if (ca === cb) continue;
       const tag = `${netKey(n, vc)}|${ps[i]}|${ps[j]}`;
@@ -406,6 +486,21 @@ export function layout(project: Project, opts: LayoutOptions = {}): LayoutResult
     }
   }
 
+  // Template runs (bus trunks, node columns) are pre-routed, unless they would cut through a part,
+  // a label, a port symbol or another net's pin or approach point (an edit may have moved things).
+  const tplRuns = new Map<string, Pt[][]>();
+  const anchors = new Map(el.pins.map((p) => [key(p.at), drawnNet.get(`${p.part}[${p.number}]`)]));
+  const approaches = new Map(el.pins.map((p) => [key(step(p.at, p.dir)), drawnNet.get(`${p.part}[${p.number}]`)]));
+  for (const r of regions) for (const [netId, runs] of trunkRuns(r, geo, at, interior.get(r))) for (const run of runs) {
+    const edges = unitEdges(run);
+    const blocked = edges.some(([a, b]) => edgeForbidden(a, b, obstacles)) || edges.flat().some((p) => {
+      const k = key(p);
+      return anchors.has(k) || (approaches.has(k) && approaches.get(k) !== netId);
+    });
+    if (blocked) notes.push(`template ${r.template.id}: run on net ${netId} left to the router (blocked)`);
+    else tplRuns.set(netId, [...(tplRuns.get(netId) ?? []), run]);
+  }
+
   // Step 7: route wired nets; port stubs are pre-wired.
   const requests: NetRequest[] = [];
   for (const n of circuit.nets) {
@@ -425,21 +520,24 @@ export function layout(project: Project, opts: LayoutOptions = {}): LayoutResult
     } else if (opts.previous && opts.reuseRoutes !== false && opts.previous.routes[n.id]?.terminals === signature(terms)) {
       // Incremental mode: a net whose drawn terminals did not move keeps its route.
       requests.push({ net: n.id, terminals: terms, prewired: opts.previous.routes[n.id]!.runs.flatMap((w) => unitEdges(w)), noRoute: true });
-    } else requests.push({ net: n.id, terminals: terms, ...(opts.prewire?.[n.id] ? { prewired: opts.prewire[n.id]!.flatMap((w) => unitEdges(w)) } : {}) });
+    } else {
+      const pre = [...(opts.prewire?.[n.id] ?? []), ...(tplRuns.get(n.id) ?? [])];
+      requests.push({ net: n.id, terminals: terms, ...(pre.length ? { prewired: pre.flatMap((w) => unitEdges(w)) } : {}) });
+    }
   }
-  requests.sort((a, b) => Number(!a.noRoute) - Number(!b.noRoute) || a.terminals.length - b.terminals.length || cmpStr(netKey(netById.get(a.net)!, vc), netKey(netById.get(b.net)!, vc)));
+  // Net order: template-internal nets first, then fewest endpoints, then canonical key (SPEC 9.2 step 7).
+  requests.sort((a, b) => Number(!a.noRoute) - Number(!b.noRoute) || Number(!inRegion(a.net)) - Number(!inRegion(b.net))
+    || a.terminals.length - b.terminals.length || cmpStr(netKey(netById.get(a.net)!, vc), netKey(netById.get(b.net)!, vc)));
   // Sheet bounds start from the first part, not from the origin (an origin start left a blank band).
   let bounds: Box = shift(placed.get(ids[0]!)!.env, at(ids[0]!));
   for (const id of ids) bounds = unionBox(bounds, shift(placed.get(id)!.env, at(id)));
   const routeBounds = { x: bounds.x - 4, y: bounds.y - 4, w: bounds.w + 8, h: bounds.h + 8 };
   const routed = route(requests, obstacles, routeBounds);
   const failed = routed.flatMap((r) => r.failed.map((f) => `${f} (net ${r.net})`));
-  if (failed.length && spacing < 6 && !place) {
-    notes.push(`routing failed for ${failed.join(", ")}; retrying with spacing +2 G`);
-    const again = layout(project, { ...opts, spacing: (opts.spacing ?? 0) + 2 });
-    again.notes.unshift(...notes);
-    return again;
-  }
+  if (failed.length && spacing < 6 && !place) return retry(`routing failed for ${failed.join(", ")}; retrying with spacing +2 G`, { ...opts, spacing: (opts.spacing ?? 0) + 2 });
+  // Without templates, as a last resort; in incremental mode the edit first retries with fresh routes.
+  const fallback = regions.length > 0 && !(opts.previous && opts.reuseRoutes !== false);
+  if (failed.length && fallback) return retry(`routing failed for ${failed.join(", ")}; retrying without templates`, { ...opts, spacing: undefined, templates: false });
 
   for (const r of routed) {
     el.wires.push(...mergeRuns(r.edges));
@@ -501,12 +599,23 @@ export function layout(project: Project, opts: LayoutOptions = {}): LayoutResult
   // Step 8: a drawing is valid only if verification layers 1 and 2 pass on the render model.
   if (!failed.length) {
     const q = checkDrawing(circuit, defs, render);
+    if (!q.valid && fallback) return retry(`templates dropped: the drawing failed its checks (${[...q.connections.errors.map((e) => e.message), ...q.overlaps.map((o) => o.message)].join("; ")})`, { ...opts, templates: false });
     if (!q.valid) {
       const why = [...q.connections.errors.map((e) => e.message), ...q.overlaps.map((o) => o.message)];
       return { status: "budget_exhausted", render, pinDefs: defs, issues: why.map((w) => `check: ${w}`), notes, state: stateOf() };
     }
   }
-  return { status: failed.length ? "budget_exhausted" : lowConfidence ? "valid_low_confidence" : "valid", render, pinDefs: defs, issues: failed.map((f) => `could not route ${f}`), notes, state: stateOf() };
+  const blocks = reps.map((b) => ({ id: regionOf.has(b) ? `${regionOf.get(b)!.template.id}:${b}` : b, parts: membersOf(b), rank: brank.get(b)!,
+    ...(regionOf.has(b) ? { template: regionOf.get(b)!.key, links: regionOf.get(b)!.links } : {}) }));
+  return { status: failed.length ? "budget_exhausted" : lowConfidence ? "valid_low_confidence" : "valid", render, pinDefs: defs, issues: failed.map((f) => `could not route ${f}`), notes, state: stateOf(), blocks };
+
+  /** Lay out again with other options, keeping this attempt's notes first. */
+  function retry(why: string, next: LayoutOptions): LayoutResult {
+    notes.push(why);
+    const again = layout(project, next);
+    again.notes.unshift(...notes);
+    return again;
+  }
 
   function stateOf(): LayoutState {
   const state: LayoutState = { parts: {}, routes: {} };
@@ -525,6 +634,7 @@ export function layout(project: Project, opts: LayoutOptions = {}): LayoutResult
     const req = requests.find((q) => q.net === r.net)!;
     state.routes[r.net] = { terminals: signature(req.terminals), runs: mergeRuns(r.edges), ...(portNet.has(r.net) ? { ports: true as const } : {}) };
   }
+  if (regions.length) state.templates = regions.map((r) => r.key).sort(cmpStr);
   return state;
   }
 }
@@ -574,6 +684,7 @@ function icFor(
   id: string, pins: PinDef[], drawnNet: Map<string, string>, netById: Map<string, Net>, ncSet: Set<string>, col: number,
   netCol: (net: string, self: string) => number | undefined,
   forced?: Partial<Record<Side, string[]>>,
+  forcedLast = false,
 ): SymbolDef {
   const visible = pins.filter((p) => drawnNet.has(`${id}[${p.number}]`) || ncSet.has(`${id}[${p.number}]`));
   const sides = { left: [] as PinDef[], right: [] as PinDef[], top: [] as PinDef[], bottom: [] as PinDef[] };
@@ -590,9 +701,10 @@ function icFor(
   }
   const sortKey = (p: PinDef) => { const n = drawnNet.get(`${id}[${p.number}]`); const net = n ? netById.get(n) : undefined; return net?.name ?? `~${p.number}`; };
   for (const s of Object.values(sides)) s.sort((a, b) => cmpStr(sortKey(a), sortKey(b)) || cmpNatural(a.number, b.number));
-  // Forced sides (SPEC 11.3 setPinSides): listed pins first, in the given order.
+  // Forced sides (SPEC 11.3 setPinSides): listed pins first, in the given order (a template's: last).
   for (const [side, ns] of Object.entries(forced ?? {}) as Array<[Side, string[]]>) {
-    sides[side].unshift(...ns.map((n) => visible.find((p) => p.number === n)).filter((p): p is PinDef => p !== undefined));
+    const listed = ns.map((n) => visible.find((p) => p.number === n)).filter((p): p is PinDef => p !== undefined);
+    if (forcedLast) sides[side].push(...listed); else sides[side].unshift(...listed);
   }
   const textW = (ps: PinDef[]) => Math.max(0, ...ps.map((p) => measure(p.name, PIN_SIZE).width / 10));
   const inner = Math.ceil(textW(sides.left) + textW(sides.right) + 3);

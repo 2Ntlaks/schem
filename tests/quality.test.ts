@@ -223,11 +223,13 @@ describe("layer 4: readability metrics", () => {
   });
 
   // The weaknesses the owner saw in the 0a drawings are measured, and nothing else is.
-  // When Phase 0b fixes one, its entry here is removed.
+  // When Phase 0b fixes one, its entry here is removed. The summing-amplifier template
+  // (Appendix A.1) removed case 3's dots one step apart and its wire steps; the I2C template
+  // (Appendix A.2) removed case 5's crossing beside a dot and its squeezed wires.
   const known: Record<string, string[]> = {
     "case01-led.json": [],
-    "case03-summing.json": ["minDotSpacing", "jogs"],
-    "case05-i2c.json": ["minCrossingToDot", "squeezedRuns"],
+    "case03-summing.json": [],
+    "case05-i2c.json": [],
   };
   for (const [f, expected] of Object.entries(known)) {
     it(`${f}: limit breaches are exactly the known weaknesses`, () => {
