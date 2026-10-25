@@ -117,6 +117,7 @@ Built on 2026-10-25: the template mechanism and six templates. Case 3 and case 5
 | Area | SPEC says | 0b does | Why |
 |---|---|---|---|
 | A.2 ranks | U2 and U3 rank 2 | peripherals get ranks 2, 3, ... in canonical order, one column each | in one column they would be stacked; "peripherals in one row" needs them side by side |
+| A.2 controller pin sides | GPIO21 and GPIO22 on the right, SDA above SCL | the same, placed after the controller's other right-side pins (`setPinSides` from an edit still puts its pins first) | the bus trunks then run below the other right-side wires and their pull-ups |
 | A.2 spacing | `U2.top >= SCL.y + 5`, `R2.x - R1.x >= label + 2` | measured: peripheral envelope (with its label) 2 G below the SCL trunk; SCL pull-up envelope 1 G right of the SDA pull-up's | the same intent, from measured sizes |
 | A.1 rows and columns | input rows 5 G apart; `Rf.y <= IN-.y - 5`; tap column `T = OUT.x + 2` | input rows: the next input's label 2 G below the previous input's wire (6 G with two-line labels); a single input sits on the IN- row (the classic inverting drawing); Rf's envelope 1 G above the op-amp's, op-amp label below it; `T >= OUT.x + 2` and right of Rf's label; input labels clear of the node column | measured sizes; a long label no longer makes the region infeasible |
 | A.1 sources | not part of the template | a `follow` link slot: the source on each input's net, each one stepped right of the one above, so its wire runs up past it and turns once | case 3's V3 had a step in its wire because the sources were stacked in one column |
@@ -139,10 +140,13 @@ Built on 2026-10-25: the template mechanism and six templates. Case 3 and case 5
 | Case 3 | crossings 0, bends 9, length 82, dots 4 (1 G apart), jogs 2; breaches: dot spacing, jogs | crossings 0, bends 8, length 88, dots 4 (2 G apart), jogs 0; no breach |
 | Case 5 | crossings 2 (1 G from a dot), bends 6, length 110, squeezed runs 1, sheet 52x54; breaches: crossing beside a dot, squeezed wires | crossings 2 (2 G from dots), bends 4, length 150, squeezed 0, sheet 88x35; no breach |
 | 300 generated circuits | 285 valid; 291 readability breaches, 350 crossings | 285 valid; 173 breaches, 263 crossings |
-| Random edits, the 80 seeds of `tests/edits.test.ts` | 68 of 74 stable (91.9%) | 70 of 74 (94.6%) |
-| Random edits, 300 seeds | 249 of 277 (89.9%) | 241 of 277 (87.0%) |
+| Random edits, the 80 seeds of `tests/edits.test.ts` | 65 of 74 stable (87.8%) | 68 of 74 (91.9%) |
+| Random edits, 300 seeds | 239 of 277 (86.3%) | 231 of 277 (83.4%) |
+| `npm run phase0`, readability breaches per validation case 1-8 | 0, 1, 2, 1, 2, 1, 0, 2 | 0, 0, 0, 1, 0, 1, 0, 2 |
 
-The 300-seed stability is lower: a region moves as one block, so an edit that changes a region (a new input resistor, a removed peripheral turning the I2C region into a pull-up) or pushes a region aside in its column moves several untouched parts at once.
+"main" is main after the rev C.3 merge (symbols, loader, affected-part rule). The 300-seed stability is lower: a region moves as one block, so an edit that changes a region (a new input resistor, a removed peripheral turning the I2C region into a pull-up) or pushes a region aside in its column moves several untouched parts at once; a part no longer reached from a source after a removal is ranked after the I2C peripherals' columns. Keeping regions that hold an affected member out of the incremental column-separation skip made it worse (81%), so that was not kept.
+
+Case 7 (two ICs, I2C EEPROM): the I2C template gives no crossing beside a dot and no squeezed wires, and 1 crossing instead of 3, because a template's pin sides go **after** the other pins of that side (here RESET above PC4/PC5). Listed first, the trunks ran through the RESET pull-up and were left to the router.
 
 ### Next: H-bridge, low-side switch, bridge rectifier, decoupling
 

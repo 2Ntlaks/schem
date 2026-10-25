@@ -234,7 +234,9 @@ export function layout(project: Project, opts: LayoutOptions = {}): LayoutResult
       sym = headerFor(defs[id]!);
       orient = defaultOrient(sym, id, { drawnNet, netById, portNet, col, netCol }) ?? orient;
     } else {
-      sym = icFor(id, defs[id]!, drawnNet, netById, ncSet, col, netCol, opts.place?.[id]?.sides ?? sidesHint.get(id) ?? prevOf(id)?.sides ?? (tr ? templateSides(tr, id) : undefined));
+      // Pin sides: fixed placement, hint, previous layout; else the template's, after the other pins of that side.
+      const given = opts.place?.[id]?.sides ?? sidesHint.get(id) ?? prevOf(id)?.sides;
+      sym = icFor(id, defs[id]!, drawnNet, netById, ncSet, col, netCol, given ?? (tr ? templateSides(tr, id) : undefined), !given);
     }
     // Orientation precedence: fixed placement, lock, orient hint, previous layout, template, default.
     const lockOf = locks.get(id), oh = orientHint.get(id), prev = prevOf(id), to = tr ? templateOrient(tr, id, sym) : undefined;
@@ -682,6 +684,7 @@ function icFor(
   id: string, pins: PinDef[], drawnNet: Map<string, string>, netById: Map<string, Net>, ncSet: Set<string>, col: number,
   netCol: (net: string, self: string) => number | undefined,
   forced?: Partial<Record<Side, string[]>>,
+  forcedLast = false,
 ): SymbolDef {
   const visible = pins.filter((p) => drawnNet.has(`${id}[${p.number}]`) || ncSet.has(`${id}[${p.number}]`));
   const sides = { left: [] as PinDef[], right: [] as PinDef[], top: [] as PinDef[], bottom: [] as PinDef[] };
@@ -698,9 +701,10 @@ function icFor(
   }
   const sortKey = (p: PinDef) => { const n = drawnNet.get(`${id}[${p.number}]`); const net = n ? netById.get(n) : undefined; return net?.name ?? `~${p.number}`; };
   for (const s of Object.values(sides)) s.sort((a, b) => cmpStr(sortKey(a), sortKey(b)) || cmpNatural(a.number, b.number));
-  // Forced sides (SPEC 11.3 setPinSides): listed pins first, in the given order.
+  // Forced sides (SPEC 11.3 setPinSides): listed pins first, in the given order (a template's: last).
   for (const [side, ns] of Object.entries(forced ?? {}) as Array<[Side, string[]]>) {
-    sides[side].unshift(...ns.map((n) => visible.find((p) => p.number === n)).filter((p): p is PinDef => p !== undefined));
+    const listed = ns.map((n) => visible.find((p) => p.number === n)).filter((p): p is PinDef => p !== undefined);
+    if (forcedLast) sides[side].push(...listed); else sides[side].unshift(...listed);
   }
   const textW = (ps: PinDef[]) => Math.max(0, ...ps.map((p) => measure(p.name, PIN_SIZE).width / 10));
   const inner = Math.ceil(textW(sides.left) + textW(sides.right) + 3);
