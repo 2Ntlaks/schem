@@ -26,6 +26,8 @@ export interface ModuleDef {
   controller?: boolean;
   doc: ModuleDoc;
   pins: PinDef[];
+  /** Preferred representative pin number per group (SPEC 6.2, 7.3, rev C.3); else the lowest-numbered member. */
+  representatives?: Record<string, string>;
 }
 
 const ROLES: ReadonlySet<Role> = new Set(["power_in", "power_out", "ground", "input", "output", "bidir", "passive", "nc"]);
@@ -34,7 +36,8 @@ const TOKEN = /^[A-Za-z0-9_+\-]+$/;
 const MODULE_ID = /^module:[a-z0-9][a-z0-9.\-]*$/;
 const PIN_KEYS = new Set(["number", "name", "role", "aliases", "group", "iface", "chain"]);
 
-const isObj = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
+type Obj = Record<string, unknown>;
+const isObj = (v: unknown): v is Obj => typeof v === "object" && v !== null && !Array.isArray(v);
 const isStrArray = (v: unknown): v is string[] => Array.isArray(v) && v.every((x) => typeof x === "string" && x.length > 0);
 
 /** Library file names, in a fixed order (SPEC 9.6). */
@@ -74,6 +77,13 @@ export function checkModuleDef(def: unknown, key: string): Issue[] {
   if (!isObj(def.doc) || typeof def.doc.url !== "string" || typeof def.doc.revision !== "string")
     bad("doc must give the documentation url and revision the pins come from (SPEC 7.3).");
   out.push(...checkPinList(def.pins, `module ${key}`, "E202", true));
+  if (def.representatives !== undefined) {
+    if (!isObj(def.representatives)) bad("representatives maps group names to pin numbers.");
+    else for (const [g, n] of Object.entries(def.representatives)) {
+      const pin = Array.isArray(def.pins) ? (def.pins as Obj[]).find((p) => isObj(p) && p.number === n) : undefined;
+      if (!pin || pin.group !== g) bad(`representatives: "${String(n)}" is not a pin of group "${g}".`);
+    }
+  }
   return out;
 }
 
@@ -107,7 +117,11 @@ export function checkPinList(pins: unknown, owner: string, code: string, roleReq
   return out;
 }
 
-/** The logical pin inventory of a module (a deep copy, safe to put on a part). */
+/**
+ * The logical pin inventory of a module (a deep copy, safe to put on a part). A group's preferred
+ * representative is marked `representative: true` (src/core/validate.ts groupRepresentative).
+ */
 export function modulePins(def: ModuleDef): PinDef[] {
-  return structuredClone(def.pins);
+  const reps = def.representatives ?? {};
+  return structuredClone(def.pins).map((p) => (p.group !== undefined && reps[p.group] === p.number ? { ...p, representative: true } : p));
 }

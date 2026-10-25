@@ -12,6 +12,8 @@ import { applyEditScript, parseEditScript, readEditScript, type EditScript } fro
 import { loadProject, projectDocument, projectPinDefs, readProject, saveProject, SCHEMA, type LoadedProject } from "../src/io/project.js";
 import { layout } from "../src/layout/layout.js";
 import { checkDrawing } from "../src/quality/index.js";
+import { xformDir, xformPt } from "../src/geom/geom.js";
+import { BUILTIN } from "../src/symbols/library.js";
 import { checkModuleDef, MODULE_LIBRARY, moduleFile } from "../src/modules/index.js";
 
 const ROOT = join(import.meta.dirname, "..");
@@ -139,7 +141,9 @@ describe("project files: both shapes", () => {
     doc.circuit.parts.push({ id: "J1", type: "header", pins: [{ number: "1", name: "SIG" }, { number: "2", name: "GND" }] });
     const r = loadProject(doc);
     expect(r.ok).toBe(true);
-    expect(r.pinDefs!.J1!.map((p) => p.role)).toEqual(["bidir", "ground"]); // SPEC 7.3 default roles
+    expect(r.pinDefs!.J1!.map((p) => p.role)).toEqual(["passive", "ground"]); // header: passive unless the name says supply or ground
+    doc.circuit.parts.push({ id: "X1", type: "my-custom-board", pins: [{ number: "1", name: "SIG" }, { number: "2", name: "VCC" }] });
+    expect(loadProject(doc).pinDefs!.X1!.map((p) => p.role)).toEqual(["bidir", "power_in"]); // SPEC 7.3 defaults for other own-pin parts
     expect(projectDocument(r.project!).circuit).toMatchObject({ parts: expect.arrayContaining([{ id: "J1", type: "header", pins: [{ number: "1", name: "SIG" }, { number: "2", name: "GND" }] }]) });
     const fixed = moduleProject() as any;
     fixed.circuit.parts[1].pins = [{ number: "1", name: "1" }];
@@ -224,6 +228,26 @@ describe("modules (SPEC 7.3)", () => {
     const unknown = moduleProject() as any;
     unknown.circuit.parts[0].type = "module:esp8266-made-up";
     expect(loadProject(unknown).errors[0]).toMatchObject({ code: "E202" });
+  });
+
+  it("a module may name a preferred representative per group (SPEC 6.2, 7.3, rev C.3)", () => {
+    const doc = moduleProject() as any;
+    const def = structuredClone(MODULE_LIBRARY["module:esp32-devkitc-v4"]!) as any;
+    def.representatives = { GND: "J3-7" };
+    doc.assets.definitions["module:esp32-devkitc-v4"] = def;
+    const p = loaded(doc);
+    const defs = projectPinDefs(p);
+    expect(groupRepresentative("U1", "GND", defs)).toBe("J3-7");
+    expect(groupRepresentative("U1", "GND", defs, new Set(["U1[J3-7]"]))).toBe("J2-14"); // no-connect: back to the lowest
+    const r = layout(p);
+    expect(r.status.startsWith("valid"), r.issues.join("; ")).toBe(true);
+    const drawn = r.render!.electrical.pins.filter((x) => x.part === "U1").map((x) => x.number);
+    expect(drawn).toContain("J3-7");
+    expect(drawn).not.toContain("J2-14");
+    expect(checkDrawing(p.circuit, r.pinDefs, r.render!).valid).toBe(true);
+    expect(JSON.parse(saveProject(p)).assets.definitions["module:esp32-devkitc-v4"].representatives).toEqual({ GND: "J3-7" });
+    def.representatives = { GND: "J2-10" }; // not a GND pin
+    expect(loadProject(doc).errors.map((e) => e.message).join()).toMatch(/representatives: "J2-10" is not a pin of group "GND"/);
   });
 
   it("saving embeds the module definition and writes the part as written (no pins, no derived controller)", () => {
@@ -349,50 +373,79 @@ describe("edit scripts (SPEC 11.3)", () => {
     const p = loaded(json(join(VALIDATION, "case03-summing.json")));
     const run = applyEditScript(p, script([{ op: "setPinSides", part: "U1", left: ["U1[3]", "U1[2]"] }]));
     expect(run.result.saved).toBe(false);
-    expect(run.result.issues[0]).toMatch(/^E270 /);
+    expect(run.result.issues[0]).toMatch(/^E270 .*setOrientation \{ part: "U1", rot: 180, flip: true \}/); // SPEC 11.3 rev C.3
     expect(run.result.project).toBe(p);
+    // The orientation it names really gives IN+ above IN- on the left and OUT on the right.
+    const o = { rot: 180, flip: true } as const;
+    const pin = (n: string) => { const q = BUILTIN.opamp!.pins.find((x) => x.number === n)!; return { at: xformPt(q.at, [0, 0], o), dir: xformDir(q.dir, o) }; };
+    expect([pin("3").dir, pin("2").dir, pin("1").dir]).toEqual(["left", "left", "right"]);
+    expect(pin("3").at[1]).toBeLessThan(pin("2").at[1]);
+    // A pin list no orientation of the symbol can give says so.
+    const q = loaded({ circuit: { parts: [{ id: "Q1", type: "npn" }, { id: "R1", type: "resistor" }], nets: [{ id: "n1", endpoints: ["Q1[B]", "R1[1]"] }] } });
+    const none = applyEditScript(q, script([{ op: "setPinSides", part: "Q1", left: ["Q1[B]", "Q1[C]", "Q1[E]"] }]));
+    expect(none.result.issues[0]).toMatch(/^E270 .*No orientation/);
   });
 
-  it("removePart drops hints that name the part and reports them; renamePart rewrites a decouples pin", () => {
+  it("affected parts: port-drawn power and ground nets do not spread (SPEC 9.5, rev C.3)", () => {
+    const doc = moduleProject() as any;
+    doc.circuit.nets[2].endpoints.push("R1[2]"); // three endpoints: GND is drawn with ground symbols
+    doc.circuit.nets[1].endpoints = ["D1[A]", "U1[J2-9]"];
+    const g = loaded(doc);
+    const gPrev = layout(g).state!;
+    expect(gPrev.routes.n3!.ports).toBe(true);
+    const add = applyEditScript(g, script([{ op: "addPart", part: { id: "C1", type: "capacitor" } }, { op: "connect", endpoints: ["C1[1]", "U1[J2-10]"] }, { op: "connect", endpoints: ["C1[2]", "U1.GND"] }]), gPrev);
+    expect(add.result.saved, add.result.issues.join("; ")).toBe(true);
+    expect(add.affected.actual).toEqual(["C1", "R1", "U1"]); // LED net (wired): U1, R1; GND (ports): only C1
+  });
+
+  it("removePart removes the hints, lock and label side naming the part and lists the hint ids; renamePart rewrites a decouples pin", () => {
     const d = json(join(VALIDATION, "case07-two-ic-decoupling.json"));
-    for (const x of d.circuit.parts) if (x.type === "header") x.type = "ic"; // drawable until the header symbol lands
+    d.intent.hints.push({ id: "h5", type: "align", axis: "row", parts: ["C3", "C4"], priority: "normal" }, { id: "h6", type: "align", axis: "row", parts: ["C1", "C2", "C4"], priority: "normal" });
+    d.intent.overrides = { labelSide: { C4: "below", C3: "above" } };
+    const free = layout(loaded(d)).state!.parts.C4!; // lock C4 where it is drawn
+    d.intent.locks = [{ part: "C4", x: free.at[0], y: free.at[1], rot: free.orient.rot, flip: free.orient.flip }];
     const p = loaded(d);
     const prev = layout(p).state;
     const rm = applyEditScript(p, script([{ op: "removePart", part: "C4" }]), prev);
     expect(rm.result.saved, rm.result.issues.join("; ")).toBe(true);
-    expect(rm.droppedHints).toEqual(["h4"]);
+    expect(rm.removedHints).toEqual(["h4", "h5"]);
+    expect(rm.result.removedHints).toEqual(["h4", "h5"]);
+    expect(rm.project!.intent.hints!.find((h) => h.id === "h6")).toMatchObject({ parts: ["C1", "C2"] }); // two parts remain
+    expect(rm.project!.intent.locks).toEqual([]);
+    expect(rm.project!.intent.overrides!.labelSide).toEqual({ C3: "above" });
     const rn = applyEditScript(p, script([{ op: "renamePart", from: "U2", to: "EEPROM" }]), prev);
     expect(rn.result.saved, rn.result.issues.join("; ")).toBe(true);
     expect(rn.project!.intent.hints!.filter((h) => h.type === "decouples").map((h) => (h as { pin: string }).pin)).toEqual(["U1[7]", "U1[20]", "EEPROM[8]", "EEPROM[8]"]);
   });
 
   describe("frozen Phase 0b edit scripts (cases 3, 5, 7)", () => {
-    const run = (c: string, kind: string, mutate?: (d: any) => void) => {
+    // Affected parts by the rev C.3 rule (port-drawn nets do not spread), where they differ from the
+    // frozen expect.affectedParts, which follow the rev C.2 table. Worked out by hand from SPEC 9.5.
+    const C3: Record<string, string[]> = {
+      "03-remove-part": ["Rf", "U1"], // RL was on OUT (wired: U1, Rf) and GND (ports)
+      "05-add-part": ["C1"], // C1 joins 3V3 and GND, both drawn with ports
+      "07-add-part": ["C5", "R1", "U1"], // RESET is wired (R1, U1); GND is ports
+      "07-remove-part": ["U2"], // removeHint h4 names C4 and U2[8]; C4 was on 5V and GND (ports)
+    };
+    const run = (c: string, kind: string) => {
       const s = readEditScript(join(EDITS, `case${c}-${kind}.json`));
       if (!s.ok) throw new Error(JSON.stringify(s.issues));
-      const d = json(join(ROOT, "phase0", "cases", s.script.case!));
-      mutate?.(d);
-      const p = loaded(d);
+      const p = loaded(json(join(ROOT, "phase0", "cases", s.script.case!)));
       const before = layout(p);
       return { script: s.script, r: applyEditScript(p, s.script, before.state) };
     };
-    for (const c of ["03", "05"]) for (const kind of ["longer-value", "add-part", "remove-part", "pin-sides"]) {
-      it(`case${c}-${kind}: applies as expected, affected parts match expect.affectedParts`, () => {
+    for (const c of ["03", "05", "07"]) for (const kind of ["longer-value", "add-part", "remove-part", "pin-sides"]) {
+      it(`case${c}-${kind}: applies as expected; affected parts by the rev C.3 rule, frozen list reported beside them`, () => {
         const { script: s, r } = run(c, kind);
         expect(r.asExpected, r.result.issues.join("; ")).toBe(true);
-        if (s.expect?.ok === true) expect(r.result.saved).toBe(true);
-        if (r.result.saved) {
-          expect(r.affected.match, `expected ${r.affected.expected} got ${r.affected.actual}`).toBe(true);
-          expect(r.stability).toBeDefined();
-          expect(r.result.check!.connections.valid).toBe(true);
-        }
-      });
-    }
-    for (const kind of ["longer-value", "add-part", "remove-part", "pin-sides"]) {
-      it(`case07-${kind} (header drawn as ic): affected parts match when saved`, () => {
-        const { r } = run("07", kind, (d) => { for (const x of d.circuit.parts) if (x.type === "header") x.type = "ic"; });
-        if (r.result.saved) expect(r.affected.match, `expected ${r.affected.expected} got ${r.affected.actual}`).toBe(true);
-        else expect(r.result.status).not.toBe("invalid_input"); // the script itself is well-formed
+        if (s.expect?.ok === true) expect(r.result.saved, r.result.issues.join("; ")).toBe(true);
+        if (!r.result.saved) return; // case 3 pin sides: rejected (E270), which the script accepts
+        const want = C3[`${c}-${kind}`] ?? s.expect!.affectedParts!;
+        expect(r.affected.actual).toEqual(want);
+        expect(r.affected.expected).toEqual(s.expect!.affectedParts);
+        expect(r.affected.match).toBe(C3[`${c}-${kind}`] === undefined);
+        expect(r.stability).toBeDefined();
+        expect(r.result.check!.connections.valid).toBe(true);
       });
     }
   });

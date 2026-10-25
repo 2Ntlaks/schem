@@ -12,7 +12,7 @@ import { cmpNatural } from "../geom/geom.js";
 import { canonical, type Circuit, type Issue, type Net, type Part, type PinDef, type PinDefs, type Role } from "../core/model.js";
 import { resolveEndpoint, validate } from "../core/validate.js";
 import { checkHints, HINT_TYPES, type Hint, type HintPriority, type Intent, type Lock, type NetStyle } from "../core/intent.js";
-import type { Project } from "../layout/layout.js";
+import { pinDefsOf, type Project } from "../layout/layout.js";
 import { BUILTIN } from "../symbols/library.js";
 import { checkModuleDef, checkPinList, MODULE_LIBRARY, modulePins, type ModuleDef } from "../modules/index.js";
 
@@ -191,7 +191,7 @@ export function loadProject(input: string | unknown, opts: LoadOptions = {}): Lo
       part.pins = modulePins(def);
       if (def.controller && part.props?.controller === undefined) part.props = { ...(part.props ?? {}), controller: "true" };
       pinDefs[id] = modulePins(def);
-    } else if (part.pins) pinDefs[id] = part.pins.map((p) => (p.role ? { ...p } : { ...p, role: defaultRole(p.name) }));
+    } else if (part.pins) pinDefs[id] = ownPins(part);
     else if (type === "ic") { err("E203", `part ${id}: an ic needs its pins (SPEC 7.3).`, id); continue; }
     else { missing.add(type); err("E201", `unknown part type "${type}" (${id}).`, id); }
     parts.push(part);
@@ -324,11 +324,16 @@ function parseHint(h: unknown, i: number, unknownFields: string[]): { hint: Hint
 /** The pin inventory the engine uses for a loaded project's circuit. */
 export function projectPinDefs(p: LoadedProject): PinDefs {
   const defs: PinDefs = {};
-  for (const part of p.circuit.parts) {
-    if (BUILTIN[part.type]) defs[part.id] = BUILTIN[part.type]!.pins.map(stripPin);
-    else defs[part.id] = (part.pins ?? []).map((x) => (x.role ? { ...x } : { ...x, role: defaultRole(x.name) }));
-  }
+  for (const part of p.circuit.parts) defs[part.id] = BUILTIN[part.type] ? BUILTIN[part.type]!.pins.map(stripPin) : ownPins(part);
   return defs;
+}
+
+/**
+ * Pins of a part that declares its own (ic, header, module after expansion, custom): the layout's
+ * reading where it knows the type (a header pin without a role is passive), else the SPEC 7.3 defaults.
+ */
+function ownPins(part: Part): PinDef[] {
+  return pinDefsOf({ parts: [part], nets: [] })[part.id] ?? (part.pins ?? []).map((x) => (x.role ? { ...x } : { ...x, role: defaultRole(x.name) }));
 }
 
 /** The SPEC 6.5 document for a project, as a plain object in canonical key order. */

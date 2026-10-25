@@ -20,6 +20,10 @@ export interface EditScript {
   edit?: string;
   description?: string;
   ops: EditOp[];
+  /** SPEC 11.4 optimistic-concurrency tokens (rev C.3 `ops.json`). */
+  expectedRevision?: string;
+  expectedLayout?: string;
+  /** Phase 0b scripts only: the expected outcome. `affectedParts` follows the rev C.2 table. */
   expect?: { ok?: boolean | "either"; affectedParts?: string[] };
 }
 
@@ -75,7 +79,7 @@ export function parseEditScript(input: string | unknown): { ok: true; script: Ed
     issues.push({ code: "E102", message: `expect is { ok: true | false | "either", affectedParts: [...] }.` });
   if (issues.length) return { ok: false, issues };
   const script: EditScript = { ops: structuredClone(doc.ops) as EditOp[] };
-  for (const k of ["schema", "case", "edit", "description"] as const) if (isStr(doc[k])) script[k] = doc[k] as string;
+  for (const k of ["schema", "case", "edit", "description", "expectedRevision", "expectedLayout"] as const) if (isStr(doc[k])) script[k] = doc[k] as string;
   if (isObj(ex)) script.expect = structuredClone(ex) as EditScript["expect"];
   return { ok: true, script };
 }
@@ -90,10 +94,14 @@ export interface ScriptRun {
   project?: LoadedProject;
   /** Whether saved / rejected matches `expect.ok` (true when the script expects nothing). */
   asExpected: boolean;
-  /** `expect.affectedParts` against the parts the edit reports as affected (SPEC 9.5). */
+  /**
+   * The frozen `expect.affectedParts` (rev C.2 table) next to the affected parts the edit computed by
+   * the rev C.3 rule (port-drawn nets do not spread), which gate 4 uses. Both are reported; a
+   * difference is information, not a failure.
+   */
   affected: { expected?: string[]; actual: string[]; match?: boolean };
-  /** Hints dropped because a part they name was removed (not by an explicit removeHint). */
-  droppedHints: string[];
+  /** Hints removed with a removed part (SPEC 11.3, rev C.3), as edit() lists them. */
+  removedHints: string[];
   /** SPEC 15 gate 4 on the change report (incremental edits only). */
   stability?: { report: ChangeReport; breaks: string[] };
 }
@@ -107,7 +115,7 @@ export function applyEditScript(project: LoadedProject, script: EditScript, prev
     result: { saved: false, status: "invalid_input", project, affected: { parts: [], nets: [] }, issues, revision: revision(project) },
     asExpected: script.expect?.ok === false || script.expect?.ok === "either" || script.expect?.ok === undefined,
     affected: { ...(script.expect?.affectedParts ? { expected: script.expect.affectedParts } : {}), actual: [] },
-    droppedHints: [],
+    removedHints: [],
   });
   if (project.unknownFields.length) return refuse([`E105 edits are refused: the file uses fields this engine does not know (${project.unknownFields.join(", ")}) (SPEC 6.6).`]);
 
@@ -126,20 +134,19 @@ export function applyEditScript(project: LoadedProject, script: EditScript, prev
     } else ops.push(op);
   }
 
-  const result = edit({ project, ops, ...(previous ? { previous } : {}) });
+  const result = edit({
+    project, ops, ...(previous ? { previous } : {}),
+    ...(script.expectedRevision ? { expectedRevision: script.expectedRevision } : {}), ...(script.expectedLayout ? { expectedLayout: script.expectedLayout } : {}),
+  });
   const expected = script.expect?.affectedParts;
   const actual = [...result.affected.parts].sort(cmpStr);
   const compared = result.saved || actual.length > 0; // a transaction refused before layout computes no affected parts
   const affected = { ...(expected ? { expected, ...(compared ? { match: JSON.stringify([...expected].sort(cmpStr)) === JSON.stringify(actual) } : {}) } : {}), actual };
-  const removedByOp = new Set(script.ops.flatMap((o) => (o.op === "removeHint" ? [o.id] : [])));
   let edited: LoadedProject | undefined;
-  let droppedHints: string[] = [];
   if (result.saved) {
     const p = result.project as LoadedProject;
     const { layoutCache: _stale, ...rest } = p;
     edited = { ...rest, assets: { ...project.assets, definitions } };
-    const after = new Set((p.intent.hints ?? []).map((h) => h.id));
-    droppedHints = (project.intent.hints ?? []).map((h) => h.id).filter((id) => !after.has(id) && !removedByOp.has(id));
     // Hints must still make sense after the edit (a decouples hint whose capacitor became a resistor, ...).
     const h = checkHints(edited.intent.hints ?? [], edited.circuit, projectPinDefs(edited));
     if (h.errors.length) {
@@ -153,7 +160,7 @@ export function applyEditScript(project: LoadedProject, script: EditScript, prev
     ...(edited ? { project: edited } : {}),
     asExpected: ok === undefined || ok === "either" || ok === result.saved,
     affected,
-    droppedHints,
+    removedHints: result.removedHints ?? [],
     ...(result.report ? { stability: { report: result.report, breaks: stabilityBreaks(result.report) } } : {}),
   };
 }

@@ -11,6 +11,8 @@ export interface PinDef {
   group?: string;
   iface?: string[];
   chain?: "in" | "out";
+  /** Preferred representative of its group (a module's `representatives`, SPEC 6.2 and 7.3, rev C.3). */
+  representative?: boolean;
 }
 
 export interface Part { id: string; type: string; props?: Record<string, string>; pins?: PinDef[] }

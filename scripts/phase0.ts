@@ -59,7 +59,7 @@ interface EditSummary {
     untouched: number; meanMove: number; maxMove: number; turned: string[]; lockedMoved: string[];
     routesAffected: string[]; routesOther: string[]; portStubs: string[]; breaks: string[]; pass: boolean;
   };
-  droppedHints?: string[];
+  removedHints?: string[];
   issues: string[];
   images?: string[];
 }
@@ -143,7 +143,7 @@ function runEdit(scriptFile: string, outDir: string): EditSummary {
     if (run.result.mode) s.mode = run.result.mode;
     if (run.result.layout) s.layout = run.result.layout.status;
     s.affected = run.affected;
-    s.droppedHints = run.droppedHints;
+    s.removedHints = run.removedHints;
     s.issues = run.result.issues;
     if (run.stability) {
       const r = run.stability.report;
@@ -195,11 +195,11 @@ console.log("");
 console.log(`${pad("edit script", 26)} ${pad("status", 34)} ${pad("expect", 6)} ${pad("as exp", 6)} ${pad("affected", 8)} ${pad("mode", 19)} gate 4`);
 for (const e of edits) {
   const g = e.gate4 ? `${e.gate4.pass ? "pass" : "FAIL"} (untouched ${e.gate4.untouched}, mean ${e.gate4.meanMove} G, max ${e.gate4.maxMove} G, other routes ${e.gate4.routesOther.length})` : "-";
-  const aff = e.affected?.match === undefined ? "-" : e.affected.match ? "match" : "DIFFER";
+  const aff = e.affected?.match === undefined ? "-" : e.affected.match ? "same" : "differs";
   console.log(`${pad(e.script, 26)} ${pad(e.status, 34)} ${pad(e.expectOk ?? "-", 6)} ${pad(e.asExpected ?? "-", 6)} ${pad(aff, 8)} ${pad(e.mode ?? "-", 19)} ${g}`);
-  if (e.affected?.match === false) console.log(`    affected: expected ${e.affected.expected?.join(" ")}; edit reports ${e.affected.actual.join(" ")}`);
+  if (e.affected?.match === false) console.log(`    affected: frozen expect (rev C.2 table) ${e.affected.expected?.join(" ")}; recomputed (rev C.3, used by gate 4) ${e.affected.actual.join(" ") || "(none)"}`);
   if (e.gate4 && !e.gate4.pass) for (const b of e.gate4.breaks) console.log(`    gate 4: ${b}`);
-  if (e.droppedHints?.length) console.log(`    dropped hints: ${e.droppedHints.join(", ")}`);
+  if (e.removedHints?.length) console.log(`    removed hints: ${e.removedHints.join(", ")}`);
   if (!e.status.startsWith("saved")) for (const i of e.issues.slice(0, 2)) console.log(`    ${i}`);
 }
 console.log(`\nwrote ${rel(OUT)}/ (${sets.join(", ")}, edits)`);
