@@ -6,9 +6,11 @@
 /**
  * Incremental mode: `prev` keeps an untouched part where it was, `prevAffected` keeps a part the
  * edit touched near where it was. They give way first, affected parts before untouched ones.
+ * `templateSoft`: a template's linking constraints in incremental mode; they give way to untouched
+ * parts staying put, but move the parts the edit touched.
  */
-export type Priority = "structural" | "lock" | "strict" | "high" | "template" | "normal" | "align" | "prev" | "prevAffected";
-const RANK: Record<Priority, number> = { structural: 8, lock: 7, strict: 6, high: 5, template: 4, normal: 3, align: 2, prev: 1, prevAffected: 0 };
+export type Priority = "structural" | "lock" | "strict" | "high" | "template" | "normal" | "align" | "prev" | "templateSoft" | "prevAffected";
+const RANK: Record<Priority, number> = { structural: 9, lock: 8, strict: 7, high: 6, template: 5, normal: 4, align: 3, prev: 2, templateSoft: 1, prevAffected: 0 };
 
 export interface Constraint { a: string; b: string; c: number; priority: Priority; why: string }
 

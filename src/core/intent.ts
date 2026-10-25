@@ -31,4 +31,6 @@ export interface LayoutState {
    * `ports` marks a net drawn only with supply or ground symbols (its runs are their stubs).
    */
   routes: Record<string, { terminals: string; runs: Pt[][]; ports?: true }>;
+  /** Template regions used, as `id@version:parts` (SPEC 9.4: templates are part of `layout.basis`). */
+  templates?: string[];
 }

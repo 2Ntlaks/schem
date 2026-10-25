@@ -34,8 +34,16 @@ const sideways: Project = {
   intent: { hints: [{ id: "h1", type: "orient", part: "R1", rot: 0, flip: false, priority: "normal" }] },
 };
 
+// Case 3 with capacitor inputs: no template matches it (the summing template needs input
+// resistors), so it keeps the Phase 0a placement and its wire steps.
+const case3 = load("case03-summing.json");
+const capacitorInputs: Project = {
+  meta: { title: "summing node with capacitor inputs" },
+  circuit: { ...case3.circuit, parts: case3.circuit.parts.map((p) => (["R1", "R2", "R3"].includes(p.id) ? { ...p, type: "capacitor", props: { value: "1u" } } : p)) },
+};
+
 describe("checked fixes", () => {
-  for (const project of [load("case01-led.json"), load("case03-summing.json"), load("case05-i2c.json"), sideways]) {
+  for (const project of [load("case01-led.json"), case3, load("case05-i2c.json"), sideways, capacitorInputs]) {
     const name = project.meta?.title ?? "sideways resistor";
     it(`${name}: every offered fix, applied, removes its finding and changes what it says it changes`, () => {
       const base = layout(project);
@@ -62,10 +70,14 @@ describe("checked fixes", () => {
     expect(f.fix!.tradeoff).toBeNull();
   });
 
-  it("finds a fix for the two dots one step apart in case 3", () => {
-    const p = load("case03-summing.json");
-    const base = layout(p);
-    expect(review(p, base.state!, base.render!).find((x) => x.id === "L-minDotSpacing")!.fix).not.toBeNull();
+  it("finds a fix for a wire step near the summing node (case 3 with capacitor inputs; the template fixes case 3 itself)", () => {
+    // Case 3's other 0a weakness, dots one step apart, no longer occurs here either: the router
+    // no longer joins a net 1 G from one of its own bends or junctions.
+    const base = layout(capacitorInputs);
+    expect(base.state!.templates ?? []).toEqual(["pull-down@1:RL"]);
+    expect(review(capacitorInputs, base.state!, base.render!).find((x) => x.id === "L-jogs")!.fix).not.toBeNull();
+    const fixed = layout(case3);
+    expect(review(case3, fixed.state!, fixed.render!).map((x) => x.id).filter((id) => id.startsWith("L-"))).toEqual([]);
   });
 
   it("a fix checked on one layout is refused on another (expectedLayout)", () => {
