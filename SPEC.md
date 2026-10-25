@@ -9,7 +9,7 @@
 | Reviews | rev A: `archive/SPEC-REVIEW-revA.md`, rev B: `archive/SPEC-REVIEW-revB.md`, rev C: `archive/SPEC-REVIEW-revC.md` |
 | Previous | `archive/SPEC-revA.md`, `archive/SPEC-revB.md`, `archive/SPEC-revC1.md`, `archive/SPEC-revC2.md` |
 
-Section 18 maps every rev B finding (N01-N22, F31 and the over-corrections) to what changed, then lists the rev C.1 amendments and the rev C.2 and C.3 changes. Rulings tagged **[owner to confirm]** are listed in section 16. The rev A finding map is in `archive/SPEC-revB.md` section 18. Section numbers are kept from earlier revisions.
+Section 18 maps every rev B finding (N01-N22, F31 and the over-corrections) to what changed, then lists the rev C.1 amendments and the rev C.2 and C.3 changes. The rev C.3 rulings the owner confirmed are listed in section 16. The rev A finding map is in `archive/SPEC-revB.md` section 18. Section numbers are kept from earlier revisions.
 
 ---
 
@@ -163,7 +163,7 @@ flowchart LR
 
 An ambiguous name is an error listing the candidates by number.
 
-**"In a net" means as written** (rev C.1). A terminal is in a net only if that terminal itself, or its group as a group endpoint, is written in the net. Equivalence classes (below) are used only for invariant 1, merging and the verifier's comparison. (Invariant 2 is checked as written, so a no-connect mark on a member of a connected group is allowed.) A group member that is not written and whose group is connected is simply hidden: no supply warning. The representative of a group is the member the module definition names in `representatives` (section 7.3) if that member is not marked no-connect; otherwise its **lowest-numbered member that is not marked no-connect**. A group whose members are all no-connect cannot be used as an endpoint (`E225`). (Rev C.3: by natural order alone, the Arduino Uno's GND group lands on the USB chip's programming header.) **[owner to confirm]**
+**"In a net" means as written** (rev C.1). A terminal is in a net only if that terminal itself, or its group as a group endpoint, is written in the net. Equivalence classes (below) are used only for invariant 1, merging and the verifier's comparison. (Invariant 2 is checked as written, so a no-connect mark on a member of a connected group is allowed.) A group member that is not written and whose group is connected is simply hidden: no supply warning. The representative of a group is the member the module definition names in `representatives` (section 7.3) if that member is not marked no-connect; otherwise its **lowest-numbered member that is not marked no-connect**. A group whose members are all no-connect cannot be used as an endpoint (`E225`). (Rev C.3: by natural order alone, the Arduino Uno's GND group lands on the USB chip's programming header.)
 
 **Electrical equivalence.** For validation, every endpoint is expanded to its **equivalence class**: a terminal in a group belongs to the class of its group; any other terminal is its own class. All rules in 6.3 are checked on classes, so:
 - `U1{GND}` in net n1 and `U1[14]` (a member of that group) in net n2 is an error: the part already joins them internally, so the two nets would be shorted.
@@ -381,7 +381,7 @@ part U2 ic "Sensor" pins: VIN GND SDA SCL
 - **Box shape is fixed before placement**, from an ordered candidate list of pin-side assignments (power top, ground bottom, upstream pins left, downstream right, then variants). Repair may try the next candidate. Side pins are 2 G apart; top and bottom pins are spaced by their name widths (at least 2 G) so the names never run together (rev C.2).
 - **Modules** (`module:esp32-devkitc-v4`, `module:arduino-uno-r3`, `module:raspberry-pi-pico`, sensor breakouts) carry real pin numbers, names, aliases, groups, roles, interface roles, a `controller` flag for microcontroller boards, and the documentation URL and revision they come from. Pin numbers and aliases follow the board's own documentation exactly (the ESP32-DevKitC V4 numbers each header, so its GND pins are `J2-14`, `J3-1` and `J3-7`; header label `D2` is GPIO9). Where the documentation gives no numbers, pins are numbered 1..N in the order it lists them, and `doc.pinNumbering` says so. Board revisions are separate module ids. **Phase 1 ships only the modules the corpus uses.**
 - **Module definition shape** (rev C.3): `{ id, version, kind: "module", name, refPrefix, controller, doc: { title, url, revision, retrieved, pinNumbering, notes }, pins: [ { number, name, role, aliases?, group?, iface? } ], representatives? }`. `representatives` maps a group name to its preferred representative pin number (section 6.2). A module has no geometry: it is drawn as a generated box, like `ic`.
-- **Board supply pins** (rev C.3): roles are fixed per module, taken from the documentation for the board's usual supply (USB on development boards): a regulator output is `power_out`, a supply input `power_in`. v1 has no `power_bidir` role and no per-part role override. Because a board has several alternative supply pins and is often powered by an undrawn USB cable, an unconnected supply pin on a module is not reported. **[owner to confirm]**
+- **Board supply pins** (rev C.3): roles are fixed per module, taken from the documentation for the board's usual supply (USB on development boards): a regulator output is `power_out`, a supply input `power_in`. v1 has no `power_bidir` role and no per-part role override. Because a board has several alternative supply pins and is often powered by an undrawn USB cable, an unconnected supply pin on a module is not reported.
 
 ## 8. Text DSL
 
@@ -647,7 +647,7 @@ Low confidence in v1: differential pair, current mirror, Sallen-Key and other co
 | `removePart` | parts on the nets it was on, except port-drawn nets |
 | `setSpacing`, `relayout canonical`, style, theme, `update-assets` | whole sheet (canonical layout, locks honoured) |
 
-**Port-drawn nets** (rev C.3) are power and ground nets drawn only with port symbols (section 9.2 step 3). They do not spread "affected": a capacitor added to GND does not make every part on GND affected. Their stubs move with their parts, which the displacement figures already count. **[owner to confirm]** The frozen `expect.affectedParts` lists in `phase0/cases/edits/` follow the rev C.2 table; gate 4 uses this rule, recomputed by the harness.
+**Port-drawn nets** (rev C.3) are power and ground nets drawn only with port symbols (section 9.2 step 3). They do not spread "affected": a capacitor added to GND does not make every part on GND affected. Their stubs move with their parts, which the displacement figures already count. The frozen `expect.affectedParts` lists in `phase0/cases/edits/` follow the rev C.2 table; gate 4 uses this rule, recomputed by the harness.
 
 **Incremental layout** (rev C.3, as built in Phase 0b). The whole pipeline runs, with the previous layout (`layout` in the file) as a soft anchor:
 - Parts that are not affected keep their previous orientation and IC pin sides.
@@ -818,7 +818,7 @@ Applied in order as one transaction: validated, applied in memory, laid out, ver
 **`setPinSides` rules** (rev C.3):
 - Each list runs top to bottom (left and right sides) or left to right (top and bottom). A pin is written as a number, a name or alias, or `U1[3]` / `U1.OUT`.
 - Listed pins come first on their side, in the given order. Pins not listed keep their default side (section 7.3) and follow the listed ones. A listed pin that is not drawn is ignored; a name that is not a pin of the part is an error.
-- Only generated boxes (`ic`, `header`, modules) have pin sides. On a fixed symbol (an op-amp, a transistor) the edit is **rejected** (D4) with an error that names the `setOrientation` giving the same arrangement, if one exists (for an op-amp, IN+ above IN- is `rot 180, flip true`). A mirror is not applied silently: it would make `setPinSides` write the part's orientation, which belongs to `setOrientation`, and an agent re-reading the file would not find the pin sides it asked for. **[owner to confirm]**
+- Only generated boxes (`ic`, `header`, modules) have pin sides. On a fixed symbol (an op-amp, a transistor) the edit is **rejected** (D4) with an error that names the `setOrientation` giving the same arrangement, if one exists (for an op-amp, IN+ above IN- is `rot 180, flip true`). A mirror is not applied silently: it would make `setPinSides` write the part's orientation, which belongs to `setOrientation`, and an agent re-reading the file would not find the pin sides it asked for.
 
 **Circuit operations:** `addPart`, `removePart`, `renamePart {from, to}`, `setProp {part, key, value}`, `connect {endpoints, name?}`, `disconnect {endpoint}`, `renameNet {net, name}`, `mergeNets {nets, keep, sameSupply?}`, `setNoConnect {terminal, nc}`.
 
@@ -965,7 +965,7 @@ Phase 2 themes: `textbook`, `dark`, `blueprint`, `mono-print`. Themes are JSON a
 
 Cases 1, 3 and 5 were developed during Phase 0a, so gate 3 below (validation set) is biased in their favour; the test-set figures in gate 2 decide. The owner supplied no projects before the freeze (2026-10-23), so cases 11 and 12 are the substitutes above.
 
-**Case 5** (rev C.3) is a byte-for-byte copy of the Phase 0a case: its ESP32 is an `ic` with invented pins 1-4 and a `power_in` 3V3 pin, not the DevKitC's real numbers. It stays as frozen for the gates, because changing a frozen case after work has started breaks the freeze. A corrected copy using `module:esp32-devkitc-v4` may be added to the development set (`cases/`); it counts for no gate. **[owner to confirm]**
+**Case 5** (rev C.3) is a byte-for-byte copy of the Phase 0a case: its ESP32 is an `ic` with invented pins 1-4 and a `power_in` 3V3 pin, not the DevKitC's real numbers. It stays as frozen for the gates, because changing a frozen case after work has started breaks the freeze. A corrected copy using `module:esp32-devkitc-v4` may be added to the development set (`cases/`); it counts for no gate.
 
 **Edit scripts** (cases 3, 5, 7, 11), each applied separately: change one value to a 3× longer text; add a part on an existing net; remove a part; change one IC's pin sides.
 
@@ -979,7 +979,7 @@ Cases 1, 3 and 5 were developed during Phase 0a, so gate 3 below (validation set
 3. Same metric on the validation set alone: at least 7 of 8 (used to choose the ordering candidate).
 4. Stability, on each edit script: locked parts move 0; untouched parts (section 9.5) move on average ≤ 2 G and at most 6 G; no untouched part changes orientation; route changes limited to affected nets plus at most one other. Port-drawn nets are not counted as route changes (`portStubs`, section 9.5): their stubs move with their parts, which the displacement figures already count. On case 3, a rejected `setPinSides` (section 11.3) counts as a pass with nothing moved.
 5. Rated better than or equal to the best baseline on at least 8 of 12.
-6. The 30-part performance target (section 13 item 11) is met on case 11 (24 parts) and on one generated 30-part circuit (section 13 item 7, fixed seed, at most 150 pins), since no frozen case has 30 parts. **[owner to confirm]**
+6. The 30-part performance target (section 13 item 11) is met on case 11 (24 parts) and on one generated 30-part circuit (section 13 item 7, fixed seed, at most 150 pins), since no frozen case has 30 parts.
 
 "Blind" means shuffled images with no indication of tool or candidate.
 
@@ -1014,7 +1014,7 @@ More modules; drafting netlists from Arduino / ESP-IDF / MicroPython pin definit
 5. Which of your hardware projects should join the Phase 1 test set? (None was supplied by the 0b freeze on 2026-10-23, so Phase 0b uses the section 15 substitutes.)
 6. Is an HTTP API wanted, or are CLI + MCP enough?
 
-Rev C.3 rulings tagged **[owner to confirm]**, each with the recommended answer:
+Rev C.3 rulings, confirmed by the owner on 2026-10-25 as recommended:
 
 7. **`setPinSides` on a fixed symbol** (case 3's op-amp, 11.3): reject with an error naming the equivalent `setOrientation`. Not a silent mirror.
 8. **Affected parts** (9.5): port-drawn power and ground nets do not make their parts affected; gate 4 uses this rule.
