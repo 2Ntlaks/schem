@@ -327,12 +327,22 @@ function hBridge(hi: "pmos" | "pnp", lo: "nmos" | "npn"): Template {
 function lowSide(q: "npn" | "nmos", load: "relay" | "two-pin"): Template {
   const T = Q[q]!;
   const loadSlot: Template["slots"][number] = load === "relay"
-    ? { name: "load", types: ["relay"], role: "member", orient: UPRIGHT, pins: [{ pin: "A1", net: "SUP" }, { pin: "A2", net: "SW" }] }
+    ? { name: "load", types: ["relay"], role: "member", orient: UPRIGHT, pins: [{ pin: "A1", net: "SUP" }, { pin: "A2", net: "SW" },
+      { pin: "11", net: "COM", optional: true }, { pin: "14", net: "NO", optional: true }, { pin: "12", net: "NC", optional: true }] }
     : { name: "load", types: ["resistor", "motor", "inductor"], role: "member", symmetric: true, orient: { net: "SW", dir: "down" }, pins: [{ pin: "1", net: "SUP" }, { pin: "2", net: "SW" }] };
   return {
     id: `low-side-${q}-${load}`, version: 1, priority: 6,
     summary: `${q} low-side switch with a ${load === "relay" ? "relay coil" : "two-pin"} load to the supply`,
-    nets: { SW: { kind: ["signal"] }, GND: { kind: ["ground"] }, SUP: { kind: ["power"] }, CTL: { kind: ["signal"] } },
+    nets: { SW: { kind: ["signal"] }, GND: { kind: ["ground"] }, SUP: { kind: ["power"] }, CTL: { kind: ["signal"] },
+      COM: { kind: ["signal"] }, NO: { kind: ["signal"] }, NC: { kind: ["signal"] } },
+    ...(load === "relay" ? {
+      // The terminal block the contacts go to: right of the relay, its COM pin level with the
+      // relay's COM lead, so COM runs straight and NO and NC make short loops over the contacts.
+      link: [
+        rel("y", pin("conn", net("COM")), "=", pin("load", "11"), 1, "COM terminal level with the COM lead"),
+        rel("x", env("conn", "left"), ">=", env("load", "right"), 5, "room for the NO and NC loops"),
+      ],
+    } : {}),
     slots: [
       { name: "q", types: [q], role: "member", orient: UPRIGHT, pins: [{ pin: T.main, net: "SW" }, { pin: T.ref, net: "GND" }, { pin: T.ctrl, net: "CTL" }] },
       loadSlot,
@@ -342,6 +352,8 @@ function lowSide(q: "npn" | "nmos", load: "relay" | "two-pin"): Template {
         pins: [{ pin: "1", net: "*", pred: { kind: ["signal"] } }, { pin: "2", net: "CTL" }] },
       { name: "pd", types: ["resistor"], role: "member", symmetric: true, many: { min: 0 }, orient: { net: "GND", dir: "down" },
         pins: [{ pin: "1", net: "CTL" }, { pin: "2", net: "GND" }] },
+      ...(load === "relay" ? [{ name: "conn", types: ["header"], role: "link" as const, many: { min: 0 },
+        pins: [{ pin: { on: "COM" }, net: "COM" }, { pin: { on: "NO" }, net: "NO" }, { pin: { on: "NC" }, net: "NC" }] }] : []),
     ],
     interior: [
       rel("x", pin("load", net("SW")), "=", pin("q", T.main), 0, "load above the transistor on one vertical"),
