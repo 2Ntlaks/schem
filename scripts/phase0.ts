@@ -18,6 +18,7 @@ import { toSvg } from "../src/render/svg.js";
 import { toPng } from "../src/render/png.js";
 import { readProject, type LoadedProject } from "../src/io/project.js";
 import { applyEditScript, readEditScript } from "../src/io/edit-script.js";
+import { phase0Gates } from "./lib/phase0-gates.js";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const PHASE0 = join(ROOT, "phase0");
@@ -64,7 +65,6 @@ interface EditSummary {
   images?: string[];
 }
 
-let failures = 0;
 const rel = (p: string) => relative(ROOT, p).split("\\").join("/");
 
 /** Types in the project the engine cannot draw yet (no symbol, not ic, module or own pins it knows). */
@@ -113,10 +113,8 @@ function runCase(set: string, file: string, outDir: string): CaseSummary {
     s.issues.push(...q.connections.errors.map((e) => `verifier ${e.code} ${e.message}`), ...q.overlaps.map((o) => `overlap ${o.code} ${o.message}`));
     s.images = draw(r, outDir, name);
     s.status = !q.connections.valid ? "INVALID (verifier)" : q.overlaps.length ? "INVALID (overlaps)" : r.status;
-    if (!q.connections.valid) failures++;
   } catch (e) {
     s.status = `error: ${(e as Error).message}`;
-    failures++;
   }
   return s;
 }
@@ -155,11 +153,9 @@ function runEdit(scriptFile: string, outDir: string): EditSummary {
     }
     if (run.result.saved && run.result.layout?.render) {
       s.images.push(...draw(run.result.layout, outDir, `${name}.after`));
-      if (run.result.check && !run.result.check.connections.valid) failures++;
     }
   } catch (e) {
     s.status = `error: ${(e as Error).message}`;
-    failures++;
   }
   return s;
 }
@@ -203,4 +199,11 @@ for (const e of edits) {
   if (!e.status.startsWith("saved")) for (const i of e.issues.slice(0, 2)) console.log(`    ${i}`);
 }
 console.log(`\nwrote ${rel(OUT)}/ (${sets.join(", ")}, edits)`);
-process.exitCode = failures ? 1 : 0;
+const gates = phase0Gates(cases, edits, withTest);
+writeFileSync(join(OUT, "gates.json"), `${JSON.stringify({ scope: withTest ? "full" : "validation", gates }, null, 2)}\n`);
+for (const g of gates) {
+  console.log(`gate ${g.gate}: ${g.status} (${g.evaluated}/${g.required} results)${g.reason ? `: ${g.reason}` : ""}`);
+  for (const failure of g.failures) console.log(`    ${failure}`);
+}
+// Incomplete ratings/holdout evidence is never presented as a passed phase.
+process.exitCode = gates.some((g) => g.status === "fail") ? 1 : 0;

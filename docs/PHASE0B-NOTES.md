@@ -1,5 +1,7 @@
 # Phase 0b: build notes
 
+For the later gate-reporting, decoupling-slot and PNG-scale changes, see [2026-10-25 build progress](PHASE0B-PROGRESS-2026-10-25.md). The notes below describe the earlier implementation snapshot.
+
 Status on 2026-10-23: the parts of Phase 0b that do not depend on the frozen cases are built: edit operations, incremental mode and the minimal findings harness. Templates, the baselines and the gate run wait for the case freeze (`phase0/`, written by agent B).
 
 ## What is built
@@ -99,4 +101,4 @@ Built 2026-10-25 for the frozen cases (`phase0/HANDOFF.md`, "What Phase 0b must 
 
 ### `npm run phase0`
 
-Reads `phase0/cases/validation/*.json` and the edit scripts for cases 3, 5 and 7, whose file names it builds from the case numbers (it never lists `phase0/cases/edits/`). `--test` adds `phase0/cases/test/` and the case 11 scripts, for the end gate only. A case with a part type the layout cannot draw is reported as `missing symbol: X` (none since the 0b symbols landed); any other failure is reported per case, and the run exits 1 only on a crash or a drawing the verifier rejects. Output: `out/phase0/validation/<case>.svg|png` and `summary.json`; `out/phase0/edits/<script>.before.svg|png`, `.after.svg|png` and `summary.json` with the gate 4 figures and both affected-part lists. Cases 1, 3 and 5 draw byte-identical SVG and PNG to `npm run draw` on `cases/`.
+Reads `phase0/cases/validation/*.json` and the edit scripts for cases 3, 5 and 7, whose file names it builds from the case numbers (it never lists `phase0/cases/edits/`). `--test` adds `phase0/cases/test/` and the case 11 scripts, for the end gate only. A case with a part type the layout cannot draw is reported as `missing symbol: X`. Output: `out/phase0/validation/<case>.svg|png` and `summary.json`; `out/phase0/edits/<script>.before.svg|png`, `.after.svg|png` and `summary.json` with the gate 4 figures and both affected-part lists. The 2026-10-25 continuation also writes `out/phase0/gates.json` and exits 1 for failed case/status/overlap checks, unexpected edit outcomes or failed stability checks. Ratings, benchmarks and successful validation subsets remain explicitly incomplete against the full gates. Cases 1, 3 and 5 draw byte-identical SVG and PNG to `npm run draw` on `cases/`.
