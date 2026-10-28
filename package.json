@@ -17,7 +17,8 @@
     "phase0": "tsx scripts/phase0.ts",
     "gates": "tsx scripts/gates.ts",
     "showcase": "tsx scripts/showcase.ts",
-    "draw:symbols": "tsx scripts/symbols.ts"
+    "draw:symbols": "tsx scripts/symbols.ts",
+    "readme:art": "tsx scripts/readme-art.ts"
   },
   "devDependencies": {
     "@types/node": "22.10.2",

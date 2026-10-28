@@ -1,48 +1,117 @@
+<div align="center">
+
 # schem
 
-Turn a circuit description into a clean schematic drawing, with no dragging and dropping.
+**Describe the circuit. Get the schematic.**
 
-You (or an AI agent) write which parts exist and which pins connect, as JSON. schem places the parts, routes the wires, checks that the drawing shows exactly those connections, and writes SVG and PNG.
+A netlist goes in. A clean schematic comes out: laid out automatically, and checked against the netlist before you see it.<br>
+Built for AI agents, pleasant for people.
 
-![The same six circuits drawn by schem, SKiDL, netlistsvg and schemdraw](docs/showcase/comparison.png)
+[![CI](https://github.com/2Ntlaks/schem/actions/workflows/ci.yml/badge.svg)](https://github.com/2Ntlaks/schem/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-182a38)](LICENSE)
+[![Node](https://img.shields.io/badge/node-%E2%89%A522-182a38)](https://nodejs.org/)
+[![Status](https://img.shields.io/badge/status-early%20prototype-bf5238)](#where-it-stands)
 
-*The same six circuits, drawn by schem and by three open-source tools. schem, SKiDL and netlistsvg lay the drawing out automatically; schemdraw drawings are written by hand in code. Each baseline got a fixed budget of attempts, all logged in [`baselines/LOG.md`](baselines/LOG.md) with their known defects. SKiDL's case 7 is a tool failure: its fallback stacked eight parts behind one chip. Open [`docs/showcase/index.html`](docs/showcase/index.html) locally for the full-size page.*
+<br>
+
+<img src="docs/assets/hero.png" alt="A circuit file listing nine parts and six nets on the left; on the right, the summing amplifier schematic schem drew from it, marked valid with every connection checked and no overlaps" width="100%">
+
+<sub>Nothing above is mocked up: the file is <a href="examples/summing-amp.schem.json"><code>examples/summing-amp.schem.json</code></a>, and the drawing and its status line are made by the engine (<code>npm run readme:art</code>).</sub>
+
+</div>
+
+<br>
 
 ## Why
 
-AI agents are good at saying what a circuit is ("an ESP32 drives a relay through a transistor") and bad at drawing it. Code-based drawing tools make the agent pick every coordinate and direction, and when the picture is wrong, the agent has nothing to go on but the picture.
+> AI agents are good at saying what a circuit is. They are bad at drawing it.
 
-schem splits the job:
+An agent can tell you that an ESP32 drives a relay through a transistor with a flyback diode. Ask it to *draw* that, and it has to pick every coordinate itself, and when the picture comes out wrong it has nothing to go on but the picture. schem takes the drawing off its hands:
 
-- **The agent writes a netlist**: parts and connections, no coordinates.
-- **The engine draws it**: placement by a constraint solver with patterns for common circuits, wires by a grid router, conventional layout (power at the top, ground at the bottom, signals left to right).
-- **A verifier checks the result**: it rebuilds the connections from the finished drawing and compares them with the netlist, and it checks for overlapping parts and labels. A drawing that does not show exactly the netlist is reported as not valid.
-- **Edits keep the drawing stable**: after changing one value or adding one part, the rest of the drawing stays in place (untouched parts may shift a little, within a measured limit), so a figure in a document does not jump around between versions.
+- **You write a netlist.** Parts and the pins they connect. No coordinates, no wires, no layout.
+- **schem draws it the way an engineer would.** Power at the top, ground at the bottom, signals flowing left to right, familiar circuits in their textbook arrangement.
+- **Then it checks its own work.** The connections are rebuilt from the finished drawing and compared with your netlist, and parts and labels are checked for overlaps. If the picture does not say exactly what the netlist says, you are told.
+- **Edits stay put.** Change a value or add a part, and the rest of the drawing stays where it was (untouched parts may shift a little, within a measured limit). A figure in your report does not reshuffle itself between versions.
 
-The visual target is the clean style of [circuit-diagram.org](https://www.circuit-diagram.org/): thin strokes, standard symbols, aligned parts, tidy labels.
-
-## Try it
+## Quick start
 
 You need [Node.js](https://nodejs.org/) 22 or newer.
 
-```
+```sh
 git clone https://github.com/2Ntlaks/schem.git
 cd schem
 npm install
-npm run schem -- draw examples/led.schem.json
+npm run schem -- draw examples/esp32-relay.schem.json
 ```
 
-This writes `out/led.svg` and `out/led.png` and prints:
-
 ```
-led: valid. Wrote out/led.svg and out/led.png (120 ms)
+esp32-relay: valid. Wrote out/esp32-relay.svg and out/esp32-relay.png (190 ms)
 ```
 
-There are five examples in [`examples/`](examples/), from an LED up to an ESP32 driving a relay. `-o <folder>` writes somewhere else. The command exits with `0` for a valid drawing, `1` for a drawing with problems (it still writes the files, and lists the problems), and `2` when the file could not be drawn.
+Five circuits to try are in [`examples/`](examples/). Add `-o <folder>` to write somewhere else. The exit code is `0` for a valid drawing, `1` when the drawing has problems (the files are still written and the problems listed), and `2` when the file could not be drawn, with a message saying what is wrong and where.
 
-## Write your own circuit
+## How it works
 
-A circuit file lists parts and nets. A net names the pins it connects:
+```mermaid
+flowchart LR
+    N["<b>netlist</b><br/>parts + connections"] --> P["<b>place</b><br/>constraint solver,<br/>circuit patterns"]
+    P --> R["<b>route</b><br/>grid router"]
+    R --> V{"<b>verify</b><br/>connections rebuilt<br/>from the drawing"}
+    V -- valid --> O["<b>SVG + PNG</b>"]
+    V -- problems --> F["drawn anyway,<br/>problems listed"]
+```
+
+Placement solves a set of layout rules (signal flow, rails, alignment, spacing) and recognises common circuits, such as an op-amp stage or an I2C bus with pull-ups, to give them their usual shape. Wires are routed on a grid with costs for bends and crossings. The verifier works only from the finished drawing, so a layout bug cannot hide a wrong connection. Output is deterministic: the same file gives the same SVG, byte for byte, on Windows and Linux, which CI checks on every push.
+
+The full design is in [`SPEC.md`](SPEC.md).
+
+## Gallery
+
+Drawn by schem from the files in [`examples/`](examples/), with no hand adjustment.
+
+<table>
+  <tr>
+    <td width="50%" valign="top">
+      <img src="docs/showcase/img/case06-schem.png" alt="ESP32 driving a relay through an NPN transistor, with a flyback diode and a load connector">
+      <br><sub><b>ESP32 relay driver</b>: a dev board, transistor switch, relay and flyback diode. <a href="examples/esp32-relay.schem.json">file</a></sub>
+    </td>
+    <td width="50%" valign="top">
+      <img src="docs/showcase/img/case05-schem.png" alt="ESP32 with BME280 and SHT31 sensors on a shared I2C bus with two pull-up resistors">
+      <br><sub><b>Two I2C sensors</b>: a shared bus with its pull-ups. <a href="examples/i2c-sensors.schem.json">file</a></sub>
+    </td>
+  </tr>
+  <tr>
+    <td colspan="2">
+      <img src="docs/showcase/img/case04-schem.png" alt="H-bridge motor driver with four MOSFETs, gate resistors and a four-input drive header">
+      <br><sub><b>H-bridge motor driver</b>: four MOSFETs around the motor, gate networks, drive header. <a href="examples/h-bridge.schem.json">file</a></sub>
+    </td>
+  </tr>
+</table>
+
+## How it compares
+
+The same six circuits, drawn by schem and three open-source tools. SKiDL and netlistsvg lay out automatically, like schem; schemdraw drawings are written by hand in code.
+
+<img src="docs/showcase/comparison.png" alt="A grid of six circuits, each drawn by schem, SKiDL, netlistsvg and schemdraw">
+
+<details>
+<summary><b>How the comparison was made fair</b></summary>
+<br>
+
+- Every tool drew from the same netlist, and every drawing's connections were checked against it. A drawing that failed the check could not be chosen.
+- Each tool had one first attempt plus at most three revisions per circuit, using only that tool's own options. Every attempt, what changed and why, is logged in [`baselines/LOG.md`](baselines/LOG.md), along with the known defects in the chosen drawings.
+- schem's drawings are used exactly as the engine makes them, rendered with the same settings as the others.
+- SKiDL's case 7 is a tool failure: its fallback placement stacked eight parts behind one chip.
+- Our own weakest circuit, a differential pair, is left out because schem draws it poorly. It is not hidden: it is in the log.
+- This is our comparison, not a blind one. A blind rating by outside judges is planned.
+
+Open [`docs/showcase/index.html`](docs/showcase/index.html) locally for the full-size page, or rebuild it with `npm run showcase`.
+
+</details>
+
+## Write your own
+
+A circuit file lists parts, and nets that name the pins they connect:
 
 ```json
 {
@@ -62,33 +131,50 @@ A circuit file lists parts and nets. A net names the pins it connects:
 }
 ```
 
-- [`docs/netlist-format.md`](docs/netlist-format.md) explains every field.
-- [`docs/parts.md`](docs/parts.md) lists the part types and their pin names.
+[`docs/netlist-format.md`](docs/netlist-format.md) explains every field, and [`docs/parts.md`](docs/parts.md) lists every part type with its pin names. Nets named like `GND` or `5V` are drawn as ground and power symbols.
 
-If the file has a mistake (a missing comma, an unknown part type, a pin that does not exist), the command says what and where.
+## Where it stands
 
-## Status: early prototype
+schem is an early prototype. It is useful today for small and medium circuits, and honest about the rest.
 
-This is a working prototype, not a finished tool. What works today:
+<table>
+  <tr>
+    <th width="50%" align="left">Works today</th>
+    <th width="50%" align="left">Not there yet</th>
+  </tr>
+  <tr>
+    <td valign="top">
 
-- 22 built-in symbols (resistors, capacitors, diodes, LEDs, transistors, op-amps, relays, sources and more), chips drawn as labelled boxes, connectors, and 4 board modules (Arduino Uno, ESP32-DevKitC, a Pololu regulator, an I2C LCD) with their real pin names.
-- All 8 development circuits draw valid. A generated 30-part circuit draws in under 3 seconds.
-- Deterministic output: the same file always gives the same SVG, byte for byte, on Windows and Linux.
+- 22 symbols: passives, diodes, LEDs, BJTs, MOSFETs, op-amps, relays, switches, sources and more
+- Chips as labelled boxes, connectors, and 4 boards with their real pinouts (Arduino Uno, ESP32-DevKitC, a Pololu regulator, an I2C LCD)
+- All 8 development circuits draw valid; a generated 30-part circuit draws in under 3 seconds
+- Byte-identical output on Windows and Linux
+- Clear errors for broken input
 
-What is not there yet:
+</td>
+    <td valign="top">
 
-- **Dense and symmetric circuits draw poorly.** Boards with several chips spread out too much, and circuits that want mirror symmetry (a differential pair) come out messy, which is why case 8 is missing from the comparison above.
-- **The library is small.** Many common parts and boards are missing.
-- **Edits are an engine feature only.** The edit operations and the stability checks exist in the code (`src/edit/`), but the command line only draws whole files for now.
-- **Not on npm yet**, so `npx schem` does not work; use the clone above.
-- **Not yet judged blind.** The comparison above is our own, made with a logged and fixed budget. A blind rating by outside judges is planned.
+- Dense boards with several chips spread out too far
+- Circuits that want mirror symmetry, like a differential pair, come out messy
+- The library is small, and new boards cannot be added yet
+- Edits work in the engine (`src/edit/`) but not yet from the command line
+- Not on npm, so no `npx schem` yet
+- No blind rating by outside judges yet
 
-The design, including what is planned, is in [`SPEC.md`](SPEC.md).
+</td>
+  </tr>
+</table>
 
 ## Contributing
 
-Help is welcome, and much of it needs no knowledge of the layout engine: new symbols, example circuits, and bug reports with a circuit file that draws badly. See [`CONTRIBUTING.md`](CONTRIBUTING.md).
+There is a lot to do, and much of it needs no knowledge of the layout engine.
+
+- **Send a circuit that draws badly.** Open an issue with the file and the PNG. Real circuits that break the layout are the most useful thing this project can get.
+- **Draw a symbol.** The library is small; [`CONTRIBUTING.md`](CONTRIBUTING.md#adding-a-symbol) walks through adding one, and the tests check it in all eight orientations.
+- **Add an example**, or fix anything in the docs that confused you.
+
+Coding agents are welcome too: [`AGENTS.md`](AGENTS.md) holds their rules. Start with [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
 ## License
 
-[MIT](LICENSE).
+[MIT](LICENSE). The symbols are drawn for this project, not copied from other libraries.
