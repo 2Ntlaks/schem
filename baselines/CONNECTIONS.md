@@ -26,12 +26,12 @@ Parts: B1 battery 9V, R1 resistor 470, D1 led red.
 | unnamed (n2) | R1[2], D1[A] |
 | GND | D1[K], B1[-] |
 
-Final drawings: schemdraw attempt 3, SKiDL attempt 1, netlistsvg attempt 1. Each final check reports
+Final drawings: schemdraw attempt 3, SKiDL attempt 1, netlistsvg attempt 2. Each final check reports
 every net above as OK, so all three results are PASS.
 
 Checks: `out/schemdraw/validation/case01/attempt-3.check.txt`,
 `out/skidl/validation/case01/attempt-1.check.txt`,
-`out/netlistsvg/validation/case01/attempt-1.check.txt`.
+`out/netlistsvg/validation/case01/attempt-2.check.txt`.
 
 ## Case 2: divider and buffer
 
@@ -144,12 +144,12 @@ D1 diode 1N4148, K1 relay SRD-05VDC-SL-C, J1 header LOAD.
 | unnamed (n7) | J1[2], K1[14] |
 | unnamed (n8) | J1[3], K1[12] |
 
-Final drawings: schemdraw attempt 3, SKiDL attempt 1, netlistsvg attempt 1. Each final check reports
+Final drawings: schemdraw attempt 4, SKiDL attempt 1, netlistsvg attempt 4. Each final check reports
 every net above as OK, so all three results are PASS.
 
-Checks: `out/schemdraw/validation/case06/attempt-3.check.txt`,
+Checks: `out/schemdraw/validation/case06/attempt-4.check.txt`,
 `out/skidl/validation/case06/attempt-1.check.txt`,
-`out/netlistsvg/validation/case06/attempt-1.check.txt`.
+`out/netlistsvg/validation/case06/attempt-4.check.txt`.
 
 ## Case 7: two ICs with decoupling
 
@@ -167,12 +167,15 @@ R3 resistor 4.7k.
 | SDA | R2[2], U1[27], U2[5] |
 | SCL | R3[2], U1[28], U2[6] |
 
-Final drawings: schemdraw attempt 3, SKiDL attempt 4, netlistsvg attempt 1. Each final check reports
+Final drawings: schemdraw attempt 4, SKiDL attempt 4, netlistsvg attempt 2. Each final check reports
 every net above as OK, so all three results are PASS.
 
-Checks: `out/schemdraw/validation/case07/attempt-3.check.txt`,
+SKiDL case 7 is a tool failure: the passives are stacked behind U1, so only the two ICs are visible. The
+attempt is kept as the tool's honest final, and its check still PASS.
+
+Checks: `out/schemdraw/validation/case07/attempt-4.check.txt`,
 `out/skidl/validation/case07/attempt-4.check.txt`,
-`out/netlistsvg/validation/case07/attempt-1.check.txt`.
+`out/netlistsvg/validation/case07/attempt-2.check.txt`.
 
 ## Case 8: differential pair
 

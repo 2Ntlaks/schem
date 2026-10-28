@@ -100,3 +100,118 @@ disk and rebuildable with the commands above.
    the README or to a script?
 3. SKiDL case 7's fallback hides eight parts. I kept it as the tool's honest output rather than editing the
    drawing. Is that acceptable for the comparison, or should the case be marked as a tool failure on the page?
+
+## Rework after the lead's Part A review
+
+This section records the rework the lead asked for after reading the Part A report. Where it conflicts
+with the earlier text above, this section is the current state. The branch is still
+`deepseek/step2-showcase`; Part A only, Part B not started.
+
+### 1. schemdraw case 6: R1 now ends at the tap
+
+Attempt 3 drew R1 from (5.6, 7) to its default end near 8.6 and then tapped the base wire at 7.5, so the
+base wire left the middle of R1's lead and about 1.1 units of that lead dangled.
+
+Attempt 4 (`baselines/scripts/schemdraw/validation/case06/attempt-4.py`) draws R1 with
+`elm.Resistor().at((5.6, 7)).to((7.5, 7))` and starts the base wire at `r1.end`. The check is PASS and the
+zoom on R1 shows no dangling lead. Attempt 4 is the new final.
+
+The long 5 V and GND rails at the right of that drawing still end in space. That is a separate known
+defect and is listed in `baselines/LOG.md`.
+
+### 2. netlistsvg revisions within the budget
+
+Only per-case config keys were used: `parts.<ref>.dirs`, `parts.<ref>.type` and `parts.<ref>.title`. The
+tool-wide settings (`splitKinds`, `noSplitNets`) were not touched.
+
+- **Case 1**: attempt 1 ran the battery value "470" into B1. Attempt 2 changes R1 to the skin's horizontal
+  resistor (`r_h`), so the ref and value sit above and below the body. Check PASS. The rectangular body is a
+  style difference from the zigzag `r_v` used elsewhere; that is noted in `baselines/LOG.md`. Attempt 2 is
+  the new final.
+- **Case 3**: attempt 2 swapped R1's `dirs` and changed nothing. Attempt 3 made R1 horizontal (`r_h`), which
+  clears the text but wraps the SUM net in a closed rectangle around R1, with R1's lead crossing that wire.
+  Attempt 4 (horizontal R1 plus `dirs`) is identical to attempt 3. All checks PASS, but both horizontal
+  versions are more misleading than the text collision, so attempt 1 stays the final and the collision is
+  listed as a known defect.
+- **Case 4**: attempt 3 set M1 to 1=input, 2=output; the M1 title is still crossed and the top of the drawing
+  becomes a tangle of long wires. Attempt 4 set M1 to 1=output, 2=input; M1 then sits beside Q4 and its title
+  runs into Q4's "drain" label. Both checks PASS, but both are worse than attempt 2, which stays the final
+  with the M1 title crossing reported.
+- **Case 6**: attempt 2 (`dirs`) moved the 5 V symbols but the titles still crossed wires and a pin label ran
+  into GND. Attempt 3 shortened the titles to "U1 ESP32" and "K1 relay" and both clear the wires. Attempt 4
+  uses "U1 ESP32" and "K1 5 V relay", so the relay voltage is kept and only the part numbers are lost. Both
+  checks PASS; attempt 4 is the new final, and the missing part numbers are listed as a known defect.
+- **Case 7**: attempt 2 shortens the titles to "U1 ATmega328P" and "U2 24LC256", which removes the repeated
+  part numbers and the long overhang. Check PASS. The titles still sit just above the VCC pin labels; that is
+  the generic skin's fixed title position and is listed as a known defect. Attempt 2 is the new final.
+
+The totals in `baselines/LOG.md` are now schemdraw 27 attempts, SKiDL 16 and netlistsvg 19, each within the
+budget of 1 plus at most 3 revisions per case.
+
+### 3. schemdraw case 7: SDA and SCL labels off the wires
+
+The full-size re-review found that attempt 3 placed the SDA and SCL labels with `S.label(loc="top")` and
+`S.label(loc="bottom")` but the bus wires still ran through the middle of both words. Attempt 4
+(`baselines/scripts/schemdraw/validation/case07/attempt-4.py`) uses free text above SDA and below SCL
+instead. Check PASS. Attempt 4 is the new final.
+
+### 4. All 24 finals re-reviewed
+
+I re-opened every `final.png` at full size and zoomed the places where text sits near a wire or a part. The
+review corrected several earlier "clean" verdicts in `baselines/LOG.md` and added the defects it found:
+
+- schemdraw case 6 (R1 lead, before the fix above) and case 7 (SDA/SCL labels, fixed above).
+- SKiDL case 1: the PWR net label sits on the top frame line.
+- SKiDL case 2: C1's "100n" value runs into the top-left corner of R2's body.
+- SKiDL case 3: V1's "1V" overlaps V2's "V2" and the vertical GND label.
+- SKiDL case 4: J1's five series resistors and their pin labels overlap at the top right; R5's "10k" sits on
+  its own wire; two "12V" texts collide near B1.
+- SKiDL case 5: U2's box touches the left frame; U1 is squeezed between the two sensors and its value crosses
+  a wire; R1's "4.7k" sits on its body.
+- SKiDL case 6: U1's "ESP32-DevKitC V4" value is crossed by a vertical wire.
+- SKiDL case 8: Q3's "2N3906" value is crossed by its emitter wire.
+- netlistsvg case 3: R1's text crosses the feedback wire; two long source wires cross the middle.
+- netlistsvg case 4: the M1 title is crossed by two vertical wires.
+- netlistsvg case 6 and case 7: the shortened titles named above.
+
+The SKiDL finals were not revised again, because the review asked for corrected verdicts, not new SKiDL
+attempts. Every one of the 24 final checks still reports `RESULT PASS`.
+
+### 5. SKiDL case 7 marked as a tool failure
+
+SKiDL case 7 is now marked in `baselines/LOG.md` and `baselines/CONNECTIONS.md` as: "tool failure: passives
+stacked behind U1, only the two ICs visible". The attempt is kept as the tool's honest final and its check
+still PASS, but the drawing is not presented as a fair comparison.
+
+### Files changed in the rework
+
+- `baselines/scripts/schemdraw/validation/case06/attempt-4.py` (new).
+- `baselines/scripts/schemdraw/validation/case07/attempt-4.py` (new).
+- `baselines/LOG.md`: attempt counts, status table, new attempt entries, corrected verdicts, known defects.
+- `baselines/CONNECTIONS.md`: final attempt numbers (schemdraw 6 and 7 attempt 4, netlistsvg 1 attempt 2,
+  6 attempt 4, 7 attempt 2) and the SKiDL case 7 tool-failure note.
+- `docs/agent-reports/deepseek-step2-showcase.md`: this section.
+
+As before, every image, SVG, check file, `final.png` and netlistsvg config under `baselines/out/` stays out
+of the commit, because the repo ignores `out/` directories. They are on disk and rebuildable with the
+commands in `baselines/README.md`.
+
+### Commands run in the rework
+
+- `baselines/scripts/run_schemdraw.sh validation 06 4`: check PASS.
+- `baselines/scripts/run_schemdraw.sh validation 07 4`: check PASS.
+- `baselines/scripts/run_netlistsvg.sh validation 01 2`: check PASS.
+- `baselines/scripts/run_netlistsvg.sh validation 03 {2,3,4}`: check PASS for each.
+- `baselines/scripts/run_netlistsvg.sh validation 04 {3,4}`: check PASS for each.
+- `baselines/scripts/run_netlistsvg.sh validation 06 {2,3,4}`: check PASS for each.
+- `baselines/scripts/run_netlistsvg.sh validation 07 2`: check PASS.
+- `npm run typecheck`: passed, no output from `tsc`.
+- `npm test`: 16 test files, 449 tests, all passed.
+- `npm run phase0`: all eight validation cases `valid`; the run reports gates 1 to 6 as incomplete because
+  the owner ratings and the test subset are not part of this runner.
+
+Each copied `final.png` was hash-checked against its attempt PNG and matched.
+
+### Skipped
+
+Nothing from the lead's review was skipped. The SKiDL finals were not redrawn, as explained in item 4.

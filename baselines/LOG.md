@@ -33,19 +33,19 @@ ATtiny85 board) or forced by bugs in the harness, and they apply to every case e
 
 All eight validation cases have a `final.png` for all three tools. All 24 final checks PASS.
 
-Attempts used: schemdraw 25 (max 4 in a case), SKiDL 16 (max 4), netlistsvg 9 (max 2). Two further SKiDL runs
+Attempts used: schemdraw 27 (max 4 in a case), SKiDL 16 (max 4), netlistsvg 19 (max 4). Two further SKiDL runs
 failed in the harness before producing an image (see case 4 and case 7 below); they are not counted as attempts.
 
 | Case | schemdraw final | SKiDL final | netlistsvg final |
 |---|---|---|---|
-| 1 | 3: "+" beside the positive plate | 1: clean wired loop | 1: clean split-power loop |
-| 2 | 3: VOUT and "+" clear of wires | 1: clean divider and follower | 1: clean |
-| 3 | 1: clean summing amplifier | 1: readable summer | 1: readable summer, no overlaps |
-| 4 | 4: all part labels clear of wires | 4: best of four seeds, parts separated | 2: transistor ports on logical sides |
-| 5 | 4: pull-up labels off the buses | 1: only seed with U1 not squeezed | 1: clean |
-| 6 | 3: U1 value fits, relay labelled | 1: full relay circuit drawn cleanly | 1: clean |
-| 7 | 3: labels clear, orthogonal leads | 4: ICs clear, passives hidden | 1: all parts drawn, titles busy |
-| 8 | 4: labels clear, mirror wire orthogonal | 1: clean pair and mirror | 1: clean pair and mirror |
+| 1 | 3: "+" beside the positive plate | 1: wired loop; PWR label on the frame | 2: R1 horizontal, 470 clear of B1 |
+| 2 | 3: VOUT and "+" clear of wires | 1: C1 value runs into R2 | 1: clean |
+| 3 | 1: clean summing amplifier | 1: V1 label collides with V2 | 1: readable summer; R1 text crosses Rf wire |
+| 4 | 4: all part labels clear of wires | 4: ICs separated, J1 pile at top right | 2: logical port sides; M1 title crossed |
+| 5 | 4: pull-up labels off the buses | 1: U1 squeezed, R1 value on its body | 1: clean |
+| 6 | 4: R1 ends at the tap | 1: relay drawn; U1 value crossed | 4: titles clear of 5V/GND |
+| 7 | 4: SDA/SCL labels off the wires | 4: ICs only, passives hidden (tool failure) | 2: shorter titles, less crowding |
+| 8 | 4: labels clear, mirror wire orthogonal | 1: pair and mirror; Q3 value crossed | 1: clean pair and mirror |
 
 ## Attempts
 
@@ -83,8 +83,11 @@ Case 6:
 - a1: U1 value "ESP32-DevKitC" ran into the IO26 pin name; K1 had no visible label; the load header was too
   cramped for COM/NO/NC.
 - a2: value shortened to "ESP32-DevKitC" (still too wide), K1 label added, roomy three-pin load box.
-- a3: value shortened to "ESP32"; the rest unchanged. Chosen. One NC/NO wire crossing remains, drawn without a
-  junction dot.
+- a3: value shortened to "ESP32"; the rest unchanged. One NC/NO wire crossing remains, drawn without a junction
+  dot. R1 also ran from 5.6 to its default end near 8.6 while the R2/Q1 base wire tapped at 7.5, so the base wire
+  left the middle of R1's lead and the last part of the lead dangled.
+- a4: R1 ends at the tap (5.6 to 7.5) and the base wire starts at its end. Check PASS. Chosen. The two long 5 V and
+  GND rails still end in space at the right (see known defects).
 
 Case 7:
 - a1: each capacitor on its own 5 V symbol; four symbols and labels crowded J1's wire, and U1's top pin labels
@@ -92,7 +95,9 @@ Case 7:
 - a2: shared 5 V rail and wider pin spacing; element labels on the vertical capacitors flipped to the rail side,
   putting C2/C4 values on the rail.
 - a3: capacitor labels as free text under the ground symbols, resistor labels beside the bodies, J1 leads
-  orthogonal. Chosen.
+  orthogonal. The SDA and SCL labels used `S.label(..., loc="top")` and `S.label(..., loc="bottom")`, but the bus
+  wires still ran through the middle of both words.
+- a4: SDA and SCL are free text above and below their wires instead. Check PASS. Chosen.
 
 Case 8:
 - a1: source labels sat on wires and the mirror connection ran diagonally.
@@ -107,13 +112,15 @@ Cases 1, 2, 3, 5, 6 and 8 drew in wired mode at attempt 1 and were accepted afte
 failed wired routing and fell back to label mode; their revisions explored seeds and thresholds.
 
 Case 1:
-- a1: wired, clean LED loop. Chosen.
+- a1: wired LED loop; the circuit is small on the sheet and the PWR label sits on the top frame line. Chosen.
 
 Case 2:
-- a1: wired, clean divider and buffer; C1 and R2 labels are close but do not overlap. Chosen.
+- a1: wired divider and buffer; C1's "100n" value runs into the top-left corner of R2's body. Chosen with that
+  defect.
 
 Case 3:
-- a1: wired; the three sources and their resistors are readable, with long supply wires but no overlaps. Chosen.
+- a1: wired; the three sources and their resistors are readable, with long supply wires. V1's "1V" overlaps V2's
+  "V2" and the vertical GND label beside them. Chosen with that defect.
 
 Case 4:
 - a1: wired routing failed (`RoutingFailure`); the fallback drew the bridge as a vertical chain, the drive header
@@ -123,18 +130,21 @@ Case 4:
   scattered the parts, worse than a1.
 - a3: seed 3, `auto_stub` on. The parts separated into a horizontal chain, but Q3/R7 and the Q1/M1 pair still
   overlap.
-- a4: seed 4, `auto_stub` on. Best separation of the four: Q3, R7, Q1, M1, Q2 and Q4 are each visible, though
-  R5's value sits on R7 and two "12V" texts collide. Chosen.
+- a4: seed 4, `auto_stub` on. Best separation of the four: Q3, R7, Q1, M1, Q2 and Q4 are each visible. J1's five
+  series resistors and their pin labels are still a pile at the top right, R5's "10k" sits on its own down wire,
+  and two "12V" texts collide near B1. Chosen with those defects.
 
 Case 5:
-- a1: wired; all parts drawn, but the U2 and U3 boxes touch the sheet frame and their values are clipped at the
-  edges. The I2C wires loop on the right.
+- a1: wired; all parts drawn. U2's box touches the left frame. U1 is squeezed into a narrow box between the two
+  sensors, its "ESP32-DevKitC" value crosses a wire, and R1's "4.7k" value sits on R1's body. The I2C wires loop
+  on the right.
 - a2: seed 2. U1 squeezed between the sensors, labels stacked on its pins, more crossed wires. Worse.
 - a3: seed 3. Same squeezed U1 and clipped outer boxes. No better.
 - a1 chosen.
 
 Case 6:
-- a1: wired, clean: relay with coil and contact, flyback diode, NPN, base resistor and load connector. Chosen.
+- a1: wired: relay with coil and contact, flyback diode, NPN, base resistor and load connector. U1's
+  "ESP32-DevKitC V4" value is crossed by a vertical wire near its right end. Chosen with that defect.
 
 Case 7:
 - a1: wired routing failed; the fallback stacked C1-C4, R1-R3 and J1 at one point behind U1, so the drawing
@@ -143,38 +153,63 @@ Case 7:
   slightly different IC placement. (The first run of this attempt hit the same `expansion_factor` `TypeError` as
   case 4 and drew nothing.)
 - a3: seed 3, `auto_stub` on. Same defect, U1 one step lower.
-- a4: seed 4, `auto_stub` on. The two ICs have the most room of the four; the passives are still hidden. Chosen
-  as the least crowded, with the defect reported.
+- a4: seed 4, `auto_stub` on. The two ICs have the most room of the four, but the passives are still hidden. Tool
+  failure: passives stacked behind U1, only the two ICs visible. Chosen as the least crowded; defect reported.
 
 Case 8:
-- a1: wired, all parts drawn; RL's label overlaps its body slightly. Chosen.
+- a1: wired, all parts drawn; Q3's "2N3906" value is crossed by its emitter wire. Chosen with that defect.
 
 ### netlistsvg
 
 Case 1:
-- a1: clean loop; the 5 V net becomes two PWR symbols under the tool-wide split setting. Chosen.
+- a1: loop; the 5 V net becomes two PWR symbols under the tool-wide split setting, but "470" runs into the B1
+  circle.
+- a2: R1 uses the skin's horizontal resistor (`r_h`), so its ref and value sit above and below the body, clear of
+  B1. Check PASS. Chosen. The rectangular body differs from the zigzag `r_v` used in other cases; that is a style
+  choice, not a connection change.
 
 Case 2:
 - a1: clean; op-amp, feedback and load all readable. Chosen.
 
 Case 3:
-- a1: no overlapping text or parts, but long wires from the two outer sources cross the middle. Chosen.
+- a1: the only text collision is R1's "R1" and "10k", which cross the feedback wire beside Rf; long wires from the
+  two outer sources also cross the middle.
+- a2: R1's `dirs` swapped to A=output, B=input. The drawing is unchanged; the label still crosses the wire.
+- a3: R1 changed to the horizontal `r_h`. The text is now above and below the body and clear, but the SUM net is
+  routed as a closed rectangle around R1 and R1's left lead crosses the SUM wire without a junction dot. That is
+  more misleading than the text collision.
+- a4: a3 plus R1 `dirs` A=input, B=output. The drawing is identical to a3. Check PASS.
+  a1 kept as final; the Rf-wire text collision is reported.
 
 Case 4:
 - a1: all transistor ports defaulted to outputs, so each generic box had its three ports on one side and many
   wires crossed the sheet.
 - a2: `dirs` set to gate=input, source=input, drain=output for Q1-Q4, and J1's four drive pins to output. The
-  bridge lays out with Q3/Q4 on the right and clearly fewer crossings. Chosen.
+  bridge lays out with Q3/Q4 on the right and clearly fewer crossings. The M1 title "M1 12 V DC motor" is crossed
+  by two vertical wires.
+- a3: M1's pins set 1=input, 2=output. M1 moved to the far right, but its title is still crossed by the vertical
+  wire through "motor", and the bridge now has long crossing wires across the top.
+- a4: M1's pins set 1=output, 2=input. M1 sits beside Q4 and its title runs into Q4's "drain" label. Worse.
+  a2 kept as final; the M1 title crossing is reported.
 
 Case 5:
 - a1: clean; both sensors and both pull-ups clear, buses straight. Chosen.
 
 Case 6:
-- a1: clean; relay, flyback, transistor and load readable. Chosen.
+- a1: relay, flyback, transistor and load readable, but the U1 title crosses the 5 V wire and the K1 title crosses
+  the GND and 5 V wires.
+- a2: U1's 5 V pin set to output and K1's A1 to input. The 5 V symbols moved, but the titles still cross wires and
+  the A1 label now runs into the GND text. Worse.
+- a3: titles shortened to "U1 ESP32" and "K1 relay". Both clear the wires. Check PASS.
+- a4: titles set to "U1 ESP32" and "K1 5 V relay", keeping the relay voltage and losing only the part numbers.
+  Clear of the wires. Check PASS. Chosen; the shortened titles are noted in the known defects.
 
 Case 7:
-- a1: all parts drawn. U1/U2 titles sit close to their pin names and the SDA wire passes near the U2 title, but
-  no overlap hides a connection. Chosen.
+- a1: all parts drawn. U1/U2 titles repeat the part number and crowd their pin names; the SDA wire passes near the
+  U2 title.
+- a2: titles shortened to "U1 ATmega328P" and "U2 24LC256", removing the duplicate part numbers and the long
+  overhang. Check PASS. Chosen; the titles still sit just above the VCC labels, which is the skin's fixed title
+  position.
 
 Case 8:
 - a1: clean pair and mirror. The OUT rail (Q2[C], Q4[C], RL[1]) and +12 V (Q3[E], Q4[E], V2[+]) are separate
@@ -182,12 +217,29 @@ Case 8:
 
 ## Known defects in the finals
 
-These are left in place because the tool, not the harness, produced them, and the budget is spent:
+These are left in place because the tool, not the harness, produced them, and the budget is spent (or the defect is
+in the tool's fixed symbol drawing):
 
-- SKiDL case 4: R5's value sits on R7 and two "12V" labels collide. The bridge is otherwise separated.
-- SKiDL case 5: the U2 and U3 boxes touch the sheet frame and their values are clipped.
-- SKiDL case 7: C1-C4, R1-R3 and J1 are stacked at one point behind U1, so only the two ICs are visible.
-- netlistsvg case 3: two long source wires cross the middle of the drawing.
+- schemdraw case 6: the long 5 V and GND rails end in space at the right. One NC/NO wire crossing is drawn without
+  a junction dot, which is correct because the nets are not joined.
+- SKiDL case 1: the PWR net label sits on the top frame line. The circuit itself is clear.
+- SKiDL case 2: C1's "100n" value runs into the top-left corner of R2's body.
+- SKiDL case 3: V1's "1V" overlaps V2's "V2" and the vertical GND label beside them.
+- SKiDL case 4: J1's five series resistors and their pin labels overlap at the top right; R5's "10k" sits on its
+  own down wire; two "12V" texts collide near B1.
+- SKiDL case 5: U2's box touches the left frame; U1 is squeezed between the two sensors and its value crosses a
+  wire; R1's "4.7k" sits on R1's body.
+- SKiDL case 6: U1's "ESP32-DevKitC V4" value is crossed by a vertical wire near its right end.
+- SKiDL case 7: tool failure: passives stacked behind U1, only the two ICs visible. Kept as the final.
+- SKiDL case 8: Q3's "2N3906" value is crossed by its emitter wire.
+- netlistsvg case 3: R1's "R1" and "10k" text crosses the feedback wire beside Rf, and two long source wires cross
+  the middle of the drawing. The horizontal R1 revision removed the text collision but wrapped R1 in a closed SUM
+  loop with a wire crossing its lead, which is more misleading.
+- netlistsvg case 4: the M1 title "M1 12 V DC motor" is crossed by two vertical wires.
+- netlistsvg case 6: the titles were shortened to "U1 ESP32" and "K1 5 V relay" to clear the 5 V and GND wires, so
+  the part numbers "DevKitC V4" and "SRD-05VDC-SL-C" are no longer shown.
+- netlistsvg case 7: the shortened titles still sit directly above the VCC pin labels; that is the generic skin's
+  fixed title position.
 
 ## Note for the judge kit
 
