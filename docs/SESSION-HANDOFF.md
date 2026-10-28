@@ -2,7 +2,13 @@
 
 For the next Claude Code session (any account) that continues Phase 0b. Read this first, then `SPEC.md` (rev C.3), `docs/PHASE0B-NOTES.md`, `phase0/HANDOFF.md`.
 
-Last updated: 2026-10-26, by the lead session on account 4.
+Last updated: 2026-10-28.
+
+## Update 2026-10-28: both branches merged
+
+The templates branch and the gate 6 branch are on `main` (`6fe468c`, `09cffef`). The branch table below is history. Current state: 449 tests pass; validation cases 1-8 all `valid`; 12 of 12 validation edits pass gate 4; gate 6 passes (generated 30-part circuit warm p95 about 1.8 s). Merge fixes and the speed-up are in `docs/PHASE0B-NOTES.md` (last two sections). Next: the steps under "Next steps after the branches land", from step 2.
+
+The owner chose the **MIT licence** and plans to open the repo to contributors once it can be shown off: README with comparison pictures, one-command try-out, LICENSE, CONTRIBUTING, good-first-issue list (symbols, modules, example circuits, templates), docs tidied.
 
 ## Standing rules
 
