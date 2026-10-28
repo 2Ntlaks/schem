@@ -53,8 +53,8 @@ export function changeReport(
     parts,
     untouched: {
       count: untouchedIds.length,
-      meanMove: moves.length ? round(moves.reduce((a, b) => a + b, 0) / moves.length) : 0,
-      maxMove: moves.length ? round(Math.max(...moves)) : 0,
+      meanMove: moves.length ? roundUp(moves.reduce((a, b) => a + b, 0) / moves.length) : 0,
+      maxMove: moves.length ? roundUp(Math.max(...moves)) : 0,
       turned: untouchedIds.filter((id) => parts[id]!.turned),
     },
     lockedMoved,
@@ -74,4 +74,5 @@ export function stabilityBreaks(r: ChangeReport): string[] {
 }
 
 function norm(k: string): number { const [x, y] = k.split(",").map(Number); return Math.abs(x!) + Math.abs(y!); }
-function round(n: number): number { return Math.round(n * 100) / 100; }
+/** Two decimals, rounded up, so a value just over a stability limit never reads as the limit itself. */
+function roundUp(n: number): number { return Math.ceil(n * 100 - 1e-9) / 100; }
