@@ -1,5 +1,7 @@
 # Phase 0b: build notes
 
+For the later gate-reporting, decoupling-slot and PNG-scale changes, see [2026-10-25 build progress](PHASE0B-PROGRESS-2026-10-25.md). The notes below describe the earlier implementation snapshot.
+
 Status on 2026-10-23: the parts of Phase 0b that do not depend on the frozen cases are built: edit operations, incremental mode and the minimal findings harness. Templates, the baselines and the gate run wait for the case freeze (`phase0/`, written by agent B).
 
 ## What is built
@@ -99,7 +101,16 @@ Built 2026-10-25 for the frozen cases (`phase0/HANDOFF.md`, "What Phase 0b must 
 
 ### `npm run phase0`
 
-Reads `phase0/cases/validation/*.json` and the edit scripts for cases 3, 5 and 7, whose file names it builds from the case numbers (it never lists `phase0/cases/edits/`). `--test` adds `phase0/cases/test/` and the case 11 scripts, for the end gate only. A case with a part type the layout cannot draw is reported as `missing symbol: X` (none since the 0b symbols landed); any other failure is reported per case, and the run exits 1 only on a crash or a drawing the verifier rejects. Output: `out/phase0/validation/<case>.svg|png` and `summary.json`; `out/phase0/edits/<script>.before.svg|png`, `.after.svg|png` and `summary.json` with the gate 4 figures and both affected-part lists. Cases 1, 3 and 5 draw byte-identical SVG and PNG to `npm run draw` on `cases/`.
+Reads `phase0/cases/validation/*.json` and the edit scripts for cases 3, 5 and 7, whose file names it builds from the case numbers (it never lists `phase0/cases/edits/`). `--test` adds `phase0/cases/test/` and the case 11 scripts, for the end gate only. A case with a part type the layout cannot draw is reported as `missing symbol: X` (none since the 0b symbols landed); any other failure is reported per case, and the run exits 1 on a crash, a drawing the verifier rejects, or a gate the validation subset already fails; it also writes `out/phase0/gates.json` (`scripts/lib/phase0-gates.ts`), where ratings and benchmarks stay explicitly incomplete. Output: `out/phase0/validation/<case>.svg|png` and `summary.json`; `out/phase0/edits/<script>.before.svg|png`, `.after.svg|png` and `summary.json` with the gate 4 figures and both affected-part lists. Cases 1, 3 and 5 draw byte-identical SVG and PNG to `npm run draw` on `cases/`.
+
+### `npm run gates`
+
+`scripts/gates.ts` measures the SPEC 15 Phase 0b gates; the gate arithmetic is `scripts/lib/gate-math.ts` (tested in `tests/gates.test.ts`), and the case and edit runs are shared with `npm run phase0` in `scripts/lib/case-run.ts`. Default mode: validation cases 1-8 and the edit scripts of cases 3, 5 and 7; `--test` (end gate only) adds cases 9-12 and the case 11 scripts. Every gate is "k of n": a run that has not measured everything still says `pass` or `fail` when the missing items cannot change the result, else `incomplete`. Exit 1 on any `fail` or crash. Output in `out/gates/<set>/` (`gates.json`, drawings, findings, edits, renders, packs).
+
+- **Gate 1**: verifier valid and status `valid`, or `valid_low_confidence` on case 8 only.
+- **Gate 4**: a saved edit passes when its change report has no breaks; a rejected edit fails, except case 3's `setPinSides` (SPEC 15).
+- **Gate 6**: the full pipeline (layout, layers 1-4, `review()` with its fix dry-runs), 1 cold + `--runs` (7) warm runs, median and p95; pass = warm p95 < 3 s (SPEC 13 item 11). Circuits: case 11 (`--test` only; the default mode times the largest validation case on the same code path, for information) and `generate(30, 16)` from `tests/support/generate.ts` (the first seed with exactly 30 parts and at most 150 pins: 30 parts, 68 pins).
+- **Gates 2, 3, 5** (decision): each case is drawn as `schem-noedit` and `schem-edit`. The edit call is `<agent-edits>/caseNN.json` (default `out/gates/<set>/agent-edits/`, edit-script shape, at most 3 visual operations, no `lock` with `at`) when an agent wrote one from `findings/caseNN.json`; otherwise the runner stands in for the agent with the first checked fix that has no trade-off and does not change the circuit; with none, the after-edit drawing is the no-edit one. A refused call also leaves the no-edit drawing. Baselines come from `baselines/out/<tool>/<set>/caseNN/final.png`, looked up by the ids of the cases the run drew. All go into one pack (`phase0/judge/blind-pack.ts`, `--pairs ours` by default) in `packs/panel-<hash of images, seed, judges, pairs>`, so an unchanged run reuses the pack and keeps the answers in it. `--ratings owner.json` (judge-answer shape; its `pack` names the pack) runs `phase0/judge/tally.ts` and decides the gates on the owner's scores; with judge answers only, on the panel median, marked as an estimate. Gates 2, 3 and 5 use the **after-edit** score; gate 5 counts a case once ours and at least one baseline are rated, and a tie with the best baseline is a success.
 
 ## Templates (SPEC 9.4)
 
@@ -183,3 +194,15 @@ The three remaining templates are switched on, each with a test circuit in `test
 Case 6 stays at 3 crossings: with J1's pins in the order COM, NO, NC and both NO and NC leaving the top of the relay on one side, every route that stays near the relay crosses three times; one crossing needs loops round J1.
 
 **Open question for the owner:** a named power net with two endpoints and no source (a motor and its flyback diode on a 12 V net, nothing else) is drawn as a plain wire (SPEC 9.2 step 2 item 1), so the drawing never shows "12V". With a source or connector on the net (3+ endpoints) it gets ports. Should a two-endpoint power net with no source part keep a port so its name shows?
+
+### Merge with the decoupling child slots (2026-10-28)
+
+`main` (the owner's decoupling child slots, `522217b`, and the gate runner) merged into the templates branch. Host envelopes in the template engine include the child slots (`clusterEnv`); the templates' own decoupling stub is gone. Four interactions fixed on the way, all tests unchanged except the one noted:
+
+- **I2C peripheral supply pin on top.** The I2C template put a peripheral's `power_in` pins on the right, so case 7's U2 VCC faced right and its capacitors C3, C4 got no slot (62 G away). The template now puts them on top after SCL and SDA, where the trunks end. `tests/templates.test.ts` (A.2) asserted the old side and now asserts the new one.
+- **Room beside a decoupled top pin.** Two capacitors on one pin take both sides of it; at the 4 G pin pitch the inner one's label covered the wire into SDA and routing failed. A generated IC box now spaces a top pin with child slots from a neighbour without any (`icSymbol` `topGap`; 2 G to the capacitor, its outline, its label, 1 G clear). As a safety net, a child slot never covers the channel above another top pin of its host. Boxes without child slots draw byte-identical.
+- **Pin-sides edits keep the template's sides for unnamed pins.** `setPinSides` naming only U2's bottom pins used to drop the template's sides for every pin, so U2 changed shape and C3 jumped sides (8 G). Pins the edit, a fixed placement or the previous layout name follow that; the rest keep the template's side.
+- **A part that must make room moves right or down.** In incremental mode the margin constraints are off (owner's change), so when the solver dropped an untouched part's lower "previous" bound the part slid to the origin (case 3 longer value: V2 11 G). Upper bounds now have their own lower priority (`prevUp`, `prevAffectedUp`), as SPEC 9.5 and the solver comment intend.
+- A shared pin's slot fills left to right, smallest capacitance first, wherever the pin sits on the box.
+
+Result: 439 tests pass; validation cases 1-8 all `valid` (case 4 was `valid_low_confidence`); 12 of 12 validation edits pass gate 4. Case 8 (differential pair, no template) is still the weakest drawing.

@@ -91,7 +91,8 @@ describe("Appendix A.2 by the I2C template (case 5)", () => {
     for (const u of ["U2", "U3"]) {
       const [s, d] = [pinAt(r, u, "3"), pinAt(r, u, "4")];
       expect([s.dir, d.dir, s.at[0] < d.at[0], s.at[1] === pinAt(r, "U2", "3").at[1]]).toEqual(["up", "up", true, true]);
-      expect(pinAt(r, u, "1").dir).toBe("right");
+      // The supply pin is on top too, right of SDA, where the trunks end (room for decoupling).
+      expect([pinAt(r, u, "1").dir, pinAt(r, u, "1").at[0] > d.at[0]]).toEqual(["up", true]);
     }
     // Pull-ups vertical, side by side, R1 left of R2, their ends above the SDA trunk.
     const [r1, r2] = [pinAt(r, "R1", "2"), pinAt(r, "R2", "2")];

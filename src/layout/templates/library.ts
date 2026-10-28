@@ -133,7 +133,9 @@ const I2C: Template = {
       pins: [{ pin: "1", net: "SCL" }, { pin: "2", net: "RAIL" }] },
     { name: "periph", types: ["ic"], role: "link", many: { min: 1 }, rank: { offset: 2, step: 1 },
       pins: [{ pin: SDA, net: "SDA" }, { pin: SCL, net: "SCL" }],
-      sides: { top: [SCL, SDA], right: [{ role: "power_in" }], bottom: [{ role: "ground" }] } },
+      // Supply pins on top after SDA/SCL: the trunks end at the bus pins, left of the supply
+      // port, and a decoupling child slot (src/layout/decoupling.ts) can serve the pin.
+      sides: { top: [SCL, SDA, { role: "power_in" }], bottom: [{ role: "ground" }] } },
   ],
   interior: [
     rel("y", pin("pu2", net("RAIL")), "=", pin("pu1", net("RAIL")), 0, "pull-ups side by side"),
