@@ -28,6 +28,20 @@ ATtiny85 board) or forced by bugs in the harness, and they apply to every case e
 - **schemdraw**: hand-written per case; `scripts/schemdraw_kit.py` checks connections from the drawing geometry.
   Free `S.text` is used for ref/value labels that are not net names, because element labels on rotated parts flip
   sides unpredictably. Free text never joins nets, so it cannot hide a connection.
+- **tscircuit** (Part A, cases 1 and 3 only): conversion rules in `scripts/tscircuit_draw.mjs` header. Tool-wide
+  settings chosen on the two neutral circuits in `scripts/tscircuit/neutral/`, then left unchanged:
+  two-terminal passives horizontal (resistors, capacitors, polarised capacitors, inductors); a multi-pin signal
+  net drawn as a star from the pin whose part has the most net memberships; net names printed on signal traces;
+  power and ground nets as named rails. Default chip box sizes and tscircuit's own part placement are kept. The
+  neutral runs: `common-emitter` attempt 1 (default orientations) overlapped C1 and R2; attempt 3 with horizontal
+  passives removed the overlap (no layout warnings) but kept tscircuit's vertical signal labels, which overlap
+  some wires; attempt 5 repeated that setting and is the reference image. `attiny85` attempt 2 is the reference
+  image: real ATtiny pin numbers (VCC 8, GND 4) are shown, and the power section is placed as a separate cluster
+  joined by VCC/GND rails. Earlier neutral attempts kept for the record: common-emitter a2 (no signal net names:
+  tscircuit auto-labelled traces "Q1_base" and "C2_pin2", worse), a4 (rotating the capacitors changed nothing),
+  a6 (signal nets as `<net>`: tscircuit left some pins unrouted, check FAIL), attiny85 a1 (pin numbers were
+  ordinal 1-6, not the real package numbers) and a3 (chip boxes 3.2x2.4 made large mostly-empty boxes). Chip box
+  size and per-part rotation are available in the config but are not part of the default setting.
 
 ## Status after Part A
 
@@ -35,6 +49,9 @@ All eight validation cases have a `final.png` for all three tools. All 24 final 
 
 Attempts used: schemdraw 27 (max 4 in a case), SKiDL 16 (max 4), netlistsvg 19 (max 4). Two further SKiDL runs
 failed in the harness before producing an image (see case 4 and case 7 below); they are not counted as attempts.
+
+tscircuit is a separate later addition. Its Part A has attempt 1 on cases 1 and 3 only (both PASS) and no finals
+yet; the rest of the cases are Part B.
 
 | Case | schemdraw final | SKiDL final | netlistsvg final |
 |---|---|---|---|
@@ -215,6 +232,36 @@ Case 8:
 - a1: clean pair and mirror. The OUT rail (Q2[C], Q4[C], RL[1]) and +12 V (Q3[E], Q4[E], V2[+]) are separate
   nets and their wires do not touch. Chosen.
 
+### tscircuit (Part A: neutral circuits, then cases 1 and 3)
+
+Neutral circuits (not counted attempts; they chose the tool-wide settings above):
+- `common-emitter` a1: tscircuit's default orientation; C1 overlaps R2 (the layout prints "1 chip overlaps
+  detected in final layout: C1 overlaps R2"). Check PASS after fixing the check to join same-named net labels.
+- a2: signal net names off. tscircuit then auto-named unnamed traces "Q1_base", "C2_pin1", "C2_pin2"; the drawing
+  is no better. Not used.
+- a3: all resistors and capacitors horizontal. No overlap warning; readable part values. Keep.
+- a4: a3 plus C1/C2 rotation 180. Pixel-identical to a3; rotation has no effect on these symbols. Not used.
+- a5: default config with a3's orientations. Same as a3; reference image.
+- a6: signal nets as tscircuit `<net>` elements instead of traces. tscircuit left V2[+], R1[2], Q1[B], C2[1],
+  J1[1] unrouted; check FAIL. Not used.
+- `attiny85` a1: check PASS, but U1's box numbered its shown pins 1-6 (its position in the used set), not the
+  ATtiny package numbers. Fixed the converter.
+- a2: check PASS; U1 shows PB5/PB3/PB4 as 1/2/3 and VCC/PB0/GND as 8/5/4. Reference image.
+- a3: chip box 3.2x2.4; made three large, mostly empty boxes. Not used.
+
+Case 1:
+- a1: check PASS. Battery at left with a PWR rail on + and GND on -; R1 horizontal to the LED; the LED cathode
+  goes to a GND rail. Clean. This is the only attempt (Part A stops after attempt 1).
+
+Case 3:
+- a1: check PASS. The three sources and input resistors form one cluster; the op-amp with Rf and RL forms
+  another, joined by SUM, OUT and GND net labels. The summing node's SUM labels are vertical and one sits on a
+  wire; the op-amp's + input is tied to a boxed GND label. Honest tscircuit layout, no hand placement. This is
+  the only attempt (Part A stops after attempt 1).
+
+No `final.png` has been chosen for tscircuit yet: Part A ends after attempt 1, and the final choice belongs to
+Part B.
+
 ## Known defects in the finals
 
 These are left in place because the tool, not the harness, produced them, and the budget is spent (or the defect is
@@ -240,6 +287,9 @@ in the tool's fixed symbol drawing):
   the part numbers "DevKitC V4" and "SRD-05VDC-SL-C" are no longer shown.
 - netlistsvg case 7: the shortened titles still sit directly above the VCC pin labels; that is the generic skin's
   fixed title position.
+- tscircuit case 3: the SUM net labels are vertical, and the label at R2's right pin sits on the summing wire; the
+  sources/resistors and the op-amp/feedback are placed as two separate clusters joined only by net labels. These
+  are tscircuit's own layout choices. Case 1 has no known defect.
 
 ## Note for the judge kit
 

@@ -1,8 +1,9 @@
-# Baselines: SKiDL, netlistsvg and schemdraw
+# Baselines: SKiDL, netlistsvg, schemdraw and tscircuit
 
-These are independent drawings of the eight Phase 0 validation circuits, made with three open-source tools
+These are independent drawings of the eight Phase 0 validation circuits, made with four open-source tools
 that also turn a netlist into a schematic. They are the comparison side of the showcase; our engine's own
-drawings are made by `npm run phase0`.
+drawings are made by `npm run phase0`. tscircuit is being added in three parts; this file and the rest of the
+folder currently describe its Part A (setup, the neutral circuits, and attempt 1 on cases 1 and 3).
 
 - `LOG.md`: the attempt budget, the tool-wide settings, every attempt and the final choice per case.
 - `CONNECTIONS.md`: the nets each final drawing shows, taken from the final `.check.txt` files.
@@ -19,18 +20,21 @@ baselines/
     run_schemdraw.sh          run one schemdraw attempt
     run_skidl.sh              run one SKiDL attempt
     run_netlistsvg.sh         run one netlistsvg attempt
+    run_tscircuit.sh          run one tscircuit attempt
     rasterize.mjs             SVG -> PNG with the repo's resvg and DejaVu fonts
     skidl_draw.py             netlist -> SKiDL circuit -> generate_svg
     netlistsvg_draw.mjs       netlist -> Yosys JSON -> netlistsvg with the analog skin
+    tscircuit_draw.mjs        netlist -> tscircuit circuit JSON -> circuit-to-svg
+    tscircuit/neutral/*.json  the two neutral circuits that chose the tscircuit settings
     schemdraw_kit.py          drawing helpers plus the geometry-based connection check
     schemdraw/validation/caseNN/attempt-K.py   hand-written schemdraw code
   out/
-    _netlist/validation/caseNN.json            neutral netlist used by all three tools
+    _netlist/validation/caseNN.json            neutral netlist used by every tool
     <tool>/validation/caseNN/attempt-K.png     every attempt
     <tool>/validation/caseNN/attempt-K.svg     every attempt
     <tool>/validation/caseNN/attempt-K.check.txt
     <tool>/validation/caseNN/final.png         the chosen attempt
-    <tool>/validation/caseNN/attempt-K.config.json   SKiDL and netlistsvg inputs
+    <tool>/validation/caseNN/attempt-K.config.json   SKiDL, netlistsvg and tscircuit inputs
 ```
 
 `baselines/out/` is generated and is gitignored (the repo ignores every `out/` directory). The scripts and
@@ -39,7 +43,7 @@ logs are tracked; rerun the steps below to rebuild the images.
 ## Rerun
 
 Run from the repo root in Git Bash. Install the tools as `VERSIONS.md` describes, or set `SCHEM_BASELINES`
-to the folder that holds `venv` and `netlistsvg` (default `%USERPROFILE%\schem-baselines`).
+to the folder that holds `venv`, `netlistsvg` and `tscircuit` (default `%USERPROFILE%\schem-baselines`).
 
 1. Rebuild the neutral netlists. They are already on disk; this step is needed only when a case or its
    loader changes.
@@ -58,12 +62,20 @@ to the folder that holds `venv` and `netlistsvg` (default `%USERPROFILE%\schem-b
    baselines/scripts/run_skidl.sh validation 04 2
    baselines/scripts/run_netlistsvg.sh validation 04 2
    baselines/scripts/run_schemdraw.sh validation 04 2
+   baselines/scripts/run_tscircuit.sh validation 04 2
    ```
 
    Each runner writes `attempt-K.svg`, `attempt-K.png` and `attempt-K.check.txt` under
    `baselines/out/<tool>/validation/caseNN/`, then prints `check: PASS` or `check: FAIL`. The schemdraw
-   runner takes its code from `baselines/scripts/schemdraw/validation/caseNN/attempt-K.py`; the other two
+   runner takes its code from `baselines/scripts/schemdraw/validation/caseNN/attempt-K.py`; the others
    take an optional config file from the output folder and create an empty one if it is missing.
+
+   To run a tscircuit neutral circuit, pass `neutral` and the file name instead of a set and case number:
+
+   ```
+   baselines/scripts/run_tscircuit.sh neutral common-emitter 1
+   baselines/scripts/run_tscircuit.sh neutral attiny85 1
+   ```
 
 3. To make a chosen attempt final, copy it to `final.png` in the same folder:
 
@@ -82,8 +94,13 @@ The check answers one question: does the drawing show exactly the case's nets? I
   back to the case pin numbers and compares.
 - **netlistsvg** (`netlistsvg_draw.mjs`): builds the Yosys JSON input, joins bits through same-named supply
   symbols, maps the ports back to case pins and compares. It also checks that every cell appears in the SVG.
+- **tscircuit** (`tscircuit_draw.mjs`): reads only the schematic layer of the circuit JSON (schematic ports,
+  schematic traces, schematic net labels), joins same-named net labels, maps schematic ports back to case pins
+  through the source ports and compares. A pin with neither a wire nor a label stays alone and counts as
+  missing. The source netlist is used only for the expected groups and the pin names.
 
-A FAIL cannot be chosen as final. All 24 finals PASS; see `CONNECTIONS.md`.
+A FAIL cannot be chosen as final. All 24 finals of the first three tools PASS, and tscircuit's Part A attempts
+on cases 1 and 3 PASS; see `CONNECTIONS.md`.
 
 ## Config levers used in the revisions
 
@@ -97,6 +114,11 @@ A FAIL cannot be chosen as final. All 24 finals PASS; see `CONNECTIONS.md`.
 - **netlistsvg** (`attempt-K.config.json`): `splitKinds`, `noSplitNets`, `symbolOf`, and
   `parts.<ref>.dirs`, `generic`, `type`, `title`, `attributes`, `pins`, `value`. `dirs` is keyed by case pin
   number for generic boxes and by skin port for mapped parts.
+- **tscircuit** (`attempt-K.config.json`): `signalTopology` (`star` default or `chain`), `signalNetLabels`
+  (default true), `signalElements` (`trace` default or `net`), `orientations.<part type>` (default
+  `horizontal` for resistors, capacitors, polarised capacitors and inductors), `chip.width`/`chip.height`,
+  and `parts.<ref>.orientation`, `rotation`, `generic`, `schWidth`, `schHeight`. None of these sets a
+  coordinate or a trace path.
 
 The final drawings keep the tool's own layout. Where a tool's placer or router produced a bad result, the
 defect is recorded in `LOG.md` rather than patched by hand.

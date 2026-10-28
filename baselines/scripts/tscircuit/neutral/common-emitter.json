@@ -1,0 +1,195 @@
+{
+ "case": 0,
+ "set": "neutral",
+ "source": "self-written for the tscircuit baseline",
+ "title": "Neutral: common-emitter amplifier",
+ "parts": [
+  {
+   "id": "V1",
+   "type": "vsource",
+   "props": { "value": "12V" },
+   "label": "12V",
+   "moduleName": null,
+   "pinSource": "builtin",
+   "pins": [
+    { "number": "+", "name": "+", "role": "power_out" },
+    { "number": "-", "name": "-", "role": "power_out" }
+   ]
+  },
+  {
+   "id": "V2",
+   "type": "vsource",
+   "props": { "value": "20mV", "frequency": "1kHz" },
+   "label": "20mV 1kHz",
+   "moduleName": null,
+   "pinSource": "builtin",
+   "pins": [
+    { "number": "+", "name": "+", "role": "output" },
+    { "number": "-", "name": "-", "role": "output" }
+   ]
+  },
+  {
+   "id": "C1",
+   "type": "capacitor",
+   "props": { "value": "10u" },
+   "label": "10u",
+   "moduleName": null,
+   "pinSource": "builtin",
+   "pins": [
+    { "number": "1", "name": "1", "role": "passive" },
+    { "number": "2", "name": "2", "role": "passive" }
+   ]
+  },
+  {
+   "id": "R1",
+   "type": "resistor",
+   "props": { "value": "100k" },
+   "label": "100k",
+   "moduleName": null,
+   "pinSource": "builtin",
+   "pins": [
+    { "number": "1", "name": "1", "role": "passive" },
+    { "number": "2", "name": "2", "role": "passive" }
+   ]
+  },
+  {
+   "id": "R2",
+   "type": "resistor",
+   "props": { "value": "22k" },
+   "label": "22k",
+   "moduleName": null,
+   "pinSource": "builtin",
+   "pins": [
+    { "number": "1", "name": "1", "role": "passive" },
+    { "number": "2", "name": "2", "role": "passive" }
+   ]
+  },
+  {
+   "id": "Q1",
+   "type": "npn",
+   "props": {},
+   "label": "",
+   "moduleName": null,
+   "pinSource": "builtin",
+   "pins": [
+    { "number": "B", "name": "base", "role": "passive" },
+    { "number": "C", "name": "collector", "role": "passive" },
+    { "number": "E", "name": "emitter", "role": "passive" }
+   ]
+  },
+  {
+   "id": "R3",
+   "type": "resistor",
+   "props": { "value": "4k7" },
+   "label": "4k7",
+   "moduleName": null,
+   "pinSource": "builtin",
+   "pins": [
+    { "number": "1", "name": "1", "role": "passive" },
+    { "number": "2", "name": "2", "role": "passive" }
+   ]
+  },
+  {
+   "id": "C2",
+   "type": "capacitor",
+   "props": { "value": "10u" },
+   "label": "10u",
+   "moduleName": null,
+   "pinSource": "builtin",
+   "pins": [
+    { "number": "1", "name": "1", "role": "passive" },
+    { "number": "2", "name": "2", "role": "passive" }
+   ]
+  },
+  {
+   "id": "R4",
+   "type": "resistor",
+   "props": { "value": "10k" },
+   "label": "10k",
+   "moduleName": null,
+   "pinSource": "builtin",
+   "pins": [
+    { "number": "1", "name": "1", "role": "passive" },
+    { "number": "2", "name": "2", "role": "passive" }
+   ]
+  },
+  {
+   "id": "J1",
+   "type": "header",
+   "props": {},
+   "label": "",
+   "moduleName": null,
+   "pinSource": "builtin",
+   "pins": [
+    { "number": "1", "name": "OUT", "role": "passive" },
+    { "number": "2", "name": "GND", "role": "ground" }
+   ]
+  }
+ ],
+ "nets": [
+  {
+   "id": "n1",
+   "name": "VCC",
+   "kind": "power",
+   "members": [
+    { "part": "V1", "pin": "+", "name": "+", "role": "power_out", "written": "V1.+" },
+    { "part": "R1", "pin": "1", "name": "1", "role": "passive", "written": "R1.1" },
+    { "part": "R3", "pin": "1", "name": "1", "role": "passive", "written": "R3.1" }
+   ]
+  },
+  {
+   "id": "n2",
+   "name": "GND",
+   "kind": "ground",
+   "members": [
+    { "part": "V1", "pin": "-", "name": "-", "role": "power_out", "written": "V1.-" },
+    { "part": "V2", "pin": "-", "name": "-", "role": "output", "written": "V2.-" },
+    { "part": "R2", "pin": "2", "name": "2", "role": "passive", "written": "R2.2" },
+    { "part": "Q1", "pin": "E", "name": "emitter", "role": "passive", "written": "Q1.E" },
+    { "part": "R4", "pin": "2", "name": "2", "role": "passive", "written": "R4.2" },
+    { "part": "J1", "pin": "2", "name": "GND", "role": "ground", "written": "J1.GND" }
+   ]
+  },
+  {
+   "id": "n3",
+   "name": "IN",
+   "kind": "signal",
+   "members": [
+    { "part": "V2", "pin": "+", "name": "+", "role": "output", "written": "V2.+" },
+    { "part": "C1", "pin": "1", "name": "1", "role": "passive", "written": "C1.1" }
+   ]
+  },
+  {
+   "id": "n4",
+   "name": "BASE",
+   "kind": "signal",
+   "members": [
+    { "part": "C1", "pin": "2", "name": "2", "role": "passive", "written": "C1.2" },
+    { "part": "R1", "pin": "2", "name": "2", "role": "passive", "written": "R1.2" },
+    { "part": "R2", "pin": "1", "name": "1", "role": "passive", "written": "R2.1" },
+    { "part": "Q1", "pin": "B", "name": "base", "role": "passive", "written": "Q1.B" }
+   ]
+  },
+  {
+   "id": "n5",
+   "name": "COLLECTOR",
+   "kind": "signal",
+   "members": [
+    { "part": "Q1", "pin": "C", "name": "collector", "role": "passive", "written": "Q1.C" },
+    { "part": "R3", "pin": "2", "name": "2", "role": "passive", "written": "R3.2" },
+    { "part": "C2", "pin": "1", "name": "1", "role": "passive", "written": "C2.1" }
+   ]
+  },
+  {
+   "id": "n6",
+   "name": "OUT",
+   "kind": "signal",
+   "members": [
+    { "part": "C2", "pin": "2", "name": "2", "role": "passive", "written": "C2.2" },
+    { "part": "R4", "pin": "1", "name": "1", "role": "passive", "written": "R4.1" },
+    { "part": "J1", "pin": "1", "name": "OUT", "role": "passive", "written": "J1.OUT" }
+   ]
+  }
+ ],
+ "nc": []
+}

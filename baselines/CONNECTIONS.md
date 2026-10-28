@@ -7,12 +7,16 @@ The check is done per tool in the way that tool represents a drawing. schemdraw'
 connections from the drawn geometry (pin anchors, wire segments, supply symbols and net labels).
 SKiDL writes the netlist that its drawing used and maps it back to the case pin numbers. netlistsvg
 reads its own converter output, where power and ground nets become separate symbols that join by
-name. Every final check below reports each net as `OK` and ends with `RESULT PASS`.
+name. tscircuit reads the schematic part of its circuit JSON: schematic ports, schematic traces and
+schematic net labels, with same-named labels joined (tscircuit ends a short wire at a named label
+rather than routing a long wire). Every final check below reports each net as `OK` and ends with
+`RESULT PASS`.
 
 Unnamed nets have no label and are joined only by drawn wires. Named supply nets may be drawn as
 several symbols with the same name; those symbols are one net for a reader.
 
-All 24 finals: schemdraw 8, SKiDL 8, netlistsvg 8, all PASS.
+All 24 finals of the first three tools: schemdraw 8, SKiDL 8, netlistsvg 8, all PASS. tscircuit has
+attempt 1 on cases 1 and 3 in this part, both PASS; its other cases are Part B.
 
 ## Case 1: LED and resistor
 
@@ -27,11 +31,13 @@ Parts: B1 battery 9V, R1 resistor 470, D1 led red.
 | GND | D1[K], B1[-] |
 
 Final drawings: schemdraw attempt 3, SKiDL attempt 1, netlistsvg attempt 2. Each final check reports
-every net above as OK, so all three results are PASS.
+every net above as OK, so all three results are PASS. tscircuit attempt 1 also reports every net as
+OK (PASS); it has no final chosen yet.
 
 Checks: `out/schemdraw/validation/case01/attempt-3.check.txt`,
 `out/skidl/validation/case01/attempt-1.check.txt`,
-`out/netlistsvg/validation/case01/attempt-2.check.txt`.
+`out/netlistsvg/validation/case01/attempt-2.check.txt`,
+`out/tscircuit/validation/case01/attempt-1.check.txt`.
 
 ## Case 2: divider and buffer
 
@@ -70,11 +76,13 @@ R3 resistor 10k, Rf resistor 20k, U1 opamp, RL resistor 2k2.
 | GND | V1[-], V2[-], V3[-], U1[3], RL[2] |
 
 Final drawings: schemdraw attempt 1, SKiDL attempt 1, netlistsvg attempt 1. Each final check reports
-every net above as OK, so all three results are PASS.
+every net above as OK, so all three results are PASS. tscircuit attempt 1 also reports every net as
+OK (PASS); it has no final chosen yet.
 
 Checks: `out/schemdraw/validation/case03/attempt-1.check.txt`,
 `out/skidl/validation/case03/attempt-1.check.txt`,
-`out/netlistsvg/validation/case03/attempt-1.check.txt`.
+`out/netlistsvg/validation/case03/attempt-1.check.txt`,
+`out/tscircuit/validation/case03/attempt-1.check.txt`.
 
 ## Case 4: H-bridge motor driver
 
