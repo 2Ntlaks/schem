@@ -51,7 +51,7 @@ function fileLines(doc: { [k: string]: Json }): string[] {
     const one = `      ${compact(n)}${end}`;
     if (one.length <= 64) { lines.push(one); return; }
     const { endpoints, ...head } = n;
-    lines.push(`      ${compact(head).replace(/ \}$/, ",")}`, `        "endpoints": ${compact(endpoints)} }${end}`);
+    lines.push(`      ${compact(head).replace(/ \}$/, ",")}`, `        "endpoints": ${compact(endpoints!)} }${end}`);
   });
   lines.push("    ]", "  }", "}");
   return lines;
