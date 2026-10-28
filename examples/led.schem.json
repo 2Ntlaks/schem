@@ -1,0 +1,56 @@
+{
+  "schema": "schem/1.0",
+  "meta": {
+    "title": "LED with a current-limiting resistor"
+  },
+  "circuit": {
+    "parts": [
+      {
+        "id": "B1",
+        "type": "battery",
+        "props": {
+          "value": "9V"
+        }
+      },
+      {
+        "id": "R1",
+        "type": "resistor",
+        "props": {
+          "value": "470"
+        }
+      },
+      {
+        "id": "D1",
+        "type": "led",
+        "props": {
+          "color": "red"
+        }
+      }
+    ],
+    "nets": [
+      {
+        "id": "n1",
+        "name": "PWR",
+        "endpoints": [
+          "B1[+]",
+          "R1[1]"
+        ]
+      },
+      {
+        "id": "n2",
+        "endpoints": [
+          "D1[A]",
+          "R1[2]"
+        ]
+      },
+      {
+        "id": "n3",
+        "name": "GND",
+        "endpoints": [
+          "B1[-]",
+          "D1[K]"
+        ]
+      }
+    ]
+  }
+}

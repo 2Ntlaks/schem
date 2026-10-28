@@ -1,0 +1,172 @@
+{
+  "schema": "schem/1.0",
+  "meta": {
+    "title": "ESP32 with two I2C sensors"
+  },
+  "circuit": {
+    "parts": [
+      {
+        "id": "U1",
+        "type": "ic",
+        "props": {
+          "label": "ESP32-DevKitC",
+          "controller": "true"
+        },
+        "pins": [
+          {
+            "number": "1",
+            "name": "3V3",
+            "role": "power_in"
+          },
+          {
+            "number": "2",
+            "name": "GND",
+            "role": "ground"
+          },
+          {
+            "number": "3",
+            "name": "GPIO21",
+            "role": "bidir",
+            "iface": [
+              "i2c.sda"
+            ]
+          },
+          {
+            "number": "4",
+            "name": "GPIO22",
+            "role": "bidir",
+            "iface": [
+              "i2c.scl"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "U2",
+        "type": "ic",
+        "props": {
+          "label": "BME280"
+        },
+        "pins": [
+          {
+            "number": "1",
+            "name": "VIN",
+            "role": "power_in"
+          },
+          {
+            "number": "2",
+            "name": "GND",
+            "role": "ground"
+          },
+          {
+            "number": "3",
+            "name": "SCL",
+            "role": "bidir",
+            "iface": [
+              "i2c.scl"
+            ]
+          },
+          {
+            "number": "4",
+            "name": "SDA",
+            "role": "bidir",
+            "iface": [
+              "i2c.sda"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "U3",
+        "type": "ic",
+        "props": {
+          "label": "SHT31"
+        },
+        "pins": [
+          {
+            "number": "1",
+            "name": "VIN",
+            "role": "power_in"
+          },
+          {
+            "number": "2",
+            "name": "GND",
+            "role": "ground"
+          },
+          {
+            "number": "3",
+            "name": "SCL",
+            "role": "bidir",
+            "iface": [
+              "i2c.scl"
+            ]
+          },
+          {
+            "number": "4",
+            "name": "SDA",
+            "role": "bidir",
+            "iface": [
+              "i2c.sda"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "R1",
+        "type": "resistor",
+        "props": {
+          "value": "4.7k"
+        }
+      },
+      {
+        "id": "R2",
+        "type": "resistor",
+        "props": {
+          "value": "4.7k"
+        }
+      }
+    ],
+    "nets": [
+      {
+        "id": "n1",
+        "name": "3V3",
+        "endpoints": [
+          "R1[1]",
+          "R2[1]",
+          "U1[1]",
+          "U2[1]",
+          "U3[1]"
+        ]
+      },
+      {
+        "id": "n2",
+        "name": "GND",
+        "endpoints": [
+          "U1[2]",
+          "U2[2]",
+          "U3[2]"
+        ]
+      },
+      {
+        "id": "n3",
+        "name": "SDA",
+        "endpoints": [
+          "R1[2]",
+          "U1[3]",
+          "U2[4]",
+          "U3[4]"
+        ]
+      },
+      {
+        "id": "n4",
+        "name": "SCL",
+        "endpoints": [
+          "R2[2]",
+          "U1[4]",
+          "U2[3]",
+          "U3[3]"
+        ]
+      }
+    ]
+  }
+}

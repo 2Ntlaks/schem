@@ -11,6 +11,8 @@
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "draw": "tsx scripts/draw.ts",
+    "schem": "tsx src/cli.ts",
+    "docs:parts": "tsx scripts/parts-doc.ts",
     "phase0": "tsx scripts/phase0.ts",
     "gates": "tsx scripts/gates.ts",
     "showcase": "tsx scripts/showcase.ts",
