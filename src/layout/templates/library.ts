@@ -133,7 +133,9 @@ const I2C: Template = {
       pins: [{ pin: "1", net: "SCL" }, { pin: "2", net: "RAIL" }] },
     { name: "periph", types: ["ic"], role: "link", many: { min: 1 }, rank: { offset: 2, step: 1 },
       pins: [{ pin: SDA, net: "SDA" }, { pin: SCL, net: "SCL" }],
-      sides: { top: [SCL, SDA], right: [{ role: "power_in" }], bottom: [{ role: "ground" }] } },
+      // Supply pins on top after SDA/SCL: the trunks end at the bus pins, left of the supply
+      // port, and a decoupling child slot (src/layout/decoupling.ts) can serve the pin.
+      sides: { top: [SCL, SDA, { role: "power_in" }], bottom: [{ role: "ground" }] } },
   ],
   interior: [
     rel("y", pin("pu2", net("RAIL")), "=", pin("pu1", net("RAIL")), 0, "pull-ups side by side"),
@@ -229,58 +231,192 @@ const LED_HORIZONTAL: Template = {
 };
 
 // ---------------------------------------------------------------------------
-// Stubs: matcher data written ahead of the symbols they need (nmos, npn, diode, header are
-// being added). Pin names are provisional and must be checked against the new symbols; the
-// layout constraints are still to be written (docs/PHASE0B-NOTES.md, "Templates").
+// Switching templates (Phase 0b symbols: nmos, pmos, npn, pnp, diode, relay, motor).
 
-const LOW_SIDE_SWITCH: Template = {
-  id: "low-side-switch", version: 0, priority: 6, status: "stub",
-  summary: "transistor with load to supply on collector/drain, emitter/source to ground, resistor into base/gate",
-  nets: { SW: { kind: ["signal"] }, GND: { kind: ["ground"] }, SUP: { kind: ["power"] }, CTL: { kind: ["signal"] }, DRV: { kind: ["signal"] } },
-  slots: [
-    { name: "q", types: ["nmos", "npn"], role: "member", pins: [{ pin: "D", net: "SW" }, { pin: "S", net: "GND" }, { pin: "G", net: "CTL" }] },
-    { name: "load", types: ["resistor", "led", "relay", "motor", "inductor"], role: "member", symmetric: true, pins: [{ pin: "1", net: "SUP" }, { pin: "2", net: "SW" }] },
-    { name: "rg", types: ["resistor"], role: "member", symmetric: true, pins: [{ pin: "1", net: "DRV" }, { pin: "2", net: "CTL" }] },
-  ],
+/** Pin names of a transistor type: control (gate, base), main (drain, collector), reference (source, emitter). */
+const Q: Record<string, { ctrl: string; main: string; ref: string }> = {
+  nmos: { ctrl: "G", main: "D", ref: "S" }, pmos: { ctrl: "G", main: "D", ref: "S" },
+  npn: { ctrl: "B", main: "C", ref: "E" }, pnp: { ctrl: "B", main: "C", ref: "E" },
 };
+const MIRROR = { rot: 0 as const, flip: true };
+const UPRIGHT = { rot: 0 as const, flip: false };
+const box = (slot: string, edge: "left" | "right" | "top" | "bottom"): Ref => ({ box: [slot, edge] });
 
-const H_BRIDGE: Template = {
-  id: "h-bridge", version: 0, priority: 3, status: "stub",
-  summary: "four switches in two legs between one supply and ground; load between the leg midpoints",
-  nets: { SUP: { kind: ["power"] }, GND: { kind: ["ground"] }, A: { kind: ["signal"] }, B: { kind: ["signal"] } },
-  slots: [
-    { name: "qa_hi", types: ["nmos", "pmos", "npn", "pnp"], role: "member", pins: [{ pin: "D", net: "SUP" }, { pin: "S", net: "A" }] },
-    { name: "qa_lo", types: ["nmos", "npn"], role: "member", pins: [{ pin: "D", net: "A" }, { pin: "S", net: "GND" }] },
-    { name: "qb_hi", types: ["nmos", "pmos", "npn", "pnp"], role: "member", pins: [{ pin: "D", net: "SUP" }, { pin: "S", net: "B" }] },
-    { name: "qb_lo", types: ["nmos", "npn"], role: "member", pins: [{ pin: "D", net: "B" }, { pin: "S", net: "GND" }] },
-    { name: "load", types: ["motor", "resistor", "inductor"], role: "member", symmetric: true, pins: [{ pin: "1", net: "A" }, { pin: "2", net: "B" }] },
-  ],
-};
+/**
+ * Complementary H-bridge (P-type high side, N-type low side): two vertical legs side by side,
+ * high side above low side, the load horizontal between the leg midpoints. Each gate's drive
+ * faces outward (left leg mirrored to the left, right leg to the right): its series resistor in
+ * line with the gate, its gate-source resistor vertical from the node between them to the rail.
+ * The part driving the first gate resistor (a connector) ranks one column before the bridge.
+ */
+function hBridge(hi: "pmos" | "pnp", lo: "nmos" | "npn"): Template {
+  const H = Q[hi]!, L = Q[lo]!;
+  const legs = [["a", "A", "", UPRIGHT], ["b", "B", "", MIRROR]] as const;
+  const slots: Template["slots"] = [];
+  const interior: Rel[] = [], trunks: NonNullable<Template["trunks"]> = [], boundary: Array<[string, { net: string } | string]> = [];
+  for (const [l, N, , orient] of legs) {
+    const out = l === "a" ? "right" : "left";  // gate drive side: outward
+    const hiS = `q${l}h`, loS = `q${l}l`;
+    slots.push(
+      { name: hiS, types: [hi], role: "member", orient, label: l === "a" ? "right" : "left", ...(l === "a" ? { rank: { offset: 1 } } : {}),
+        pins: [{ pin: H.ref, net: "SUP" }, { pin: H.main, net: N }, { pin: H.ctrl, net: `G${l}H` }] },
+      { name: loS, types: [lo], role: "member", orient, label: l === "a" ? "right" : "left",
+        pins: [{ pin: L.main, net: N }, { pin: L.ref, net: "GND" }, { pin: L.ctrl, net: `G${l}L` }] },
+    );
+    for (const [s, q, g, rail, railDir] of [[`r${l}h`, hiS, `G${l}H`, "SUP", "up"], [`r${l}l`, loS, `G${l}L`, "GND", "down"]] as const) {
+      const p = `p${s.slice(1)}`; // gate-source resistor slot
+      slots.push(
+        { name: s, types: ["resistor"], role: "member", symmetric: true, many: { min: 0 }, orient: { net: g, dir: out },
+          pins: [{ pin: "1", net: "*", pred: { kind: ["signal"] } }, { pin: "2", net: g }] },
+        { name: p, types: ["resistor"], role: "member", symmetric: true, many: { min: 0 }, orient: { net: rail, dir: railDir },
+          pins: [{ pin: "1", net: g }, { pin: "2", net: rail }] },
+      );
+      const ctrl = pin(q, l === "a" ? (q === hiS ? H.ctrl : L.ctrl) : (q === hiS ? H.ctrl : L.ctrl));
+      const sign = l === "a" ? 1 : -1; // + : the drive is left of the gate
+      interior.push(
+        rel("y", pin(s, net(g)), "=", ctrl, 0, "gate resistor in line with the gate"),
+        rel("y", pin(p, net(g)), "=", ctrl, railDir === "up" ? -2 : 2, "gate-source resistor from the gate wire to its rail"),
+        // Without a gate-source resistor this keeps the gate resistor itself off the transistor.
+        sign > 0
+          ? rel("x", ctrl, ">=", pin(s, net(g)), 2, "a wire between the gate resistor and the gate")
+          : rel("x", pin(s, net(g)), ">=", ctrl, 2, "a wire between the gate and the gate resistor"),
+        ...(sign > 0 ? [
+          rel("x", pin(p, net(g)), ">=", pin(s, net(g)), 2, "node between the gate resistor and the gate"),
+          rel("x", ctrl, ">=", pin(p, net(g)), 2, "node left of the gate"),
+          rel("x", env(p, "left"), ">=", env(s, "right"), 1, "clear of the gate resistor's label"),
+          rel("x", env(p, "right"), "<=", box(q, "left"), -1, "clear of the transistor"),
+        ] : [
+          rel("x", pin(s, net(g)), ">=", pin(p, net(g)), 2, "node between the gate and the gate resistor"),
+          rel("x", pin(p, net(g)), ">=", ctrl, 2, "node right of the gate"),
+          rel("x", env(s, "left"), ">=", env(p, "right"), 1, "clear of the gate-source resistor's label"),
+          rel("x", env(p, "left"), ">=", box(q, "right"), 1, "clear of the transistor"),
+        ]),
+      );
+      boundary.push([s, { net: "*" }]);
+    }
+    const hiMain = pin(hiS, H.main), loMain = pin(loS, L.main);
+    interior.push(
+      rel("x", loMain, "=", hiMain, 0, "one vertical leg"),
+      rel("y", loMain, "=", hiMain, 4, "high side above low side; the midpoint between them"),
+    );
+    trunks.push({ net: N, why: "the leg's midpoint conductor", points: [{ x: hiMain, y: hiMain, dy: 1 }, { x: loMain, y: loMain, dy: -1 }],
+      require: [{ pin: [hiS, H.main], dir: "down" }, { pin: [loS, L.main], dir: "up" }] });
+    boundary.push([hiS, H.ctrl], [loS, L.ctrl]);
+  }
+  slots.push({ name: "load", types: ["motor", "resistor", "inductor"], role: "member", symmetric: true, orient: { net: "A", dir: "left" },
+    pins: [{ pin: "1", net: "A" }, { pin: "2", net: "B" }] });
+  // The connector or chip driving the first gate resistor: one column before the bridge (it is
+  // not a flow source, so without this it would rank by the low-confidence second pass).
+  slots.push({ name: "drv", types: ["header", "ic"], role: "link", many: { min: 0 }, follow: { slot: "rah" }, pins: [], rank: { offset: 0 } });
+  interior.push(
+    rel("y", pin("qbh", H.main), "=", pin("qah", H.main), 0, "legs side by side"),
+    rel("y", pin("load", net("A")), "=", pin("qah", H.main), 2, "load between the leg midpoints"),
+    rel("x", env("load", "left"), ">=", env("qah", "right"), 1, "load right of the left leg and its labels"),
+    rel("x", env("load", "left"), ">=", env("qal", "right"), 1, "load right of the left leg and its labels"),
+    rel("x", env("qbh", "left"), ">=", env("load", "right"), 1, "right leg right of the load"),
+    rel("x", env("qbl", "left"), ">=", env("load", "right"), 1, "right leg right of the load"),
+  );
+  return {
+    id: `h-bridge-${hi}-${lo}`, version: 1, priority: 3,
+    summary: `complementary H-bridge: ${hi} high side, ${lo} low side, load between the leg midpoints`,
+    nets: { SUP: { kind: ["power"] }, GND: { kind: ["ground"] }, A: { kind: ["signal"] }, B: { kind: ["signal"] },
+      GaH: { kind: ["signal"] }, GaL: { kind: ["signal"] }, GbH: { kind: ["signal"] }, GbL: { kind: ["signal"] } },
+    slots, interior, trunks, boundary,
+  };
+}
 
+/**
+ * Low-side switch: the load above the transistor on one vertical, the flyback diode parallel to
+ * the load on its left, the base or gate resistor horizontal on the left in line with the control
+ * pin, and a pull-down from the node between them. `relay`: the load is a relay coil (A1, A2).
+ */
+function lowSide(q: "npn" | "nmos", load: "relay" | "two-pin"): Template {
+  const T = Q[q]!;
+  const loadSlot: Template["slots"][number] = load === "relay"
+    ? { name: "load", types: ["relay"], role: "member", orient: UPRIGHT, pins: [{ pin: "A1", net: "SUP" }, { pin: "A2", net: "SW" },
+      { pin: "11", net: "COM", optional: true }, { pin: "14", net: "NO", optional: true }, { pin: "12", net: "NC", optional: true }] }
+    : { name: "load", types: ["resistor", "motor", "inductor"], role: "member", symmetric: true, orient: { net: "SW", dir: "down" }, pins: [{ pin: "1", net: "SUP" }, { pin: "2", net: "SW" }] };
+  return {
+    id: `low-side-${q}-${load}`, version: 1, priority: 6,
+    summary: `${q} low-side switch with a ${load === "relay" ? "relay coil" : "two-pin"} load to the supply`,
+    nets: { SW: { kind: ["signal"] }, GND: { kind: ["ground"] }, SUP: { kind: ["power"] }, CTL: { kind: ["signal"] },
+      COM: { kind: ["signal"] }, NO: { kind: ["signal"] }, NC: { kind: ["signal"] } },
+    ...(load === "relay" ? {
+      // The terminal block the contacts go to: right of the relay, its COM pin level with the
+      // relay's COM lead, so COM runs straight and NO and NC make short loops over the contacts.
+      link: [
+        rel("y", pin("conn", net("COM")), "=", pin("load", "11"), 1, "COM terminal level with the COM lead"),
+        rel("x", env("conn", "left"), ">=", env("load", "right"), 5, "room for the NO and NC loops"),
+      ],
+    } : {}),
+    slots: [
+      { name: "q", types: [q], role: "member", orient: UPRIGHT, pins: [{ pin: T.main, net: "SW" }, { pin: T.ref, net: "GND" }, { pin: T.ctrl, net: "CTL" }] },
+      loadSlot,
+      { name: "fly", types: ["diode"], role: "member", many: { min: 0 }, orient: { net: "SW", dir: "down" }, label: "left",
+        pins: [{ pin: "A", net: "SW" }, { pin: "K", net: "SUP" }] },
+      { name: "rb", types: ["resistor"], role: "member", symmetric: true, many: { min: 0 }, orient: { net: "CTL", dir: "right" },
+        pins: [{ pin: "1", net: "*", pred: { kind: ["signal"] } }, { pin: "2", net: "CTL" }] },
+      { name: "pd", types: ["resistor"], role: "member", symmetric: true, many: { min: 0 }, orient: { net: "GND", dir: "down" },
+        pins: [{ pin: "1", net: "CTL" }, { pin: "2", net: "GND" }] },
+      ...(load === "relay" ? [{ name: "conn", types: ["header"], role: "link" as const, many: { min: 0 },
+        pins: [{ pin: { on: "COM" }, net: "COM" }, { pin: { on: "NO" }, net: "NO" }, { pin: { on: "NC" }, net: "NC" }] }] : []),
+    ],
+    interior: [
+      rel("x", pin("load", net("SW")), "=", pin("q", T.main), 0, "load above the transistor on one vertical"),
+      rel("y", pin("q", T.main), "=", pin("load", net("SW")), 4, "the switched node between them"),
+      rel("y", pin("fly", net("SUP")), "=", pin("load", net("SUP")), 0, "flyback diode level with the load, cathode to the supply"),
+      rel("x", env("fly", "right"), "<=", box("load", "left"), -1, "flyback diode just left of the load"),
+      rel("x", pin("fly", net("SW")), ">=", box("load", "left"), -4, "flyback diode close to the load"),
+      rel("y", pin("rb", net("CTL")), "=", pin("q", T.ctrl), 0, "drive resistor in line with the control pin"),
+      rel("x", pin("q", T.ctrl), ">=", pin("rb", net("CTL")), 2, "a wire between the drive resistor and the control pin (also without a pull-down)"),
+      rel("y", pin("pd", net("CTL")), "=", pin("q", T.ctrl), 2, "pull-down from the control wire to ground"),
+      rel("x", pin("pd", net("CTL")), ">=", pin("rb", net("CTL")), 2, "node between the drive resistor and the control pin"),
+      rel("x", pin("q", T.ctrl), ">=", pin("pd", net("CTL")), 2, "node left of the control pin"),
+      rel("x", env("pd", "left"), ">=", env("rb", "right"), 1, "clear of the drive resistor's label"),
+      rel("x", env("pd", "right"), "<=", box("q", "left"), -1, "clear of the transistor"),
+    ],
+    trunks: [{ net: "SW", why: "the switched node from the load down to the transistor",
+      points: [{ x: pin("load", net("SW")), y: pin("load", net("SW")), dy: 1 }, { x: pin("q", T.main), y: pin("q", T.main), dy: -1 }],
+      require: [{ pin: ["load", { net: "SW" }], dir: "down" }, { pin: ["q", T.main], dir: "up" }] }],
+    boundary: [["rb", { net: "*" }], ["q", T.ctrl], ["load", "11"], ["load", "12"], ["load", "14"]],
+  };
+}
+
+/**
+ * Bridge rectifier, orthogonal convention: two vertical diode legs side by side, cathodes up to
+ * the + output, anodes down to the - output, the AC inputs at the leg midpoints from the left.
+ */
 const BRIDGE_RECTIFIER: Template = {
-  id: "bridge-rectifier", version: 0, priority: 4, status: "stub",
+  id: "bridge-rectifier", version: 1, priority: 4,
   summary: "four diodes forming a full bridge",
   nets: { AC1: {}, AC2: {}, POS: {}, NEG: {} },
   slots: [
-    { name: "d1", types: ["diode"], role: "member", pins: [{ pin: "A", net: "AC1" }, { pin: "K", net: "POS" }] },
-    { name: "d2", types: ["diode"], role: "member", pins: [{ pin: "A", net: "AC2" }, { pin: "K", net: "POS" }] },
-    { name: "d3", types: ["diode"], role: "member", pins: [{ pin: "A", net: "NEG" }, { pin: "K", net: "AC1" }] },
-    { name: "d4", types: ["diode"], role: "member", pins: [{ pin: "A", net: "NEG" }, { pin: "K", net: "AC2" }] },
+    { name: "d1", types: ["diode"], role: "member", orient: { net: "POS", dir: "up" }, label: "left", pins: [{ pin: "A", net: "AC1" }, { pin: "K", net: "POS" }] },
+    { name: "d3", types: ["diode"], role: "member", orient: { net: "AC1", dir: "up" }, label: "left", pins: [{ pin: "A", net: "NEG" }, { pin: "K", net: "AC1" }] },
+    { name: "d2", types: ["diode"], role: "member", orient: { net: "POS", dir: "up" }, label: "right", pins: [{ pin: "A", net: "AC2" }, { pin: "K", net: "POS" }] },
+    { name: "d4", types: ["diode"], role: "member", orient: { net: "AC2", dir: "up" }, label: "right", pins: [{ pin: "A", net: "NEG" }, { pin: "K", net: "AC2" }] },
+  ],
+  interior: [
+    rel("x", pin("d3", net("AC1")), "=", pin("d1", net("AC1")), 0, "left leg vertical"),
+    rel("y", pin("d3", net("AC1")), "=", pin("d1", net("AC1")), 6, "left leg: the AC1 node between the diodes"),
+    rel("x", pin("d4", net("AC2")), "=", pin("d2", net("AC2")), 0, "right leg vertical"),
+    rel("y", pin("d4", net("AC2")), "=", pin("d2", net("AC2")), 6, "right leg: the AC2 node between the diodes"),
+    rel("y", pin("d2", net("POS")), "=", pin("d1", net("POS")), 0, "legs side by side"),
+    rel("x", pin("d2", net("POS")), ">=", pin("d1", net("POS")), 4, "right leg right of the left leg"),
+  ],
+  trunks: [
+    { net: "AC1", why: "the left leg's midpoint conductor",
+      points: [{ x: pin("d1", net("AC1")), y: pin("d1", net("AC1")), dy: 1 }, { x: pin("d3", net("AC1")), y: pin("d3", net("AC1")), dy: -1 }],
+      require: [{ pin: ["d1", "A"], dir: "down" }, { pin: ["d3", "K"], dir: "up" }] },
+    { net: "AC2", why: "the right leg's midpoint conductor",
+      points: [{ x: pin("d2", net("AC2")), y: pin("d2", net("AC2")), dy: 1 }, { x: pin("d4", net("AC2")), y: pin("d4", net("AC2")), dy: -1 }],
+      require: [{ pin: ["d2", "A"], dir: "down" }, { pin: ["d4", "K"], dir: "up" }] },
   ],
 };
 
-const DECOUPLING: Template = {
-  id: "decoupling", version: 0, priority: 7, status: "stub",
-  summary: "capacitor between an IC power pin's net and ground (a child slot of the IC's region)",
-  nets: { SUP: { kind: ["power"] }, GND: { kind: ["ground"] } },
-  slots: [
-    { name: "ic", types: ["ic"], role: "link", pins: [{ pin: { role: "power_in" }, net: "SUP" }] },
-    { name: "c", types: ["capacitor"], role: "member", symmetric: true, orient: { net: "SUP", dir: "up" }, pins: [{ pin: "1", net: "SUP" }, { pin: "2", net: "GND" }] },
-  ],
-};
-
-/** All templates, active and stubs; the engine sorts matches by priority. */
+/** All templates; the engine sorts matches by priority. Decoupling is handled by src/layout/decoupling.ts. */
 export const TEMPLATES: readonly Template[] = [
-  OPAMP_INVERTING, OPAMP_NONINVERTING, H_BRIDGE, BRIDGE_RECTIFIER, I2C, LOW_SIDE_SWITCH, DECOUPLING,
+  OPAMP_INVERTING, OPAMP_NONINVERTING, hBridge("pmos", "nmos"), hBridge("pnp", "npn"), BRIDGE_RECTIFIER, I2C,
+  lowSide("npn", "relay"), lowSide("nmos", "relay"), lowSide("npn", "two-pin"), lowSide("nmos", "two-pin"),
   DIVIDER, PULL_UP, PULL_DOWN, LED_VERTICAL, LED_HORIZONTAL,
 ];

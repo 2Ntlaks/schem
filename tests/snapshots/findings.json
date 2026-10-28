@@ -12,15 +12,8 @@
     "findings": []
   },
   "case04-hbridge": {
-    "status": "valid_low_confidence",
-    "findings": [
-      {
-        "id": "L-squeezedRuns",
-        "severity": "info",
-        "message": "Readability: wires of different nets squeezed onto adjacent tracks: 2 (at most 0). No checked fix found among 2 candidates.",
-        "fix": null
-      }
-    ]
+    "status": "valid",
+    "findings": []
   },
   "case05-i2c": {
     "status": "valid",
@@ -28,76 +21,11 @@
   },
   "case06-esp32-relay": {
     "status": "valid",
-    "findings": [
-      {
-        "id": "L-squeezedRuns",
-        "severity": "info",
-        "message": "Readability: wires of different nets squeezed onto adjacent tracks: 2 (at most 0).",
-        "fix": {
-          "ops": [
-            {
-              "op": "setOrientation",
-              "part": "K1",
-              "rot": 180,
-              "flip": false
-            }
-          ],
-          "expectedLayout": "645267677d5bf2017d1e39af8b2f94ad6c3011504916e6872a0157f3eaff1c17",
-          "changesCircuit": false,
-          "expect": {
-            "breaches": -1,
-            "crossings": -1,
-            "wireLength": 18
-          },
-          "tradeoff": null
-        }
-      }
-    ]
+    "findings": []
   },
   "case07-two-ic-decoupling": {
-    "status": "valid_low_confidence",
-    "findings": [
-      {
-        "id": "C13-C1",
-        "severity": "warn",
-        "message": "Decoupling capacitor C1 is 27 G from the nearest supply pin it can serve (at most 8 G).",
-        "fix": {
-          "ops": [
-            {
-              "op": "place",
-              "part": "C1",
-              "rel": "below",
-              "of": "U1",
-              "priority": "high"
-            }
-          ],
-          "expectedLayout": "1780100c504907bd0ad89f14342c8e78c9f2faff83f09f05de76cebffebc6eef",
-          "changesCircuit": false,
-          "expect": {
-            "conventions": -1
-          },
-          "tradeoff": null
-        }
-      },
-      {
-        "id": "C13-C2",
-        "severity": "warn",
-        "message": "Decoupling capacitor C2 is 36 G from the nearest supply pin it can serve (at most 8 G). No checked fix found among 4 candidates.",
-        "fix": null
-      },
-      {
-        "id": "C13-C3",
-        "severity": "warn",
-        "message": "Decoupling capacitor C3 is 45 G from the nearest supply pin it can serve (at most 8 G). No checked fix found among 4 candidates.",
-        "fix": null
-      },
-      {
-        "id": "C13-C4",
-        "severity": "warn",
-        "message": "Decoupling capacitor C4 is 54 G from the nearest supply pin it can serve (at most 8 G). No checked fix found among 4 candidates.",
-        "fix": null
-      }
-    ]
+    "status": "valid",
+    "findings": []
   },
   "case08-diffpair": {
     "status": "valid",
@@ -114,41 +42,11 @@
               "rot": 270
             }
           ],
-          "expectedLayout": "006ec0a7fa37cfdb6cfd5fa2a3d14298dee544dc4e0433417f2da870f3bf8ff3",
+          "expectedLayout": "0232d27a1bccb511b00b7241ce5ede31186d30e5c2137c6fbb4b1c5f22c067bb",
           "changesCircuit": false,
           "expect": {
             "bends": -2,
             "wireLength": -6
-          },
-          "tradeoff": null
-        }
-      },
-      {
-        "id": "L-minCrossingToDot",
-        "severity": "info",
-        "message": "Readability: a crossing and a junction dot are 1 G apart (at least 2 G). No checked fix found among 2 candidates.",
-        "fix": null
-      },
-      {
-        "id": "L-squeezedRuns",
-        "severity": "info",
-        "message": "Readability: wires of different nets squeezed onto adjacent tracks: 1 (at most 0).",
-        "fix": {
-          "ops": [
-            {
-              "op": "setOrientation",
-              "part": "Q2",
-              "rot": 180,
-              "flip": false
-            }
-          ],
-          "expectedLayout": "006ec0a7fa37cfdb6cfd5fa2a3d14298dee544dc4e0433417f2da870f3bf8ff3",
-          "changesCircuit": false,
-          "expect": {
-            "breaches": -1,
-            "crossings": 1,
-            "bends": 2,
-            "wireLength": 38
           },
           "tradeoff": null
         }
@@ -161,13 +59,13 @@
       {
         "id": "C13-C5",
         "severity": "warn",
-        "message": "Decoupling capacitor C5 is 86 G from the nearest supply pin it can serve (at most 8 G). No checked fix found among 4 candidates.",
+        "message": "Decoupling capacitor C5 is 81 G from the nearest supply pin it can serve (at most 8 G). No checked fix found among 4 candidates.",
         "fix": null
       },
       {
         "id": "C13-C6",
         "severity": "warn",
-        "message": "Decoupling capacitor C6 is 96 G from the nearest supply pin it can serve (at most 8 G). No checked fix found among 4 candidates.",
+        "message": "Decoupling capacitor C6 is 91 G from the nearest supply pin it can serve (at most 8 G). No checked fix found among 4 candidates.",
         "fix": null
       },
       {
@@ -181,12 +79,12 @@
               "factor": 1.5
             }
           ],
-          "expectedLayout": "6f64e19c8f7f04a0ef57205588fe7784b5189d2f76247bd548dfacb163ac0994",
+          "expectedLayout": "da973315da86cb4490db1e932d5b6737332f4719526b4cd728a5c16069f811c3",
           "changesCircuit": false,
           "expect": {
             "breaches": -1,
             "crossings": -1,
-            "bends": -5,
+            "bends": -6,
             "wireLength": 16
           },
           "tradeoff": null
@@ -195,8 +93,26 @@
       {
         "id": "L-squeezedRuns",
         "severity": "info",
-        "message": "Readability: wires of different nets squeezed onto adjacent tracks: 2 (at most 0). No checked fix found among 2 candidates.",
-        "fix": null
+        "message": "Readability: wires of different nets squeezed onto adjacent tracks: 1 (at most 0).",
+        "fix": {
+          "ops": [
+            {
+              "op": "setOrientation",
+              "part": "R9",
+              "rot": 270,
+              "flip": false
+            }
+          ],
+          "expectedLayout": "da973315da86cb4490db1e932d5b6737332f4719526b4cd728a5c16069f811c3",
+          "changesCircuit": false,
+          "expect": {
+            "breaches": -1,
+            "crossings": -1,
+            "bends": 15,
+            "wireLength": 243
+          },
+          "tradeoff": null
+        }
       }
     ]
   }

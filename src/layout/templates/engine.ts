@@ -109,9 +109,13 @@ function matchOne(t: Template, g: TemplateGraph, nets: Map<string, NetInfo>): Re
       const vars = new Map<string, string>(), add = new Map<string, string>();
       let ok = true;
       for (const sp of spec) {
-        const num = pinsFor(defs, sp.pin)[0];
+        // `{ on: v }`: the part's pin on the net already bound to variable v.
+        const on = typeof sp.pin === "object" && "on" in sp.pin ? (bound.get(sp.pin.on) ?? add.get(sp.pin.on)) : undefined;
+        const num = typeof sp.pin === "object" && "on" in sp.pin
+          ? defs.map((d) => d.number).sort(cmpNatural).find((n) => on !== undefined && netOf(part, n) === on)
+          : pinsFor(defs, sp.pin)[0];
         const net = num === undefined ? undefined : netOf(part, num);
-        if (num === undefined || net === undefined) { ok = false; break; }
+        if (num === undefined || net === undefined) { if (sp.optional) continue; ok = false; break; }
         const taken = new Set([...bound.values(), ...add.values()]);
         if (sp.net === "*") {
           if (taken.has(net) || !predOk(net, sp.pred)) { ok = false; break; }
@@ -203,7 +207,7 @@ export function pinsFor(defs: readonly PinDef[], sel: PinSel, vars?: ReadonlyMap
     const byName = defs.find((d) => d.name === sel) ?? defs.find((d) => d.number === sel) ?? defs.find((d) => (d.aliases ?? []).includes(sel));
     return byName ? [byName.number] : [];
   }
-  if ("net" in sel) { const n = vars?.get(sel.net); return n === undefined ? [] : [n]; }
+  if ("net" in sel || "on" in sel) { const n = vars?.get("net" in sel ? sel.net : sel.on); return n === undefined ? [] : [n]; }
   const hit = "iface" in sel ? defs.filter((d) => (d.iface ?? []).includes(sel.iface)) : defs.filter((d) => d.role === sel.role);
   return hit.map((d) => d.number).sort(cmpNatural);
 }

@@ -105,8 +105,8 @@ describe("layer 3: conventions", () => {
     }
   });
 
-  it("the board, laid out normally, breaks only rule 13 (no decoupling template until Phase 0b)", () => {
-    expect(ids(board)).toEqual(["C13-C1"]);
+  it("the board's inferred decoupling slot follows the conventions", () => {
+    expect(ids(board)).toEqual([]);
   });
 
   // Fixed placements that break one convention each.

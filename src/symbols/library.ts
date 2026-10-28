@@ -400,18 +400,25 @@ export function headerSymbol(pins: PinDef[], measureText: (text: string, size: n
  * Generated box for chips and modules (SPEC 7.3). Side pins are 2 G apart; top and bottom
  * pins are `pitch` G apart, wide enough that their horizontal names do not run together.
  */
-export function icSymbol(sides: { left: PinDef[]; right: PinDef[]; top: PinDef[]; bottom: PinDef[] }, innerWidth: number, pitch = 2): SymbolDef {
+export function icSymbol(
+  sides: { left: PinDef[]; right: PinDef[]; top: PinDef[]; bottom: PinDef[] }, innerWidth: number, pitch = 2,
+  topGap?: (a: PinDef, b: PinDef) => number,
+): SymbolDef {
   const rows = Math.max(sides.left.length, sides.right.length, 1);
-  const cols = Math.max(sides.top.length, sides.bottom.length, 0);
-  const W = Math.max(innerWidth, (cols - 1) * pitch + 4, 6) + 2; // +2 for the 1 G leads on each side
+  // Top pins sit `pitch` apart, or further where `topGap` asks for room between two neighbours.
+  const topAt = sides.top.map((_, i) => i * pitch);
+  for (let i = 1; i < topAt.length; i++) topAt[i] = topAt[i - 1]! + Math.max(pitch, topGap?.(sides.top[i - 1]!, sides.top[i]!) ?? 0);
+  const topSpan = topAt.length ? topAt[topAt.length - 1]! : -pitch;
+  const span = Math.max(topSpan, (sides.bottom.length - 1) * pitch);
+  const W = Math.max(innerWidth, span + 4, 6) + 2; // +2 for the 1 G leads on each side
   const y0 = sides.top.length ? 4 : 2;                 // room for top pin names inside the box
   const H = y0 + (rows - 1) * 2 + (sides.bottom.length ? 4 : 2);
   const pins: SymPin[] = [];
   sides.left.forEach((p, i) => pins.push({ ...p, at: [0, y0 + 2 * i], dir: "left" }));
   sides.right.forEach((p, i) => pins.push({ ...p, at: [W, y0 + 2 * i], dir: "right" }));
-  const topStart = Math.round((W - (sides.top.length - 1) * pitch) / 2);
+  const topStart = Math.round((W - topSpan) / 2);
   const botStart = Math.round((W - (sides.bottom.length - 1) * pitch) / 2);
-  sides.top.forEach((p, i) => pins.push({ ...p, at: [topStart + pitch * i, 0], dir: "up" }));
+  sides.top.forEach((p, i) => pins.push({ ...p, at: [topStart + topAt[i]!, 0], dir: "up" }));
   sides.bottom.forEach((p, i) => pins.push({ ...p, at: [botStart + pitch * i, H], dir: "down" }));
   const leads = pins.map((p) => {
     const [x, y] = p.at;

@@ -13,6 +13,7 @@ import { existsSync, mkdirSync, readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { cmpStr } from "../src/geom/geom.js";
 import { CASES, ROOT, editScriptFiles, rel, runCase, runEdit, type CaseSummary, type EditSummary } from "./lib/case-run.js";
+import { phase0Gates } from "./lib/phase0-gates.js";
 
 const OUT = join(ROOT, "out", "phase0");
 const withTest = process.argv.includes("--test");
@@ -57,4 +58,11 @@ for (const e of edits) {
   if (!e.status.startsWith("saved")) for (const i of e.issues.slice(0, 2)) console.log(`    ${i}`);
 }
 console.log(`\nwrote ${rel(OUT)}/ (${sets.join(", ")}, edits)`);
-process.exitCode = failures ? 1 : 0;
+const gates = phase0Gates(cases, edits, withTest);
+writeFileSync(join(OUT, "gates.json"), `${JSON.stringify({ scope: withTest ? "full" : "validation", gates }, null, 2)}\n`);
+for (const g of gates) {
+  console.log(`gate ${g.gate}: ${g.status} (${g.evaluated}/${g.required} results)${g.reason ? `: ${g.reason}` : ""}`);
+  for (const failure of g.failures) console.log(`    ${failure}`);
+}
+// Incomplete ratings/holdout evidence is never presented as a passed phase.
+process.exitCode = failures || gates.some((g) => g.status === "fail") ? 1 : 0;

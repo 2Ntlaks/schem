@@ -1,5 +1,7 @@
 # Phase 0b: build notes
 
+For the later gate-reporting, decoupling-slot and PNG-scale changes, see [2026-10-25 build progress](PHASE0B-PROGRESS-2026-10-25.md). The notes below describe the earlier implementation snapshot.
+
 Status on 2026-10-23: the parts of Phase 0b that do not depend on the frozen cases are built: edit operations, incremental mode and the minimal findings harness. Templates, the baselines and the gate run wait for the case freeze (`phase0/`, written by agent B).
 
 ## What is built
@@ -22,7 +24,7 @@ Status on 2026-10-23: the parts of Phase 0b that do not depend on the frozen cas
 | Ordering in incremental mode | displacement term in the ordering cost | parts that existed keep their previous top-to-bottom order in each column; new parts keep the slots the barycentre sweeps give them | simplest form that keeps order stable |
 | Column separation in incremental mode | every pair in adjacent columns | skipped for two parts that existed before and whose rows did not overlap (1 G to spare) | a longer label pushed whole columns sideways for nothing |
 | Gate 4 route count | "route changes limited to affected nets plus at most one other" | nets drawn only with supply or ground symbols are reported apart (`portStubs`): their stubs move with their parts, which the displacement figures already count | otherwise moving one op-amp counts as a GND reroute |
-| `setSpacing` (11.3) | factor | factor f adds round((f - 1) x 4) G to every gap; runs a canonical layout | — |
+| `setSpacing` (11.3) | factor | factor f adds round((f - 1) x 4) G to every gap; runs a canonical layout | - |
 | Step 8 | verify the render model | the layout now runs layers 1 and 2 itself; a drawing that fails is `budget_exhausted` with the reasons, never `valid` | an edit (a flipped pull-up) produced a drawing the layout called valid but the verifier rejected |
 | Findings (10.2) | at most 5 candidate fixes per check, dry-run, offered if lexicographically better or with a trade-off | as specified, with this score order: validity, convention breaks, readability breaches, crossings, bends, wire length. Candidates: rotate (rules 7, 9.4, 10), align a row (rule 11), place left/right (rule 8), place next to the chip (rule 13), and for readability breaches near a point: turn nearby two-pin parts, reverse a nearby chip side, spacing x1.5 | minimal harness for 0b |
 | Hints not yet in the solve | `near`, `flow`, `group`, `decouples` | accepted only through templates (next) | they belong with the templates |
@@ -49,9 +51,9 @@ Layout changes are small: `pinDefsOf` reads header pins from the part; the place
 | Text in symbols (7.1) | no text except through `labels` | a symbol may carry fixed `texts` (centred, upright): relay terminal numbers A1 A2 11 12 14; header pin names and numbers | without them a relay's NO and NC, and a header's pins, cannot be told apart |
 | Header pins (7.2, 7.3) | `pins` only for `ic` and custom parts; unused IC pins hidden | `header` parts carry `pins` like `ic`; a header draws **every** declared pin, in declared order, in one column leaving right (mirrored when its nets lie to the left); a pin without a role is `passive` unless its name says supply or ground | a connector shows all its positions; names like `COM` are not chip I/O |
 | Relay (7.2 "one symbol") | not specified | coil plus one changeover contact, 5 pins (A1, A2, 11 COM, 12 NC, 14 NO), as proposed | follows the proposal |
-| Default orientations (9.2 step 3b) | ICs, sources, two-pin parts | transistors: N types emitter/source down, P types up, mirrored top-bottom when the supply sits on the other pin; base/gate mirrored left-right to face a driver on the right. Potentiometer: as a two-pin part on pins 1 and 3, wiper to the right when vertical. Relay: rotation 0. AC source: as a source, pin 1 up | — |
+| Default orientations (9.2 step 3b) | ICs, sources, two-pin parts | transistors: N types emitter/source down, P types up, mirrored top-bottom when the supply sits on the other pin; base/gate mirrored left-right to face a driver on the right. Potentiometer: as a two-pin part on pins 1 and 3, wiper to the right when vertical. Relay: rotation 0. AC source: as a source, pin 1 up | - |
 | Part label | value, else label, else colour | then `partNumber` (2N2222A, 1N4148) | transistors and diodes in the cases carry only a part number |
-| AC source pins | — | role `passive` (as proposed), while `vsource` uses `output` | layout ranks sources by symbol kind, so the role does not change the drawing |
+| AC source pins | - | role `passive` (as proposed), while `vsource` uses `output` | layout ranks sources by symbol kind, so the role does not change the drawing |
 
 Known limits: a relay or header turned by 90 degrees keeps its texts upright and centred, which can bring them close to a lead (no default orientation does this). Relay contacts routed around the top and drivers placed right of their transistor are flow and template work.
 
@@ -99,7 +101,7 @@ Built 2026-10-25 for the frozen cases (`phase0/HANDOFF.md`, "What Phase 0b must 
 
 ### `npm run phase0`
 
-Reads `phase0/cases/validation/*.json` and the edit scripts for cases 3, 5 and 7, whose file names it builds from the case numbers (it never lists `phase0/cases/edits/`). `--test` adds `phase0/cases/test/` and the case 11 scripts, for the end gate only. A case with a part type the layout cannot draw is reported as `missing symbol: X` (none since the 0b symbols landed); any other failure is reported per case, and the run exits 1 only on a crash or a drawing the verifier rejects. Output: `out/phase0/validation/<case>.svg|png` and `summary.json`; `out/phase0/edits/<script>.before.svg|png`, `.after.svg|png` and `summary.json` with the gate 4 figures and both affected-part lists. Cases 1, 3 and 5 draw byte-identical SVG and PNG to `npm run draw` on `cases/`.
+Reads `phase0/cases/validation/*.json` and the edit scripts for cases 3, 5 and 7, whose file names it builds from the case numbers (it never lists `phase0/cases/edits/`). `--test` adds `phase0/cases/test/` and the case 11 scripts, for the end gate only. A case with a part type the layout cannot draw is reported as `missing symbol: X` (none since the 0b symbols landed); any other failure is reported per case, and the run exits 1 on a crash, a drawing the verifier rejects, or a gate the validation subset already fails; it also writes `out/phase0/gates.json` (`scripts/lib/phase0-gates.ts`), where ratings and benchmarks stay explicitly incomplete. Output: `out/phase0/validation/<case>.svg|png` and `summary.json`; `out/phase0/edits/<script>.before.svg|png`, `.after.svg|png` and `summary.json` with the gate 4 figures and both affected-part lists. Cases 1, 3 and 5 draw byte-identical SVG and PNG to `npm run draw` on `cases/`.
 
 ### `npm run gates`
 
@@ -118,7 +120,7 @@ Built on 2026-10-25: the template mechanism and six templates. Case 3 and case 5
 |---|---|---|
 | Template data types: slots (part types, pin and interface roles, pin-to-net predicates, many-slots, follow-slots), orientations, label sides, pin sides, ranks, difference constraints (`interior`, `link`), boundary pins, pre-routed runs | `src/layout/templates/types.ts` | `tests/templates.test.ts` |
 | Engine: matching, overlap resolution, interior solve (step 5), linking constraints, runs | `src/layout/templates/engine.ts` | same |
-| Templates: op-amp inverting / summing, op-amp non-inverting, I2C pull-ups, voltage divider, pull-up, pull-down, LED + resistor (vertical to a ground symbol, else horizontal); stubs for H-bridge, bridge rectifier, low-side switch, decoupling | `src/layout/templates/library.ts` | same; drawings by `npx tsx scripts/templates.ts` |
+| Templates: op-amp inverting / summing, op-amp non-inverting, I2C pull-ups, voltage divider, pull-up, pull-down, LED + resistor (vertical to a ground symbol, else horizontal); round 2: H-bridge (MOSFET and BJT), low-side switch (relay coil or two-pin load), bridge rectifier. Decoupling is not a template: `src/layout/decoupling.ts` on main | `src/layout/templates/library.ts` | same; drawings by `npx tsx scripts/templates.ts` |
 | Hooks in the layout: block ranks, block columns and ordering, rigid regions, link constraints, template runs, fallbacks, `LayoutResult.blocks`, `LayoutState.templates` | `src/layout/layout.ts` | all layout tests |
 
 ### Where this differs from SPEC.md (to fold into the spec)
@@ -157,10 +159,50 @@ Built on 2026-10-25: the template mechanism and six templates. Case 3 and case 5
 
 Case 7 (two ICs, I2C EEPROM): the I2C template gives no crossing beside a dot and no squeezed wires, and 1 crossing instead of 3, because a template's pin sides go **after** the other pins of that side (here RESET above PC4/PC5). Listed first, the trunks ran through the RESET pull-up and were left to the router.
 
-### Next: H-bridge, low-side switch, bridge rectifier, decoupling
+### Round 2: H-bridge, low-side switch, bridge rectifier, router (2026-10-26)
 
-The matcher data for all four is in `library.ts` with `status: "stub"` and provisional pin names (`D`/`G`/`S`, `C`/`B`/`E`, `A`/`K`); check them against the new symbols, then add:
-- **Low-side switch:** interior constraints: load vertical above the transistor on one x (`pin(load, SW).x = pin(q, D).x`), drive resistor horizontal left of the gate in line (`pin(rg, CTL).y = pin(q, G).y`), source down to ground; an optional flyback slot (diode across the load, `many: { min: 0 }`) placed parallel to the load. Boundary: the drive resistor's input and the supply.
-- **H-bridge:** two legs as two columns (`qa_hi` above `qa_lo`, `qb_hi` above `qb_lo`, x equal per leg), load horizontal between the leg midpoints, gate drives outward: a `follow` link slot per gate for its resistor, left of the left leg and right of the right leg (the right leg mirrored: orientation `{ rot: 0, flip: true }`).
-- **Bridge rectifier:** two vertical diode legs side by side, AC inputs at the leg midpoints on the left, + at the top and - at the bottom: equalities on the diode pins plus pre-routed runs for the + and - rails.
-- **Decoupling:** a child slot (SPEC 9.2 step 1). The engine needs one change: letting a part of one region be bound by another template's slot inside it (today a part belongs to one region). The capacitor stands vertical next to the IC power pin; the `decouples` hint chooses the IC, otherwise the nearest in flow order (low confidence).
+The three remaining templates are switched on, each with a test circuit in `tests/support/template-circuits.ts` (written from the SPEC 9.4 table) and a test in `tests/templates.test.ts` that checks the table's constraints: bridge rectifier (AC source, four diodes, smoothing capacitor, load), BJT H-bridge without base-emitter resistors, low-side NPN motor switch with a flyback diode and no pull-down. Case 4 (MOSFET H-bridge) and case 6 (relay) cover the other variants. Decoupling is the owner's `src/layout/decoupling.ts` on main, not a template; the stub is gone.
+
+- **Fixed:** the H-bridge and low-side templates kept the drive resistor clear of the transistor only through the optional gate-source or pull-down resistor, so without one the two overlapped and the template was abandoned. Each now has its own constraint: the control pin at least 2 G from the drive resistor's pin.
+- **Module names as labels:** a module part shows its definition's `name` (case 6's U1: "ESP32-DevKitC V4") when it has no value, label or part number. The loader and `addPart` set it in memory as `Part.title`; it is never saved.
+- **Router (SPEC 9.2 step 7), four changes:**
+  1. Goal test on pop: the join onto the net's tree is pushed as a state with its full cost (last step and turn included) and the search returns when it is popped. Before, it returned on the first generated neighbour of the tree, so a route with an extra bend could win a tie on everything except its uncounted last turn.
+  2. Hug cost (2 per unit step alongside another net's wire on the adjacent track): the squeezed-run metric, priced in the search.
+  3. Jog cost (9, on top of the bend, for a bend within 2 steps of the path's previous bend): the jog metric, priced in the search. The steps since the last bend (1, 2, or "3+ or none") are part of the A* state, so the cost is exact. Without it the hug cost turned squeezed runs into jogs (generated set: jogs 64 to 107).
+  4. Rip-up and reroute: at most 3 passes; each pass takes every routed net with conflicts (crossings and hugging, at the search's costs), most first, reroutes it with every other wire in place and keeps the new route only if the total falls and nothing fails. A pass that improves nothing ends it. Pre-wired, port and reused (incremental) nets are never touched.
+  The crossing cost went from 8 to 12 (with the jog cost, 8 traded too many crossings for fewer jogs). Weights chosen by a small grid search on the 300 generated circuits (hug 1 to 4, jog 4 to 9, cross 8 to 12).
+
+| Area | SPEC says | 0b does | Why |
+|---|---|---|---|
+| Router cost | length + bend + crossing + proximity near foreign pins | adds hug (2 per unit step on the track next to another net's wire) and jog (9 for a bend within 2 G of the previous bend); crossing 12, bend 3 | the two readability metrics the critic reports, priced where the wires are chosen |
+| Rip-up passes | "a fixed number of rip-up-and-reroute passes (default 3) for nets involved in the most crossings" | a pass is a sweep over every net with conflicts (crossings and hugging), most first; 3 passes at most, ending early when a pass improves nothing | one net per pass left case 4's squeezed run: three passes went to nets whose crossings no reroute removes |
+| Module label | not stated | a module part without a value line shows its definition's `name` | case 6's U1 read as a bare box |
+
+**Measured** (`npm run phase0`, and the 300 generated circuits with `generate(seed, 5)`):
+
+| | branch head before round 2 finished (`ee3fbe8`) | after |
+|---|---|---|
+| Validation readability breaches, cases 1-8 | 0, 0, 0, 1, 0, 1, 0, 2 | 0, 0, 0, 0, 0, 0, 0, 0 |
+| Validation crossings, cases 1-8 | 0, 1, 0, 4, 2, 3, 1, 1 | 0, 0, 0, 2, 2, 3, 1, 1 |
+| Generated: valid / breaches / crossings / bends | 281 / 156 / 219 / 2197 | 281 / 97 / 223 / 2231 |
+| Generated breaches by kind | jogs 64, squeezed 67, crossing beside a dot 24, aspect 1 | jogs 25, squeezed 68, crossing beside a dot 3, aspect 1 |
+| Random edits, 80 / 300 seeds | 68 of 74 (91.9%) / 231 of 277 (83.4%) | unchanged |
+| Time: 300 generated layouts / case 4 layout | 2.8 s / 66-81 ms | 6.2 s / about 370 ms |
+
+**Cost:** routing is 2 to 5 times slower (the larger A* state, the costed join, the rip-up sweeps; no search fails, the time is in successful searches: `search` itself, `edgeKey` and `pop`). Gate 6 was already failing on time; the gate 6 branch's planned work (obstacles rasterised once per route call, a reachability pre-check) speeds exactly this loop and must be measured after the merge.
+
+Case 6 stays at 3 crossings: with J1's pins in the order COM, NO, NC and both NO and NC leaving the top of the relay on one side, every route that stays near the relay crosses three times; one crossing needs loops round J1.
+
+**Open question for the owner:** a named power net with two endpoints and no source (a motor and its flyback diode on a 12 V net, nothing else) is drawn as a plain wire (SPEC 9.2 step 2 item 1), so the drawing never shows "12V". With a source or connector on the net (3+ endpoints) it gets ports. Should a two-endpoint power net with no source part keep a port so its name shows?
+
+### Merge with the decoupling child slots (2026-10-28)
+
+`main` (the owner's decoupling child slots, `522217b`, and the gate runner) merged into the templates branch. Host envelopes in the template engine include the child slots (`clusterEnv`); the templates' own decoupling stub is gone. Four interactions fixed on the way, all tests unchanged except the one noted:
+
+- **I2C peripheral supply pin on top.** The I2C template put a peripheral's `power_in` pins on the right, so case 7's U2 VCC faced right and its capacitors C3, C4 got no slot (62 G away). The template now puts them on top after SCL and SDA, where the trunks end. `tests/templates.test.ts` (A.2) asserted the old side and now asserts the new one.
+- **Room beside a decoupled top pin.** Two capacitors on one pin take both sides of it; at the 4 G pin pitch the inner one's label covered the wire into SDA and routing failed. A generated IC box now spaces a top pin with child slots from a neighbour without any (`icSymbol` `topGap`; 2 G to the capacitor, its outline, its label, 1 G clear). As a safety net, a child slot never covers the channel above another top pin of its host. Boxes without child slots draw byte-identical.
+- **Pin-sides edits keep the template's sides for unnamed pins.** `setPinSides` naming only U2's bottom pins used to drop the template's sides for every pin, so U2 changed shape and C3 jumped sides (8 G). Pins the edit, a fixed placement or the previous layout name follow that; the rest keep the template's side.
+- **A part that must make room moves right or down.** In incremental mode the margin constraints are off (owner's change), so when the solver dropped an untouched part's lower "previous" bound the part slid to the origin (case 3 longer value: V2 11 G). Upper bounds now have their own lower priority (`prevUp`, `prevAffectedUp`), as SPEC 9.5 and the solver comment intend.
+- A shared pin's slot fills left to right, smallest capacitance first, wherever the pin sits on the box.
+
+Result: 439 tests pass; validation cases 1-8 all `valid` (case 4 was `valid_low_confidence`); 12 of 12 validation edits pass gate 4. Case 8 (differential pair, no template) is still the weakest drawing.

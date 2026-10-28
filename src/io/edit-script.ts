@@ -130,7 +130,7 @@ export function applyEditScript(project: LoadedProject, script: EditScript, prev
       if (bad.length) return refuse(bad.map((i) => `${i.code} ${i.message}`));
       definitions[op.part.type] = definitions[op.part.type] ?? structuredClone(def);
       const props = def.controller && op.part.props?.controller === undefined ? { ...(op.part.props ?? {}), controller: "true" } : op.part.props;
-      ops.push({ ...op, part: { ...op.part, ...(props ? { props } : {}) }, pins: modulePins(def) });
+      ops.push({ ...op, part: { ...op.part, title: def.name, ...(props ? { props } : {}) }, pins: modulePins(def) });
     } else ops.push(op);
   }
 

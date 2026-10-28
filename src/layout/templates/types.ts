@@ -9,9 +9,10 @@ import type { Side } from "../../core/intent.js";
 
 /**
  * A pin of a slot's part: a symbol pin name or number (aliases allowed), the pin carrying an
- * interface role, the pins with a pin role (ICs), or the pin the match bound to a net variable.
+ * interface role, the pins with a pin role (ICs), or the pin the match bound to a net variable;
+ * in a slot's own pins, `{ on: v }` is the part's pin on the net already bound to variable `v`.
  */
-export type PinSel = string | { iface: string } | { role: Role } | { net: string };
+export type PinSel = string | { iface: string } | { role: Role } | { net: string } | { on: string };
 
 /** What a net must be. Every field that is set must hold. */
 export interface NetPred {
@@ -31,6 +32,8 @@ export interface SlotPin {
   net: string;
   /** Extra condition for "*" nets. */
   pred?: NetPred;
+  /** The match does not need this pin to be connected (a relay's contacts). */
+  optional?: boolean;
 }
 
 export interface Slot {
