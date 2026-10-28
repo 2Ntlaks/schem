@@ -3,8 +3,8 @@
 // Usage: npm run showcase   (from the repo root)
 //
 // Copies the six chosen validation circuits into docs/showcase/img/ (ours from out/phase0/validation,
-// each baseline tool from baselines/out/<tool>/validation/caseNN/final.png), keeps the files as they are,
-// and writes docs/showcase/comparison.png plus docs/showcase/index.html.
+// each baseline tool from baselines/out/<tool>/validation/caseNN/final.png). Baseline files are copied as
+// they are; ours are rasterised from the phase0 SVG by the baselines' own rasteriser. Then it writes docs/showcase/comparison.png plus docs/showcase/index.html.
 //
 // comparison.png is built as an SVG that embeds the PNGs and is rasterised with @resvg/resvg-js, the
 // same renderer the engine uses (src/render/png.ts). Text uses the repo's DejaVu fonts so the image does
@@ -14,6 +14,8 @@ import { existsSync } from "node:fs";
 import { copyFile, mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+// @ts-expect-error: plain JS module without types; rasterize(svgPath, pngPath) writes the PNG.
+import { rasterize } from "../baselines/scripts/rasterize.mjs";
 
 const ROOT = path.resolve(fileURLToPath(new URL("..", import.meta.url)));
 const OUT = path.join(ROOT, "docs", "showcase");
@@ -133,10 +135,13 @@ async function copyImages(): Promise<Map<string, { buf: Buffer; w: number; h: nu
           continue;
         }
       }
-      const buf = await readFile(from);
-      const size = pngSize(buf, from);
-      await copyFile(from, path.join(IMG, `${caseDir(c.n)}-${t.key}.png`));
-      images.set(`${c.n}-${t.key}`, { buf, ...size });
+      // Ours: the same phase0 drawing, rasterised from its SVG by the baselines' own rasteriser (same
+      // padding, 1600 px long side, same fonts), so every cell and click-through compares like with like.
+      const to = path.join(IMG, `${caseDir(c.n)}-${t.key}.png`);
+      if (t.dir === null) rasterize(from.replace(/\.png$/, ".svg"), to);
+      else await copyFile(from, to);
+      const buf = await readFile(to);
+      images.set(`${c.n}-${t.key}`, { buf, ...pngSize(buf, from) });
     }
   }
 
@@ -430,7 +435,7 @@ ${figs}
   <section>
     <h2>The four tools</h2>
     <ul class="tool-list">
-      <li><strong>schem (ours)</strong>This project's engine. It takes a netlist in JSON, lays the schematic out itself, and writes SVG and PNG. The six drawings here are exactly what <code>npm run phase0</code> produced.</li>
+      <li><strong>schem (ours)</strong>This project's engine. It takes a netlist in JSON, lays the schematic out itself, and writes SVG and PNG. The six drawings here are the SVGs that <code>npm run phase0</code> produced, rasterised with the same settings as the baselines (1600 px on the long side, same fonts).</li>
       <li><strong>SKiDL</strong>A Python library for describing circuits in code. Its schematic generator places the parts and routes the wires automatically. The baseline harness falls back to SKiDL's label mode when its router fails.</li>
       <li><strong>netlistsvg</strong>A JavaScript tool that lays out a Yosys-style netlist with the ELK graph library and draws it with a replaceable skin. These drawings use the analog skin that ships with the tool.</li>
       <li><strong>schemdraw</strong>A Python drawing library. Every symbol, label and wire is placed by code, so these six drawings were written by hand, while the other three tools, ours included, lay out the drawing automatically.</li>
