@@ -1,0 +1,351 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Four ways to draw the same circuit</title>
+  <meta name="description" content="The same six validation circuits drawn by schem, SKiDL, netlistsvg and schemdraw.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --paper: #f7f3ec;
+      --card: #fffdf9;
+      --ink: #182a38;
+      --soft: #3c4c58;
+      --muted: #66747d;
+      --line: #e3dbcf;
+      --accent: #bf5238;
+    }
+    * { box-sizing: border-box; }
+    html { -webkit-text-size-adjust: 100%; }
+    body {
+      margin: 0;
+      background: var(--paper);
+      color: var(--ink);
+      font: 400 17px/1.62 "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+    }
+    h1, h2, h3 {
+      font-family: "Fraunces", Georgia, "Times New Roman", serif;
+      font-weight: 600;
+      line-height: 1.14;
+      letter-spacing: -0.01em;
+      margin: 0;
+    }
+    main { max-width: 1720px; margin: 0 auto; padding: clamp(20px, 4vw, 56px); }
+    a { color: var(--accent); text-underline-offset: 2px; }
+    code { font-family: "IBM Plex Mono", ui-monospace, "Cascadia Mono", monospace; font-size: 0.92em; background: #efe9df; padding: 0.1em 0.32em; border-radius: 4px; }
+    .hero { max-width: 820px; padding: clamp(8px, 3vw, 36px) 0 8px; }
+    .eyebrow {
+      margin: 0 0 10px;
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--accent);
+    }
+    h1 { font-size: clamp(35px, 5.2vw, 66px); }
+    .lede { font-size: clamp(17px, 1.45vw, 21px); color: var(--soft); max-width: 64ch; margin: 18px 0 0; }
+    section { margin-top: clamp(34px, 5vw, 66px); }
+    h2 { font-size: clamp(24px, 2.5vw, 34px); margin-bottom: 0.6em; }
+    .tool-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 16px;
+    }
+    .tool-list li {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 18px 20px;
+      font-size: 15px;
+      line-height: 1.55;
+      color: var(--soft);
+    }
+    .tool-list strong {
+      display: block;
+      font-family: "Fraunces", Georgia, serif;
+      font-size: 19px;
+      font-weight: 600;
+      color: var(--ink);
+      margin-bottom: 4px;
+    }
+    .fairness {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-left: 5px solid var(--accent);
+      border-radius: 14px;
+      padding: clamp(20px, 3vw, 36px);
+      max-width: 1080px;
+    }
+    .fairness h2 { margin-top: 0; }
+    .fairness ul { margin: 0; padding-left: 1.15em; }
+    .fairness li + li { margin-top: 0.55em; }
+    .hint { color: var(--muted); font-size: 14.5px; margin: 0 0 6px; }
+    .circuit { margin-top: 34px; border-top: 1px solid var(--line); padding-top: 22px; }
+    .circuit-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 14px; }
+    .case-no {
+      margin: 0;
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: var(--accent);
+    }
+    .circuit h3 { font-size: clamp(21px, 2vw, 27px); }
+    .parts { flex-basis: 100%; margin: 2px 0 0; color: var(--muted); font-size: 14.5px; }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 18px;
+      margin-top: 16px;
+      align-items: stretch;
+    }
+    .cell {
+      margin: 0;
+      min-width: 0;
+      background: #ffffff;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 10px 10px 12px;
+      display: flex;
+      flex-direction: column;
+    }
+    .tool {
+      margin: 2px 4px 8px;
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.09em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+    .cell a { display: flex; flex: 1; align-items: center; justify-content: center; min-height: 120px; }
+    .cell img { display: block; max-width: 100%; height: auto; }
+    .failure { margin: 10px 4px 0; font-size: 13px; line-height: 1.45; color: var(--accent); }
+    .notes { max-width: 940px; }
+    .notes h3 { font-size: clamp(19px, 1.8vw, 24px); margin: 26px 0 8px; }
+    .notes p { color: var(--soft); margin: 0; }
+    footer {
+      max-width: 1720px;
+      margin: 56px auto 0;
+      padding: 24px clamp(20px, 4vw, 56px) 56px;
+      border-top: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 14px;
+    }
+    @media (max-width: 1180px) {
+      .tool-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+    @media (max-width: 900px) {
+      .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+    @media (max-width: 600px) {
+      .tool-list { grid-template-columns: 1fr; }
+      .grid { grid-template-columns: 1fr; gap: 14px; }
+      .cell a { min-height: 0; }
+    }
+  </style>
+</head>
+<body>
+<main>
+  <header class="hero">
+    <p class="eyebrow">schem showcase</p>
+    <h1>Four ways to draw the same circuit</h1>
+    <p class="lede">Six validation circuits, each drawn from the same netlist by our engine and by three open-source tools. This page shows the same grid as <a href="comparison.png">comparison.png</a> and links every drawing to its original PNG.</p>
+  </header>
+
+  <section>
+    <h2>The four tools</h2>
+    <ul class="tool-list">
+      <li><strong>schem (ours)</strong>This project's engine. It takes a netlist in JSON, lays the schematic out itself, and writes SVG and PNG. The six drawings here are exactly what <code>npm run phase0</code> produced.</li>
+      <li><strong>SKiDL</strong>A Python library for describing circuits in code. Its schematic generator places the parts and routes the wires automatically. The baseline harness falls back to SKiDL's label mode when its router fails.</li>
+      <li><strong>netlistsvg</strong>A JavaScript tool that lays out a Yosys-style netlist with the ELK graph library and draws it with a replaceable skin. These drawings use the analog skin that ships with the tool.</li>
+      <li><strong>schemdraw</strong>A Python drawing library. Every symbol, label and wire is placed by code, so these six drawings were written by hand, while the other three tools, ours included, lay out the drawing automatically.</li>
+    </ul>
+  </section>
+
+  <section class="fairness">
+    <h2>How this was made fairly</h2>
+    <ul>
+      <li>schemdraw is drawn by hand, one Python file per circuit. schem, SKiDL and netlistsvg are automatic: they take the netlist and place and route the drawing themselves.</li>
+      <li>Each baseline tool had one first attempt plus at most three revisions per circuit. Every attempt is logged in <a href="../../baselines/LOG.md">baselines/LOG.md</a>, with what changed and why.</li>
+      <li>The chosen drawing for each tool and circuit is the attempt with the fewest drawing errors among those whose connection check passes. Known defects in the chosen drawings are listed in the same log.</li>
+      <li>Some baselines shorten long part names to fit the drawing, for example <code>U1 ESP32</code> in netlistsvg case 6. The log records each of these.</li>
+      <li>Case 8 (differential pair) is left out because our own drawing of it is weak. It is not hidden from the log; it simply does not appear in this comparison.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>The drawings</h2>
+    <p class="hint">Click any drawing to open the original PNG at full size. Each drawing is scaled to fit its cell, so the scale differs between cells.</p>
+    <article class="circuit" id="case-1">
+      <header class="circuit-head">
+        <p class="case-no">Case 1</p>
+        <h3>LED and resistor</h3>
+        <p class="parts">B1 9 V battery, R1 470, D1 red LED.</p>
+      </header>
+      <div class="grid">
+      <figure class="cell">
+        <figcaption class="tool">schem (ours)</figcaption>
+        <a href="img/case01-schem.png"><img src="img/case01-schem.png" alt="Case 1, LED and resistor, drawn by schem (ours)" width="330" height="180"></a>
+      </figure>
+      <figure class="cell">
+        <figcaption class="tool">SKiDL</figcaption>
+        <a href="img/case01-skidl.png"><img src="img/case01-skidl.png" alt="Case 1, LED and resistor, drawn by SKiDL" width="1600" height="1206"></a>
+      </figure>
+      <figure class="cell">
+        <figcaption class="tool">netlistsvg</figcaption>
+        <a href="img/case01-netlistsvg.png"><img src="img/case01-netlistsvg.png" alt="Case 1, LED and resistor, drawn by netlistsvg" width="1429" height="1600"></a>
+      </figure>
+      <figure class="cell">
+        <figcaption class="tool">schemdraw</figcaption>
+        <a href="img/case01-schemdraw.png"><img src="img/case01-schemdraw.png" alt="Case 1, LED and resistor, drawn by schemdraw" width="1600" height="1422"></a>
+      </figure>
+      </div>
+    </article>
+    <article class="circuit" id="case-3">
+      <header class="circuit-head">
+        <p class="case-no">Case 3</p>
+        <h3>Op-amp summing amplifier</h3>
+        <p class="parts">V1 1 V, V2 0.5 V, V3 0.2 V, R1-R3 10k, Rf 20k, RL 2.2k, U1 op-amp.</p>
+      </header>
+      <div class="grid">
+      <figure class="cell">
+        <figcaption class="tool">schem (ours)</figcaption>
+        <a href="img/case03-schem.png"><img src="img/case03-schem.png" alt="Case 3, Op-amp summing amplifier, drawn by schem (ours)" width="510" height="430"></a>
+      </figure>
+      <figure class="cell">
+        <figcaption class="tool">SKiDL</figcaption>
+        <a href="img/case03-skidl.png"><img src="img/case03-skidl.png" alt="Case 3, Op-amp summing amplifier, drawn by SKiDL" width="1577" height="1600"></a>
+      </figure>
+      <figure class="cell">
+        <figcaption class="tool">netlistsvg</figcaption>
+        <a href="img/case03-netlistsvg.png"><img src="img/case03-netlistsvg.png" alt="Case 3, Op-amp summing amplifier, drawn by netlistsvg" width="1600" height="994"></a>
+      </figure>
+      <figure class="cell">
+        <figcaption class="tool">schemdraw</figcaption>
+        <a href="img/case03-schemdraw.png"><img src="img/case03-schemdraw.png" alt="Case 3, Op-amp summing amplifier, drawn by schemdraw" width="1600" height="1417"></a>
+      </figure>
+      </div>
+    </article>
+    <article class="circuit" id="case-4">
+      <header class="circuit-head">
+        <p class="case-no">Case 4</p>
+        <h3>H-bridge motor driver</h3>
+        <p class="parts">B1 12 V, Q1-Q4 IRF540N, R1-R4 100, R5-R8 10k, M1 12 V motor, J1 drive header.</p>
+      </header>
+      <div class="grid">
+      <figure class="cell">
+        <figcaption class="tool">schem (ours)</figcaption>
+        <a href="img/case04-schem.png"><img src="img/case04-schem.png" alt="Case 4, H-bridge motor driver, drawn by schem (ours)" width="970" height="390"></a>
+      </figure>
+      <figure class="cell">
+        <figcaption class="tool">SKiDL</figcaption>
+        <a href="img/case04-skidl.png"><img src="img/case04-skidl.png" alt="Case 4, H-bridge motor driver, drawn by SKiDL" width="1159" height="1600"></a>
+      </figure>
+      <figure class="cell">
+        <figcaption class="tool">netlistsvg</figcaption>
+        <a href="img/case04-netlistsvg.png"><img src="img/case04-netlistsvg.png" alt="Case 4, H-bridge motor driver, drawn by netlistsvg" width="1600" height="871"></a>
+      </figure>
+      <figure class="cell">
+        <figcaption class="tool">schemdraw</figcaption>
+        <a href="img/case04-schemdraw.png"><img src="img/case04-schemdraw.png" alt="Case 4, H-bridge motor driver, drawn by schemdraw" width="1600" height="759"></a>
+      </figure>
+      </div>
+    </article>
+    <article class="circuit" id="case-5">
+      <header class="circuit-head">
+        <p class="case-no">Case 5</p>
+        <h3>I2C sensors</h3>
+        <p class="parts">U1 ESP32-DevKitC, U2 BME280, U3 SHT31, R1 and R2 4.7k pull-ups.</p>
+      </header>
+      <div class="grid">
+      <figure class="cell">
+        <figcaption class="tool">schem (ours)</figcaption>
+        <a href="img/case05-schem.png"><img src="img/case05-schem.png" alt="Case 5, I2C sensors, drawn by schem (ours)" width="810" height="360"></a>
+      </figure>
+      <figure class="cell">
+        <figcaption class="tool">SKiDL</figcaption>
+        <a href="img/case05-skidl.png"><img src="img/case05-skidl.png" alt="Case 5, I2C sensors, drawn by SKiDL" width="1600" height="1343"></a>
+      </figure>
+      <figure class="cell">
+        <figcaption class="tool">netlistsvg</figcaption>
+        <a href="img/case05-netlistsvg.png"><img src="img/case05-netlistsvg.png" alt="Case 5, I2C sensors, drawn by netlistsvg" width="1600" height="919"></a>
+      </figure>
+      <figure class="cell">
+        <figcaption class="tool">schemdraw</figcaption>
+        <a href="img/case05-schemdraw.png"><img src="img/case05-schemdraw.png" alt="Case 5, I2C sensors, drawn by schemdraw" width="1600" height="931"></a>
+      </figure>
+      </div>
+    </article>
+    <article class="circuit" id="case-6">
+      <header class="circuit-head">
+        <p class="case-no">Case 6</p>
+        <h3>ESP32 relay</h3>
+        <p class="parts">U1 ESP32-DevKitC V4, K1 5 V relay, Q1 2N2222A, D1 1N4148, R1 1k, R2 10k, J1 load header.</p>
+      </header>
+      <div class="grid">
+      <figure class="cell">
+        <figcaption class="tool">schem (ours)</figcaption>
+        <a href="img/case06-schem.png"><img src="img/case06-schem.png" alt="Case 6, ESP32 relay, drawn by schem (ours)" width="670" height="320"></a>
+      </figure>
+      <figure class="cell">
+        <figcaption class="tool">SKiDL</figcaption>
+        <a href="img/case06-skidl.png"><img src="img/case06-skidl.png" alt="Case 6, ESP32 relay, drawn by SKiDL" width="1468" height="1600"></a>
+      </figure>
+      <figure class="cell">
+        <figcaption class="tool">netlistsvg</figcaption>
+        <a href="img/case06-netlistsvg.png"><img src="img/case06-netlistsvg.png" alt="Case 6, ESP32 relay, drawn by netlistsvg" width="1600" height="1291"></a>
+      </figure>
+      <figure class="cell">
+        <figcaption class="tool">schemdraw</figcaption>
+        <a href="img/case06-schemdraw.png"><img src="img/case06-schemdraw.png" alt="Case 6, ESP32 relay, drawn by schemdraw" width="1600" height="1124"></a>
+      </figure>
+      </div>
+    </article>
+    <article class="circuit" id="case-7">
+      <header class="circuit-head">
+        <p class="case-no">Case 7</p>
+        <h3>Two ICs with decoupling</h3>
+        <p class="parts">U1 ATmega328P, U2 24LC256, C1-C4, R1 10k, R2 and R3 4.7k, J1 5 V input.</p>
+      </header>
+      <div class="grid">
+      <figure class="cell">
+        <figcaption class="tool">schem (ours)</figcaption>
+        <a href="img/case07-schem.png"><img src="img/case07-schem.png" alt="Case 7, Two ICs with decoupling, drawn by schem (ours)" width="920" height="660"></a>
+      </figure>
+      <figure class="cell">
+        <figcaption class="tool">SKiDL</figcaption>
+        <a href="img/case07-skidl.png"><img src="img/case07-skidl.png" alt="Case 7, Two ICs with decoupling, drawn by SKiDL" width="1600" height="1261"></a>
+        <p class="failure">Tool failure: the passives are stacked behind U1, so only the two ICs are visible. See the note below.</p>
+      </figure>
+      <figure class="cell">
+        <figcaption class="tool">netlistsvg</figcaption>
+        <a href="img/case07-netlistsvg.png"><img src="img/case07-netlistsvg.png" alt="Case 7, Two ICs with decoupling, drawn by netlistsvg" width="1600" height="1162"></a>
+      </figure>
+      <figure class="cell">
+        <figcaption class="tool">schemdraw</figcaption>
+        <a href="img/case07-schemdraw.png"><img src="img/case07-schemdraw.png" alt="Case 7, Two ICs with decoupling, drawn by schemdraw" width="1600" height="610"></a>
+      </figure>
+      </div>
+    </article>
+  </section>
+
+  <section class="notes">
+    <h2>Two notes on the set</h2>
+    <h3>Case 7 in SKiDL: a tool failure</h3>
+    <p>SKiDL's router failed on this circuit and the fallback placement stacked C1-C4, R1-R3 and J1 behind U1, so only the two ICs are visible. The connection check still passes, but the drawing does not show the circuit, so it is kept as the tool's honest output and marked as a tool failure rather than used as a fair comparison.</p>
+    <h3>Case 8 is not shown</h3>
+    <p>The differential pair is missing from this page because our own drawing of it is weak. The circuit, and the baselines for it, are still in the repository and in the log.</p>
+  </section>
+</main>
+
+<footer>
+  Built by <code>npm run showcase</code> from <code>out/phase0/validation</code> and <code>baselines/out</code>. The attempt budget, the revisions and the known defects are in <a href="../../baselines/LOG.md">baselines/LOG.md</a>.
+</footer>
+</body>
+</html>

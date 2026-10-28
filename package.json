@@ -13,6 +13,7 @@
     "draw": "tsx scripts/draw.ts",
     "phase0": "tsx scripts/phase0.ts",
     "gates": "tsx scripts/gates.ts",
+    "showcase": "tsx scripts/showcase.ts",
     "draw:symbols": "tsx scripts/symbols.ts"
   },
   "devDependencies": {

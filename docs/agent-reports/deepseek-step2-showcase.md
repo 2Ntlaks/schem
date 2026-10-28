@@ -215,3 +215,47 @@ Each copied `final.png` was hash-checked against its attempt PNG and matched.
 ### Skipped
 
 Nothing from the lead's review was skipped. The SKiDL finals were not redrawn, as explained in item 4.
+
+## Part B: the showcase
+
+Part B is built on the same branch, `deepseek/step2-showcase`. The baseline drawings were not changed in this part; the page and the comparison use the final images exactly as they are, and our drawings exactly as `npm run phase0` writes them.
+
+### What I built
+
+`scripts/showcase.ts` (run with `npm run showcase`) does three things:
+
+1. Deletes and recreates `docs/showcase/`, then copies the six chosen circuits into `docs/showcase/img/` as `caseNN-<tool>.png`. Ours come from `out/phase0/validation/caseNN-*.png`; SKiDL, netlistsvg and schemdraw come from `baselines/out/<tool>/validation/caseNN/final.png`. The files are copied byte for byte.
+2. Builds `docs/showcase/comparison.png`: an SVG grid with a row per circuit and the columns schem (ours), SKiDL, netlistsvg and schemdraw, each drawing scaled to fit the same box on white. Circuit name at the left, tool name on top, and a small "tool failure, see notes" caption under the SKiDL case 7 cell. The SVG embeds the PNGs and is rasterised with `@resvg/resvg-js`, the renderer the engine already uses, with the repo's DejaVu fonts. The script fails if the PNG comes out over 3 MB.
+3. Writes `docs/showcase/index.html`: one page with inline CSS and no external scripts. Images are referenced from `img/` and each one links to its original PNG, so the page stays small. Google Fonts supplies Fraunces (headings) and IBM Plex Sans (body). The grid is four columns on a wide screen, two at tablet width and one at phone width.
+
+The page has the intro (what each tool is, and that schemdraw is drawn by hand while the other three are automatic), a "How this was made fairly" section, the six circuits at full size in the page layout, and two notes: what happened in SKiDL case 7, and why case 8 is missing. The fairness section says that each baseline had one attempt plus at most three revisions, all logged in `baselines/LOG.md`; that the chosen attempt is the one with the fewest drawing errors among passing checks; that known defects are in the same log; that some baselines shorten long names such as `U1 ESP32`; and that case 8 is left out because our own drawing of it is weak.
+
+I added `"showcase": "tsx scripts/showcase.ts"` to `package.json`. No dependencies were added.
+
+### Checks
+
+- `npm run typecheck`: passed (`tsc --noEmit`, no output).
+- `npm test`: 16 test files, 449 tests, all passed.
+- `npm run phase0`: all eight validation cases `valid`.
+- Deleted `docs/showcase/` completely, then ran `npm run showcase`. It rebuilt 24 images plus `comparison.png` and `index.html`, and the new `comparison.png` and `index.html` hashes matched the deleted ones exactly. The rebuild is deterministic.
+- `comparison.png` is 425,459 bytes (about 415 KB), under the 3 MB limit.
+- Every file in `docs/showcase/img/` was SHA-256 compared with its source and matched, for all 24 cells.
+- I opened `comparison.png` and checked all six rows: in each row the four cells are the right circuit for the right tool. The schem column is our six drawings, the SKiDL column is the SKiDL output (red sheet frame), netlistsvg is the netlistsvg skin, and schemdraw is the hand-written schemdraw file. The SKiDL case 7 cell has the tool-failure caption.
+- I opened the page in headless Chrome at 390, 768, 1024 and 1440 px. At every width `scrollWidth` did not exceed the viewport, the page had 6 circuits and 24 figures, no image failed to load, and the SKiDL case 7 note was present. I read the 390 px render top to bottom in slices and every card, label and note was inside the page.
+
+### Files changed
+
+Tracked:
+
+- `scripts/showcase.ts`: new.
+- `package.json`: the `showcase` script.
+- `docs/showcase/index.html`: new.
+- `docs/showcase/comparison.png`: new.
+- `docs/showcase/img/`: 24 new PNGs, copied from `out/phase0/validation` and `baselines/out`.
+- `docs/agent-reports/deepseek-step2-showcase.md`: this section.
+
+No changes to `src/`, `phase0/`, `tests/fixtures/`, `SPEC.md` or any baseline attempt. The page copies of the images are in `docs/showcase/img/`, so the baseline finals under the ignored `out/` directories do not need to be force-added for the showcase to work.
+
+### Skipped
+
+Nothing in Part B was skipped.
