@@ -156,7 +156,7 @@ schem is an early prototype. It is useful today for small and medium circuits, a
 
 - Dense boards with several chips spread out too far
 - Circuits that want mirror symmetry, like a differential pair, come out messy
-- The library is small, and new boards cannot be added yet
+- The symbol and board library is small
 - Edits work in the engine (`src/edit/`) but not yet from the command line
 - Not on npm, so no `npx schem` yet
 - No blind rating by outside judges yet
@@ -171,6 +171,7 @@ There is a lot to do, and much of it needs no knowledge of the layout engine.
 
 - **Send a circuit that draws badly.** Open an issue with the file and the PNG. Real circuits that break the layout are the most useful thing this project can get.
 - **Draw a symbol.** The library is small; [`CONTRIBUTING.md`](CONTRIBUTING.md#adding-a-symbol) walks through adding one, and the tests check it in all eight orientations.
+- **Add your board.** A dev board or breakout is one JSON file listing its real pins, no code needed. See [adding a board](CONTRIBUTING.md#adding-a-board).
 - **Add an example**, or fix anything in the docs that confused you.
 
 Coding agents are welcome too: [`AGENTS.md`](AGENTS.md) holds their rules. Start with [`CONTRIBUTING.md`](CONTRIBUTING.md).

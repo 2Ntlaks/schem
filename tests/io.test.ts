@@ -1,7 +1,7 @@
 // Project files (SPEC 6.5, 6.6), modules (SPEC 7.3), decouples hints (SPEC 6.4) and edit scripts
 // (SPEC 11.3). Reads the frozen validation cases and edit scripts in phase0/ (never phase0/cases/test/).
 
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { circuitEquals } from "../src/core/equals.js";
@@ -166,13 +166,20 @@ describe("project files: both shapes", () => {
 // ---------------------------------------------------------------------------
 
 describe("modules (SPEC 7.3)", () => {
-  it("ships the four corpus modules, byte-identical to phase0/modules", () => {
-    expect(Object.keys(MODULE_LIBRARY)).toEqual(["module:arduino-uno-r3", "module:esp32-devkitc-v4", "module:pololu-d24v10f5", "module:waveshare-lcd1602-i2c"]);
-    for (const id of Object.keys(MODULE_LIBRARY)) {
-      const f = moduleFile(id)!;
+  it("ships the corpus modules byte-identical to phase0/modules", () => {
+    const corpus = readdirSync(join(ROOT, "phase0", "modules")).filter((f) => f.endsWith(".json"));
+    expect(corpus).toEqual(["arduino-uno-r3.json", "esp32-devkitc-v4.json", "pololu-d24v10f5.json", "waveshare-lcd1602-i2c.json"]);
+    for (const f of corpus) {
+      const id = `module:${f.slice(0, -".json".length)}`;
+      expect(moduleFile(id)).toBe(f);
       expect(text(join(ROOT, "src", "modules", f))).toBe(text(join(ROOT, "phase0", "modules", f)));
-      expect(checkModuleDef(MODULE_LIBRARY[id], id)).toEqual([]);
     }
+  });
+
+  it("loads every module file in src/modules, valid, named after its id, in file-name order", () => {
+    const files = readdirSync(join(ROOT, "src", "modules")).filter((f) => f.endsWith(".json")).sort();
+    expect(Object.keys(MODULE_LIBRARY)).toEqual(files.map((f) => `module:${f.slice(0, -".json".length)}`));
+    for (const id of Object.keys(MODULE_LIBRARY)) expect(checkModuleDef(MODULE_LIBRARY[id], id)).toEqual([]);
   });
 
   it("resolves a module part to inline pins with numbers, names, aliases, groups, roles and the controller flag", () => {

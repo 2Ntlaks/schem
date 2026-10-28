@@ -2,10 +2,12 @@
 // interface roles, a controller flag and the documentation they come from. A module has no
 // artwork: it is drawn as a generated box, like `ic`.
 //
-// Phase 1 ships only the modules the corpus uses. The JSON files here are byte-identical copies
-// of phase0/modules/*.json (the frozen case author's definitions); a test checks that.
+// One JSON file per module, named after its id (`module:esp32-devkitc-v4` is `esp32-devkitc-v4.json`).
+// Every file in this folder is loaded, in file-name order, and checked when the library loads. The
+// four boards the Phase 0 cases use are byte-identical copies of phase0/modules/*.json (the frozen
+// case author's definitions); a test checks that. CONTRIBUTING.md explains how to add a board.
 
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import type { Issue, PinDef, Role } from "../core/model.js";
 
 export interface ModuleDoc {
@@ -40,14 +42,15 @@ type Obj = Record<string, unknown>;
 const isObj = (v: unknown): v is Obj => typeof v === "object" && v !== null && !Array.isArray(v);
 const isStrArray = (v: unknown): v is string[] => Array.isArray(v) && v.every((x) => typeof x === "string" && x.length > 0);
 
-/** Library file names, in a fixed order (SPEC 9.6). */
-const FILES = ["arduino-uno-r3.json", "esp32-devkitc-v4.json", "pololu-d24v10f5.json", "waveshare-lcd1602-i2c.json"];
+/** Library file names, sorted by UTF-16 code units so the order is the same on every machine (SPEC 9.6). */
+const FILES = readdirSync(new URL(".", import.meta.url)).filter((f) => f.endsWith(".json")).sort();
 
 /** The shipped module library, by module id (`module:esp32-devkitc-v4`). */
 export const MODULE_LIBRARY: Readonly<Record<string, ModuleDef>> = Object.freeze(Object.fromEntries(
   FILES.map((f) => {
     const def = JSON.parse(readFileSync(new URL(`./${f}`, import.meta.url), "utf8")) as ModuleDef;
     const issues = checkModuleDef(def, def.id);
+    if (`module:${f.slice(0, -".json".length)}` !== def.id) issues.push({ code: "E202", message: `the file must be named after the module id ("${def.id}").`, at: f });
     if (issues.length) throw new Error(`module library ${f}: ${issues.map((i) => `${i.code} ${i.message}`).join("; ")}`);
     return [def.id, def];
   }),
