@@ -4,7 +4,7 @@
 #               test       -> baselines/out/schemdraw/test/caseNN/attempt-K.py   (kept with the test images, see README)
 set -euo pipefail
 REPO="$(cd "$(dirname "$0")/../.." && pwd)"
-PY="${SCHEM_BASELINES:-/c/Users/ntlak/schem-baselines}/venv/Scripts/python.exe"
+PY="${SCHEM_BASELINES:-$HOME/schem-baselines}/venv/Scripts/python.exe"
 SET=$1; NN=$2; K=$3
 OUT="$REPO/baselines/out/schemdraw/$SET/case$NN"
 if [ "$SET" = test ]; then CODE="$OUT/attempt-$K.py"; else CODE="$REPO/baselines/scripts/schemdraw/$SET/case$NN/attempt-$K.py"; fi

@@ -1,6 +1,6 @@
 # Brief for agent B: freeze the Phase 0b cases and build the blind-judge kit
 
-You are working on **schem**, an engine that turns a circuit netlist into a clean schematic drawing for AI agents. The repository is in `C:\Users\ntlak\OneDrive\Documents\Schematic circuit` (branch `main`). Phase 0a is built and the owner has passed its last gate (2026-10-23). Before Phase 0b layout work starts, two things are needed, and they are yours:
+You are working on **schem**, an engine that turns a circuit netlist into a clean schematic drawing for AI agents. The repository root is your working folder (branch `main`). Phase 0a is built and the owner has passed its last gate (2026-10-23). Before Phase 0b layout work starts, two things are needed, and they are yours:
 
 1. **Freeze the 12 Phase 0b test cases** (netlists, allowed hints and edit scripts).
 2. **Build the layer 6 blind-judge kit** (rubric, blind image packs, tallying).

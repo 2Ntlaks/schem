@@ -124,11 +124,11 @@ The bad inputs are written in the test's own temporary folder.
 - The five commands, from the repo root and writing to a temporary folder, all exited `0`:
 
 ```
-led: valid. Wrote C:/Users/ntlak/AppData/Local/Temp/opencode/schem-final/led.svg and C:/Users/ntlak/AppData/Local/Temp/opencode/schem-final/led.png (96 ms)
-summing-amp: valid. Wrote C:/Users/ntlak/AppData/Local/Temp/opencode/schem-final/summing-amp.svg and C:/Users/ntlak/AppData/Local/Temp/opencode/schem-final/summing-amp.png (130 ms)
-h-bridge: valid. Wrote C:/Users/ntlak/AppData/Local/Temp/opencode/schem-final/h-bridge.svg and C:/Users/ntlak/AppData/Local/Temp/opencode/schem-final/h-bridge.png (365 ms)
-i2c-sensors: valid. Wrote C:/Users/ntlak/AppData/Local/Temp/opencode/schem-final/i2c-sensors.svg and C:/Users/ntlak/AppData/Local/Temp/opencode/schem-final/i2c-sensors.png (153 ms)
-esp32-relay: valid. Wrote C:/Users/ntlak/AppData/Local/Temp/opencode/schem-final/esp32-relay.svg and C:/Users/ntlak/AppData/Local/Temp/opencode/schem-final/esp32-relay.png (201 ms)
+led: valid. Wrote <temp>/schem-final/led.svg and <temp>/schem-final/led.png (96 ms)
+summing-amp: valid. Wrote <temp>/schem-final/summing-amp.svg and <temp>/schem-final/summing-amp.png (130 ms)
+h-bridge: valid. Wrote <temp>/schem-final/h-bridge.svg and <temp>/schem-final/h-bridge.png (365 ms)
+i2c-sensors: valid. Wrote <temp>/schem-final/i2c-sensors.svg and <temp>/schem-final/i2c-sensors.png (153 ms)
+esp32-relay: valid. Wrote <temp>/schem-final/esp32-relay.svg and <temp>/schem-final/esp32-relay.png (201 ms)
 ```
 
 - I ran `npm run schem -- draw examples/led.schem.json` with no `-o` as well. It exited `0`, printed

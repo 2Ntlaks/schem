@@ -18,7 +18,7 @@ import re
 import shutil
 import sys
 
-KICAD_SYMBOLS = os.environ.setdefault("KICAD10_SYMBOL_DIR", r"C:\Users\ntlak\schem-baselines\kicad-symbols")
+KICAD_SYMBOLS = os.environ.setdefault("KICAD10_SYMBOL_DIR", os.path.join(os.path.expanduser("~"), "schem-baselines", "kicad-symbols"))
 
 from skidl import *  # noqa: E402,F403  (NC, POWER, Net, Part, generate_svg, reset)
 

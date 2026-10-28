@@ -14,11 +14,12 @@
 //   graph out top-down from outputs to inputs.
 import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { rasterize } from "./rasterize.mjs";
 
-const BASE = process.env.SCHEM_BASELINES ?? "C:/Users/ntlak/schem-baselines";
+const BASE = process.env.SCHEM_BASELINES ?? join(homedir(), "schem-baselines");
 const NSVG = join(BASE, "netlistsvg", "node_modules", "netlistsvg");
 const SKIN = join(NSVG, "lib", "analog.svg");
 

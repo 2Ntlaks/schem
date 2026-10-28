@@ -39,7 +39,7 @@ logs are tracked; rerun the steps below to rebuild the images.
 ## Rerun
 
 Run from the repo root in Git Bash. Install the tools as `VERSIONS.md` describes, or set `SCHEM_BASELINES`
-to the folder that holds `venv` and `netlistsvg` (default `C:\Users\ntlak\schem-baselines`).
+to the folder that holds `venv` and `netlistsvg` (default `%USERPROFILE%\schem-baselines`).
 
 1. Rebuild the neutral netlists. They are already on disk; this step is needed only when a case or its
    loader changes.

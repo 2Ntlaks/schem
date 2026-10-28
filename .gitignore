@@ -2,3 +2,4 @@ node_modules/
 out/
 .schem-history/
 .claude/worktrees/
+__pycache__/
