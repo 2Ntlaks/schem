@@ -2,7 +2,8 @@
   "name": "schem",
   "version": "0.0.1",
   "private": true,
-  "description": "Agent-first schematic engine (Phase 0a)",
+  "description": "Turn a JSON netlist into a clean, verified schematic drawing (SVG and PNG). Agent-first.",
+  "license": "MIT",
   "type": "module",
   "engines": {
     "node": ">=22"

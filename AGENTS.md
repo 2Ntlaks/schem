@@ -1,6 +1,6 @@
 # Rules for coding agents in this repo
 
-This file is for any coding agent working here (DeepSeek in opencode, Codex, others). Read it fully before you start. The lead (Claude) reviews and merges your work; the owner decides.
+This file is for any coding agent working here (Claude Code, Codex, opencode and others), whether for the maintainers or for an outside contributor. Read it fully before you start. Maintainers review and merge your work; a person signs off on every pull request.
 
 ## What this project is
 
@@ -8,9 +8,9 @@ This file is for any coding agent working here (DeepSeek in opencode, Codex, oth
 
 ## Where you may and may not write
 
-You may write only where your task brief says. In any case:
+Your task is either a brief in `docs/agent-briefs/` or the issue you were asked to work on. Write only where the task needs. In any case:
 
-- **Never edit** `src/` (the layout engine) unless your brief explicitly names the file. The engine is the lead's work.
+- **Never edit** files under `src/` that your task does not name. Adding a symbol to `src/symbols/library.ts` is fine when that is the task; changes to the layout engine (`src/layout/`) need an issue the maintainers agreed to first.
 - **Never edit** `phase0/` (frozen test cases, checked by a SHA-256 manifest), `tests/fixtures/` (written independently from the spec), or `SPEC.md`.
 - **Never open, list, read or run** anything under `phase0/cases/test/`, `phase0/cases/edits/case11-*`, `baselines/LOG-test.md`, `baselines/out/*/test/` or `baselines/out/_netlist/test/`. These are the held-out test set; looking at them spoils the final evaluation. Never run `npm run gates -- --test` or `npm run phase0 -- --test`.
 - **Never change a test to make it pass.** If a test fails, stop and report it.
@@ -18,7 +18,7 @@ You may write only where your task brief says. In any case:
 
 ## How to work
 
-1. Work on your own git branch, never on `main`: `git switch -c <branch named in your brief>`. Commit in small steps with clear messages. Never push, never merge, never rebase `main`.
+1. Work on your own git branch, never on `main`: `git switch -c <branch named in your brief, or a short descriptive name>`. Commit in small steps with clear messages. Never push, never merge, never rebase `main`.
 2. Before you report, run and pass all of these:
    - `npm run typecheck`
    - `npm test`
@@ -34,5 +34,5 @@ You may write only where your task brief says. In any case:
 
 ## Report at the end of every task
 
-Finish with a report in `docs/agent-reports/<branch-name>.md` (and the same text as your last message):
+For a maintainer brief, finish with a report in `docs/agent-reports/<branch-name>.md` (and the same text as your last message). For an outside contribution, put the report in the pull request description instead. Either way, cover:
 what you did, the files you changed, the commands you ran with their results, anything you skipped or could not do, and open questions.
