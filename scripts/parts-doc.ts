@@ -12,7 +12,8 @@ import { cmpNatural } from "../src/geom/geom.js";
 import { MODULE_LIBRARY } from "../src/modules/index.js";
 import { BUILTIN } from "../src/symbols/library.js";
 
-/** Keep a pin name safe inside a Markdown table cell and a code span. */function md(s: string): string {
+/** Keep a pin name safe inside a Markdown table cell and a code span. */
+function md(s: string): string {
   return s.replace(/`/g, "'").replace(/\|/g, "\\|");
 }
 

@@ -246,13 +246,5 @@
         ]
       }
     ]
-  },
-  "ext": {
-    "phase0": {
-      "case": 4,
-      "set": "validation",
-      "author": "agent B (independent case author)",
-      "source": "discrete complementary H-bridge: IRF9540N high side, IRF540N low side, 100 ohm gate resistors, 10k gate-source resistors, 4 drive inputs on a header"
-    }
   }
 }

@@ -246,6 +246,7 @@ function draw(file: string | undefined, dir: string, io: Io): number {
 
   const loaded = loadProject(text);
   if (!loaded.ok || loaded.project === undefined) {
+    io.err(`Cannot draw ${showPath(file)}:`);
     printLoadErrors(loaded, io);
     return 2;
   }
