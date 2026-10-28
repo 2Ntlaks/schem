@@ -206,3 +206,19 @@ Case 6 stays at 3 crossings: with J1's pins in the order COM, NO, NC and both NO
 - A shared pin's slot fills left to right, smallest capacitance first, wherever the pin sits on the box.
 
 Result: 439 tests pass; validation cases 1-8 all `valid` (case 4 was `valid_low_confidence`); 12 of 12 validation edits pass gate 4. Case 8 (differential pair, no template) is still the weakest drawing.
+
+### Gate 6 speed-up (2026-10-28)
+
+After the merge, every router search on gate 6's generated circuit succeeds (451 searches, about 393,000 expansions per `review()`); the time was the cost of each expansion, not failed searches. Two changes in `src/layout/router.ts`, neither changes a result (`tests/findings-snapshot.test.ts`, re-taken on the merged code before the change, is byte-identical):
+
+- **Forbidden geometry rasterised once per route call** on a half grid (grid points and unit-edge midpoints), the same closed-box test as `src/geom/forbidden.ts`; a point off the raster falls back to that test.
+- **Numbers instead of strings** for grid points, unit edges and search states (coordinates within +-4096 G keep every key a small integer; outside that the router throws), wire directions as bit masks, and an inner loop without allocations.
+
+The planned reachability pre-check was not needed: no search fails on the validation set or the generated circuit.
+
+| | before (merged code) | after |
+|---|---|---|
+| Generated 30-part circuit, warm median / p95 | 2868 / 3086 ms (FAIL) | 1664 / 1822 ms (pass) |
+| Case 4, warm median / p95 | 330 / 349 ms | 81 / 103 ms |
+
+Timings on a loaded Windows laptop; the same run varies by up to 2x between repeats with identical work, so the margin to 3 s matters more than the exact figure.

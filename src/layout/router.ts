@@ -1,6 +1,6 @@
 // Grid router (SPEC 9.2 step 7). A* over (point, arrival direction) states.
 
-import { cmpStr, DIRS, edgeKey, key, manhattan, opposite, step, type Box, type Dir, type Pt } from "../geom/geom.js";
+import { cmpStr, DIRS, step, type Box, type Dir, type Pt } from "../geom/geom.js";
 import { edgeForbidden, pointBlocked, type Obstacle } from "../geom/forbidden.js";
 
 export interface Terminal { id: string; at: Pt; dir: Dir }
@@ -13,25 +13,70 @@ const COST = { step: 1, bend: 3, cross: 12, hug: 2, jog: 9 };
 const JOG = 2; // as JOG_MAX in src/quality/metrics.ts
 const EXPANSION_CAP = 60_000;
 
-interface Occ { net: string; dirs: Set<Dir> }
+interface Occ { net: string; dirs: number } // directions used there, bit i for DIRS[i]
 
 const RIP_UP_PASSES = 3;
 
+// Grid points and unit edges as numbers: the string keys of geom.ts cost most of the search time.
+// Coordinates within +-4096 G keep every key (point, edge, search state) a small integer.
+const OFF = 1 << 12, SPAN = 1 << 13;
+const pxy = (px: number, py: number): number => {
+  const x = px + OFF, y = py + OFF;
+  if (x < 0 || y < 0 || x >= SPAN || y >= SPAN) throw new Error(`router: grid point ${px},${py} is outside +-${OFF} G`);
+  return x * SPAN + y;
+};
+const pid = (p: Pt): number => pxy(p[0], p[1]);
+const unpid = (k: number): Pt => [Math.floor(k / SPAN) - OFF, (k % SPAN) - OFF];
+const eid = (a: Pt, b: Pt): number => pid(a[0] < b[0] || (a[0] === b[0] && a[1] < b[1]) ? a : b) * 2 + (a[1] === b[1] ? 0 : 1);
+const DIR_INDEX: Record<Dir, number> = Object.fromEntries(DIRS.map((d, i) => [d, i])) as Record<Dir, number>;
+
+/**
+ * The forbidden geometry of `src/geom/forbidden.ts`, rasterised once per route call on a half grid
+ * (grid points and unit-edge midpoints). Same closed-box test; points off the raster fall back to it.
+ */
+class Forbidden {
+  private readonly x0: number; private readonly y0: number; private readonly w: number; private readonly h: number;
+  private readonly cells: Uint8Array;
+  constructor(private readonly obstacles: Obstacle[], bounds: Box) {
+    this.x0 = Math.floor(2 * bounds.x); this.y0 = Math.floor(2 * bounds.y);
+    this.w = Math.ceil(2 * (bounds.x + bounds.w)) - this.x0 + 1; this.h = Math.ceil(2 * (bounds.y + bounds.h)) - this.y0 + 1;
+    this.cells = new Uint8Array(this.w * this.h);
+    for (const o of obstacles) {
+      const ua = Math.max(this.x0, Math.ceil(2 * o.x)), ub = Math.min(this.x0 + this.w - 1, Math.floor(2 * (o.x + o.w)));
+      const va = Math.max(this.y0, Math.ceil(2 * o.y)), vb = Math.min(this.y0 + this.h - 1, Math.floor(2 * (o.y + o.h)));
+      for (let v = va; v <= vb; v++) this.cells.fill(1, (v - this.y0) * this.w + ua - this.x0, (v - this.y0) * this.w + ub - this.x0 + 1);
+    }
+  }
+  private at(x2: number, y2: number): boolean | undefined {
+    const u = x2 - this.x0, v = y2 - this.y0;
+    return u < 0 || v < 0 || u >= this.w || v >= this.h ? undefined : this.cells[v * this.w + u] === 1;
+  }
+  /** A grid point (x2, y2 both even) or a unit-edge midpoint (one odd), in half-grid units. */
+  half(x2: number, y2: number): boolean {
+    const r = this.at(x2, y2);
+    if (r !== undefined) return r;
+    const p: Pt = [x2 / 2, y2 / 2];
+    return x2 % 2 === 0 && y2 % 2 === 0 ? pointBlocked(p, this.obstacles) : edgeForbidden(p, p, this.obstacles) !== undefined;
+  }
+  edge(a: Pt, b: Pt): boolean { return this.half(a[0] + b[0], a[1] + b[1]); }
+}
+
 export function route(requests: NetRequest[], obstacles: Obstacle[], bounds: Box): RoutedNet[] {
-  let occ = new Map<string, Occ>();          // point -> owning net + directions used there
-  let usedEdges = new Map<string, string>(); // unit edge -> net
-  const pinPoint = new Map<string, string>();  // pin anchor -> net
-  const approach = new Map<string, string>();  // approach point of a pin -> net
+  const forbidden = new Forbidden(obstacles, bounds);
+  let occ = new Map<number, Occ>();          // point -> owning net + directions used there
+  let usedEdges = new Map<number, string>(); // unit edge -> net
+  const pinPoint = new Map<number, string>();  // pin anchor -> net
+  const approach = new Map<number, string>();  // approach point of a pin -> net
   for (const r of requests) for (const t of r.terminals) {
-    pinPoint.set(key(t.at), r.net);
-    approach.set(key(step(t.at, t.dir)), r.net);
+    pinPoint.set(pid(t.at), r.net);
+    approach.set(pid(step(t.at, t.dir)), r.net);
   }
   const markEdge = (net: string, a: Pt, b: Pt) => {
-    usedEdges.set(edgeKey(a, b), net);
+    usedEdges.set(eid(a, b), net);
     for (const [p, q] of [[a, b], [b, a]] as const) {
-      const k = key(p);
-      const o = occ.get(k) ?? { net, dirs: new Set<Dir>() };
-      o.dirs.add(dirOf(p, q));
+      const k = pid(p);
+      const o = occ.get(k) ?? { net, dirs: 0 };
+      o.dirs |= 1 << DIR_INDEX[dirOf(p, q)];
       occ.set(k, o);
     }
   };
@@ -40,15 +85,15 @@ export function route(requests: NetRequest[], obstacles: Obstacle[], bounds: Box
   const routeNet = (r: NetRequest): RoutedNet => {
     const edges: Array<[Pt, Pt]> = [...(r.prewired ?? [])];
     const failed: string[] = [];
-    const tree = new Set<string>(); // points that may be joined
-    const treeDeg = new Map<string, number>();
+    const tree = new Set<number>(); // points that may be joined
+    const treeDeg = new Map<number, number>();
     const addTreeEdge = (a: Pt, b: Pt) => {
       markEdge(r.net, a, b);
       edges.push([a, b]);
-      for (const p of [a, b]) { const k = key(p); treeDeg.set(k, (treeDeg.get(k) ?? 0) + 1); }
-      for (const p of [a, b]) { const k = key(p); if (!pinPoint.has(k) && (treeDeg.get(k) ?? 0) < 3) tree.add(k); else tree.delete(k); }
+      for (const p of [a, b]) { const k = pid(p); treeDeg.set(k, (treeDeg.get(k) ?? 0) + 1); }
+      for (const p of [a, b]) { const k = pid(p); if (!pinPoint.has(k) && (treeDeg.get(k) ?? 0) < 3) tree.add(k); else tree.delete(k); }
     };
-    for (const [a, b] of r.prewired ?? []) for (const p of [a, b]) { const k = key(p); treeDeg.set(k, (treeDeg.get(k) ?? 0) + 1); if (!pinPoint.has(k)) tree.add(k); }
+    for (const [a, b] of r.prewired ?? []) for (const p of [a, b]) { const k = pid(p); treeDeg.set(k, (treeDeg.get(k) ?? 0) + 1); if (!pinPoint.has(k)) tree.add(k); }
 
     const terms = [...r.terminals];
     if (r.noRoute) return { net: r.net, edges, failed };
@@ -61,8 +106,8 @@ export function route(requests: NetRequest[], obstacles: Obstacle[], bounds: Box
       terms.sort((s, t) => distToTree(s, tree) - distToTree(t, tree) || cmpStr(s.id, t.id));
       const t = terms.shift()!;
       // First avoid joining 1 G from a bend or junction of the tree (a step or two dots side by side).
-      const path = search(t, r.net, tree, occ, usedEdges, pinPoint, approach, obstacles, bounds, true)
-        ?? search(t, r.net, tree, occ, usedEdges, pinPoint, approach, obstacles, bounds, false);
+      const path = search(t, r.net, tree, occ, usedEdges, pinPoint, approach, forbidden, bounds, true)
+        ?? search(t, r.net, tree, occ, usedEdges, pinPoint, approach, forbidden, bounds, false);
       if (!path) { failed.push(t.id); continue; }
       for (let i = 0; i + 1 < path.length; i++) addTreeEdge(path[i]!, path[i + 1]!);
     }
@@ -103,12 +148,12 @@ export function route(requests: NetRequest[], obstacles: Obstacle[], bounds: Box
  * wire) and unit edges running alongside another net's wire on an adjacent track.
  */
 function conflictsPerNet(nets: RoutedNet[]): Map<string, number> {
-  const owners = new Map<string, Set<string>>();
-  const edgeNet = new Map<string, string>();
+  const owners = new Map<number, Set<string>>();
+  const edgeNet = new Map<number, string>();
   for (const n of nets) for (const [a, b] of n.edges) {
-    edgeNet.set(edgeKey(a, b), n.net);
+    edgeNet.set(eid(a, b), n.net);
     for (const p of [a, b]) {
-      const k = key(p);
+      const k = pid(p);
       const s = owners.get(k) ?? new Set<string>();
       s.add(n.net);
       owners.set(k, s);
@@ -121,36 +166,41 @@ function conflictsPerNet(nets: RoutedNet[]): Map<string, number> {
   return per;
 }
 
-function distToTree(t: Terminal, tree: Set<string>): number {
+function distToTree(t: Terminal, tree: Set<number>): number {
   let best = Infinity;
-  for (const k of tree) { const [x, y] = k.split(",").map(Number); best = Math.min(best, Math.abs(x! - t.at[0]) + Math.abs(y! - t.at[1])); }
+  for (const k of tree) { const [x, y] = unpid(k); best = Math.min(best, Math.abs(x - t.at[0]) + Math.abs(y - t.at[1])); }
   return best;
 }
 
+// Search state: a point (x, y), the arrival direction as an index into DIRS, and `run`.
+type S = { x: number; y: number; di: number; g: number; f: number; hh: number; run: number; prev?: S; join?: boolean };
+
 function search(
-  t: Terminal, net: string, tree: Set<string>, occ: Map<string, Occ>, usedEdges: Map<string, string>,
-  pinPoint: Map<string, string>, approach: Map<string, string>, obstacles: Obstacle[], bounds: Box, strict: boolean,
+  t: Terminal, net: string, tree: Set<number>, occ: Map<number, Occ>, usedEdges: Map<number, string>,
+  pinPoint: Map<number, string>, approach: Map<number, string>, forbidden: Forbidden, bounds: Box, strict: boolean,
 ): Pt[] | undefined {
-  const targets = [...tree].map((k) => k.split(",").map(Number) as unknown as Pt);
-  const hMemo = new Map<string, number>();
-  const h = (p: Pt) => {
-    const k = key(p);
+  const targets = [...tree].map(unpid);
+  const hMemo = new Map<number, number>();
+  const h = (x: number, y: number, k: number) => {
     let b = hMemo.get(k);
-    if (b === undefined) { b = Infinity; for (const q of targets) b = Math.min(b, manhattan(p, q)); hMemo.set(k, b); }
+    if (b === undefined) { b = Infinity; for (const q of targets) b = Math.min(b, Math.abs(x - q[0]) + Math.abs(y - q[1])); hMemo.set(k, b); }
     return b;
   };
   const start = step(t.at, t.dir);
-  const startK = key(start);
-  if (tree.has(startK) && !usedEdges.has(edgeKey(t.at, start))) return [t.at, start];
-  if (!freeFor(start, net, occ, pinPoint, approach, obstacles)) return undefined;
-  if (edgeForbidden(t.at, start, obstacles) || usedEdges.has(edgeKey(t.at, start))) return undefined;
+  const startK = pid(start);
+  if (tree.has(startK) && !usedEdges.has(eid(t.at, start))) return [t.at, start];
+  if (!freeFor(start[0], start[1], startK, net, occ, pinPoint, approach, forbidden)) return undefined;
+  if (forbidden.edge(t.at, start) || usedEdges.has(eid(t.at, start))) return undefined;
 
   // run: steps since the path's last bend, capped at JOG + 1, which also stands for "no bend yet"
   // (a turn is then no jog either way); part of the state, so the jog cost stays exact.
-  type S = { p: Pt; d: Dir; g: number; f: number; hh: number; run: number; prev?: S; join?: boolean };
   const open = new Heap<S>(better);
-  open.push({ p: start, d: t.dir, g: COST.step, hh: h(start), f: COST.step + h(start), run: JOG + 1 });
-  const best = new Map<string, number>();
+  const h0 = h(start[0], start[1], startK);
+  open.push({ x: start[0], y: start[1], di: DIR_INDEX[t.dir], g: COST.step, hh: h0, f: COST.step + h0, run: JOG + 1 });
+  // Best cost per state (point, arrival direction, run) and per join (point, direction).
+  const best = new Map<number, number>();
+  const bestJoin = new Map<number, number>();
+  const x0 = bounds.x, y0 = bounds.y, x1 = bounds.x + bounds.w, y1 = bounds.y + bounds.h;
   let expansions = 0;
   while (open.size) {
     // Deterministic pop: lowest f, then h, then direction order, then x, then y.
@@ -158,104 +208,113 @@ function search(
     if (s.join) {
       // The cheapest way onto the tree, final step and turn included (goal test on pop).
       const path: Pt[] = [];
-      for (let u: S | undefined = s; u; u = u.prev) path.push(u.p);
+      for (let u: S | undefined = s; u; u = u.prev) path.push([u.x, u.y]);
       path.push(t.at);
       return path.reverse();
     }
-    const sk = `${key(s.p)}|${s.d}|${s.run}`;
-    if ((best.get(sk) ?? Infinity) < s.g) continue;
+    const spk = pxy(s.x, s.y);
+    if ((best.get((spk * 4 + s.di) * 4 + s.run) ?? Infinity) < s.g) continue;
     if (++expansions > EXPANSION_CAP) return undefined;
-    const crossingHere = occ.has(key(s.p)) && occ.get(key(s.p))!.net !== net;
-    for (const nd of DIRS) {
-      if (nd === opposite(s.d)) continue;
-      if (crossingHere && nd !== s.d) continue; // straight through a crossing, never turn on it
-      const q = step(s.p, nd);
-      if (q[0] < bounds.x || q[1] < bounds.y || q[0] > bounds.x + bounds.w || q[1] > bounds.y + bounds.h) continue;
-      if (usedEdges.has(edgeKey(s.p, q))) continue;
-      if (edgeForbidden(s.p, q, obstacles)) continue;
-      const qk = key(q);
-      const turn = nd !== s.d ? COST.bend + (s.run <= JOG ? COST.jog : 0) : 0;
-      const run = nd !== s.d ? 1 : Math.min(s.run + 1, JOG + 1);
+    const here = occ.get(spk);
+    const crossingHere = here !== undefined && here.net !== net;
+    for (let nd = 0; nd < 4; nd++) {
+      if (nd === ((s.di + 2) & 3)) continue;
+      if (crossingHere && nd !== s.di) continue; // straight through a crossing, never turn on it
+      const qx = s.x + DX[nd]!, qy = s.y + DY[nd]!;
+      if (qx < x0 || qy < y0 || qx > x1 || qy > y1) continue;
+      if (usedEdges.has(eStep(s.x, s.y, nd))) continue;
+      if (forbidden.half(s.x + qx, s.y + qy)) continue;
+      const qk = pxy(qx, qy);
+      const turn = nd !== s.di ? COST.bend + (s.run <= JOG ? COST.jog : 0) : 0;
+      const run = nd !== s.di ? 1 : Math.min(s.run + 1, JOG + 1);
       if (tree.has(qk)) {
         // Joining: the point must not become a four-way junction.
-        const deg = occ.get(qk)?.dirs.size ?? 0;
+        const deg = bitCount(occ.get(qk)?.dirs ?? 0);
         if (deg >= 3) continue;
-        if (strict && nearBend(q, net, occ)) continue;
+        if (strict && nearBend(qx, qy, qk, net, occ)) continue;
         const g = s.g + COST.step + turn;
-        const jk = `${qk}|${nd}|join`;
-        if ((best.get(jk) ?? Infinity) <= g) continue;
-        best.set(jk, g);
-        open.push({ p: q, d: nd, g, hh: 0, f: g, run, prev: s, join: true });
+        const jk = qk * 4 + nd;
+        if ((bestJoin.get(jk) ?? Infinity) <= g) continue;
+        bestJoin.set(jk, g);
+        open.push({ x: qx, y: qy, di: nd, g, hh: 0, f: g, run, prev: s, join: true });
         continue;
       }
-      if (!freeFor(q, net, occ, pinPoint, approach, obstacles)) continue;
+      if (!freeFor(qx, qy, qk, net, occ, pinPoint, approach, forbidden)) continue;
       const o = occ.get(qk);
       let cross = 0;
       if (o && o.net !== net) {
         // May only cross another net's straight wire, perpendicular to it.
-        const ds = [...o.dirs];
-        const straight = ds.length === 2 && opposite(ds[0]!) === ds[1]!;
-        const perpendicular = straight && ds[0] !== nd && ds[0] !== opposite(nd);
-        if (!perpendicular) continue;
+        if (!(o.dirs === H_BITS ? (nd & 1) === 1 : o.dirs === V_BITS ? (nd & 1) === 0 : false)) continue;
         cross = COST.cross;
       }
       if (o && o.net === net) continue; // own wire but not joinable (pin or junction)
-      const g = s.g + COST.step + turn + cross + (hugs(s.p, q, net, usedEdges) ? COST.hug : 0);
-      const nk = `${qk}|${nd}|${run}`;
+      const g = s.g + COST.step + turn + cross + (hugsXY(s.x, s.y, nd, net, usedEdges) ? COST.hug : 0);
+      const nk = (qk * 4 + nd) * 4 + run;
       if ((best.get(nk) ?? Infinity) <= g) continue;
       best.set(nk, g);
-      const hh = h(q);
-      open.push({ p: q, d: nd, g, hh, f: g + hh, run, prev: s });
+      const hh = h(qx, qy, qk);
+      open.push({ x: qx, y: qy, di: nd, g, hh, f: g + hh, run, prev: s });
     }
   }
   return undefined;
 }
 
-/** The unit edge a-b runs alongside another net's wire on an adjacent parallel track (a squeezed run). */
-function hugs(a: Pt, b: Pt, net: string, usedEdges: Map<string, string>): boolean {
-  const ox = a[1] === b[1] ? 0 : 1, oy = 1 - ox;
+// Unit steps per direction index (DIRS order: right, down, left, up) and wire direction bit masks.
+const DX = [1, 0, -1, 0], DY = [0, 1, 0, -1];
+const H_BITS = 0b0101, V_BITS = 0b1010; // a straight wire: right + left, or down + up
+const bitCount = (m: number) => (m & 1) + ((m >> 1) & 1) + ((m >> 2) & 1) + ((m >> 3) & 1);
+const straight = (m: number) => m === H_BITS || m === V_BITS;
+
+/** The unit edge leaving (x, y) in direction index `d`. */
+function eStep(x: number, y: number, d: number): number {
+  return d === 0 ? pxy(x, y) * 2 : d === 2 ? pxy(x - 1, y) * 2 : d === 1 ? pxy(x, y) * 2 + 1 : pxy(x, y - 1) * 2 + 1;
+}
+
+/** The unit edge leaving (x, y) in direction `d` runs alongside another net's wire on an adjacent parallel track (a squeezed run). */
+function hugsXY(x: number, y: number, d: number, net: string, usedEdges: Map<number, string>): boolean {
+  const ox = d & 1, oy = 1 - ox;
   for (const sgn of [1, -1]) {
-    const n = usedEdges.get(edgeKey([a[0] + sgn * ox, a[1] + sgn * oy], [b[0] + sgn * ox, b[1] + sgn * oy]));
+    const n = usedEdges.get(eStep(x + sgn * ox, y + sgn * oy, d));
     if (n !== undefined && n !== net) return true;
   }
   return false;
 }
 
-/** A straight point of a net's wire whose neighbour on it is a bend or a junction. */
-function nearBend(q: Pt, net: string, occ: Map<string, Occ>): boolean {
-  const o = occ.get(key(q));
-  if (!o || o.net !== net) return false;
-  const ds = [...o.dirs];
-  if (!(ds.length === 2 && opposite(ds[0]!) === ds[1]!)) return false;
-  return ds.some((d) => {
-    const n = occ.get(key(step(q, d)));
-    if (!n || n.net !== net) return false;
-    const nd = [...n.dirs];
-    return nd.length >= 3 || (nd.length === 2 && opposite(nd[0]!) !== nd[1]!);
-  });
+/** The unit edge a-b runs alongside another net's wire on an adjacent parallel track (a squeezed run). */
+function hugs(a: Pt, b: Pt, net: string, usedEdges: Map<number, string>): boolean {
+  return hugsXY(a[0], a[1], DIR_INDEX[dirOf(a, b)], net, usedEdges);
 }
 
-function better(a: { f: number; hh: number; d: Dir; p: Pt }, b: { f: number; hh: number; d: Dir; p: Pt }): boolean {
+/** A straight point of a net's wire whose neighbour on it is a bend or a junction. */
+function nearBend(x: number, y: number, k: number, net: string, occ: Map<number, Occ>): boolean {
+  const o = occ.get(k);
+  if (!o || o.net !== net || !straight(o.dirs)) return false;
+  for (let d = 0; d < 4; d++) {
+    if (!(o.dirs & (1 << d))) continue;
+    const n = occ.get(pxy(x + DX[d]!, y + DY[d]!));
+    if (!n || n.net !== net) continue;
+    const c = bitCount(n.dirs);
+    if (c >= 3 || (c === 2 && !straight(n.dirs))) return true;
+  }
+  return false;
+}
+
+function better(a: S, b: S): boolean {
   if (a.f !== b.f) return a.f < b.f;
   if (a.hh !== b.hh) return a.hh < b.hh;
-  const da = DIRS.indexOf(a.d), db = DIRS.indexOf(b.d);
-  if (da !== db) return da < db;
-  if (a.p[0] !== b.p[0]) return a.p[0] < b.p[0];
-  return a.p[1] < b.p[1];
+  if (a.di !== b.di) return a.di < b.di;
+  if (a.x !== b.x) return a.x < b.x;
+  return a.y < b.y;
 }
 
-function freeFor(p: Pt, net: string, occ: Map<string, Occ>, pinPoint: Map<string, string>, approach: Map<string, string>, obstacles: Obstacle[]): boolean {
-  const k = key(p);
+function freeFor(x: number, y: number, k: number, net: string, occ: Map<number, Occ>, pinPoint: Map<number, string>, approach: Map<number, string>, forbidden: Forbidden): boolean {
   const pn = pinPoint.get(k);
   if (pn !== undefined) return false;              // pins are reached only as targets
   const an = approach.get(k);
   if (an !== undefined && an !== net) return false; // keep other nets' pin approaches clear
-  if (pointBlocked(p, obstacles)) return false;
+  if (forbidden.half(2 * x, 2 * y)) return false;
   const o = occ.get(k);
-  if (o && o.net !== net) {
-    const ds = [...o.dirs];
-    if (!(ds.length === 2 && opposite(ds[0]!) === ds[1]!)) return false; // corners, ends, junctions
-  }
+  if (o && o.net !== net && !straight(o.dirs)) return false; // corners, ends, junctions
   return true;
 }
 
