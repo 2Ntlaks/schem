@@ -257,7 +257,32 @@ export const I2C_DECOUPLED: Project = {
   ] },
 };
 
+/**
+ * I2C bus from a controller whose reset pin, above the bus pins, has an RC network (pull-up and
+ * capacitor to ground): the RC sits in a column the bus crosses, so it must keep clear of the bus.
+ */
+export const I2C_RESET_RC: Project = {
+  meta: { title: "I2C with a reset RC" },
+  circuit: {
+    parts: [
+      ic("U1", "MCU", [["1", "RESET", "input"], ["2", "VCC", "power_in"], ["3", "SDA", "bidir", ["i2c.sda"]], ["4", "SCL", "bidir", ["i2c.scl"]], ["5", "GND", "ground"]], { controller: "true" }),
+      ic("U2", "SENSOR", [["1", "VDD", "power_in"], ["2", "GND", "ground"], ["3", "SDA", "bidir", ["i2c.sda"]], ["4", "SCL", "bidir", ["i2c.scl"]]]),
+      { id: "R1", type: "resistor", props: { value: "10k" } },
+      { id: "C1", type: "capacitor", props: { value: "100n" } },
+      { id: "R2", type: "resistor", props: { value: "4.7k" } },
+      { id: "R3", type: "resistor", props: { value: "4.7k" } },
+    ],
+    nets: [
+      { id: "n1", name: "3V3", endpoints: ["U1.VCC", "U2.VDD", "R1.1", "R2.1", "R3.1"] },
+      { id: "n2", name: "GND", endpoints: ["U1.GND", "U2.GND", "C1.2"] },
+      { id: "n3", name: "NRST", endpoints: ["U1.RESET", "R1.2", "C1.1"] },
+      { id: "n4", name: "SDA", endpoints: ["U1.SDA", "U2.SDA", "R2.2"] },
+      { id: "n5", name: "SCL", endpoints: ["U1.SCL", "U2.SCL", "R3.2"] },
+    ],
+  },
+};
+
 export const TEMPLATE_CIRCUITS: Record<string, Project> = {
   "noninverting": NONINVERTING, "inverting": INVERTING, "divider": DIVIDER, "pulls": PULLS, "led-gpio": LED_GPIO, "led-sink": LED_SINK,
-  "bridge": BRIDGE, "hbridge-bjt": HBRIDGE_BJT, "low-side": LOW_SIDE, "diff-pair": DIFF_PAIR, "i2c-decoupled": I2C_DECOUPLED,
+  "bridge": BRIDGE, "hbridge-bjt": HBRIDGE_BJT, "low-side": LOW_SIDE, "diff-pair": DIFF_PAIR, "i2c-decoupled": I2C_DECOUPLED, "i2c-reset-rc": I2C_RESET_RC,
 };

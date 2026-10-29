@@ -31,7 +31,7 @@ An agent can tell you that an ESP32 drives a relay through a transistor with a f
 - **You write a netlist.** Parts and the pins they connect. No coordinates, no wires, no layout.
 - **schem draws it the way an engineer would.** Power at the top, ground at the bottom, signals flowing left to right, familiar circuits in their textbook arrangement.
 - **Then it checks its own work.** The connections are rebuilt from the finished drawing and compared with your netlist, and parts and labels are checked for overlaps. If the picture does not say exactly what the netlist says, you are told.
-- **Edits stay put.** Change a value or add a part with `schem edit`, and the rest of the drawing stays where it was (untouched parts may shift a little, within a measured limit; 136 of 140 random test edits stay inside it, and `--strict` refuses the rest). A figure in your report does not reshuffle itself between versions.
+- **Edits stay put.** Change a value or add a part with `schem edit`, and the rest of the drawing stays where it was (untouched parts may shift a little, within a measured limit; 133 of 137 random test edits stay inside it, and `--strict` refuses the rest). A figure in your report does not reshuffle itself between versions.
 
 ## Quick start
 

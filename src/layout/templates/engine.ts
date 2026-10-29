@@ -376,6 +376,29 @@ export function solveInterior(r: Region, geo: (id: string) => Geo): Interior | {
   return { offsets, guides, env: envs.map((e) => e.box).reduce((a, b) => unionBox(a, b)) };
 }
 
+/**
+ * Rows of a template's horizontal runs that leave the region's own block (a bus trunk from the
+ * controller to the peripherals): the part whose pin sets the row, the row as an offset from that
+ * part's origin, and every part at either end of the run. Rows set by a guide are left out.
+ */
+export function trunkRows(r: Region, geo: (id: string) => Geo): Array<{ net: string; part: string; off: number; ends: string[] }> {
+  const out: Array<{ net: string; part: string; off: number; ends: string[] }> = [];
+  const parts = (ref: Ref | Ref[]) => (Array.isArray(ref) ? ref : [ref]).flatMap((x) => { const s = refSlot(x); return s ? (r.slots.get(s) ?? []).map((b) => b.part) : []; });
+  for (const tr of r.template.trunks ?? []) {
+    const netId = r.nets.get(tr.net);
+    if (!netId) continue;
+    for (let i = 0; i + 1 < tr.points.length; i++) {
+      const [p, q] = [tr.points[i]!, tr.points[i + 1]!];
+      if (Array.isArray(p.y) || JSON.stringify(p.y) !== JSON.stringify(q.y) || (p.dy ?? 0) !== (q.dy ?? 0)) continue;
+      const t = term(p.y, "y", r, geo, 0);
+      const owner = refSlot(p.y) && r.slots.get(refSlot(p.y)!)?.[0]?.part;
+      if (!t || !owner) continue;
+      out.push({ net: netId, part: owner, off: t.off + (p.dy ?? 0), ends: [...new Set([...parts(p.x), ...parts(q.x)])] });
+    }
+  }
+  return out;
+}
+
 /** Step 6: constraints linking the region to its link slots, at priority `template`. */
 export function linkConstraints(r: Region, geo: (id: string) => Geo, priority: Priority = "template"): Constraint[] {
   return (r.template.link ?? []).flatMap((rel) => expand(rel, r, geo, priority, r.template.id));

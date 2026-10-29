@@ -10,7 +10,7 @@ import { checkDrawing } from "../src/quality/index.js";
 import { toSvg } from "../src/render/svg.js";
 import { TEMPLATES } from "../src/layout/templates/index.js";
 import type { DrawnPin } from "../src/render/model.js";
-import { BRIDGE, DIFF_PAIR, DIVIDER, HBRIDGE_BJT, I2C_DECOUPLED, INVERTING, LED_GPIO, LED_SINK, LOW_SIDE, NONINVERTING, PULLS, TEMPLATE_CIRCUITS } from "./support/template-circuits.js";
+import { BRIDGE, DIFF_PAIR, DIVIDER, HBRIDGE_BJT, I2C_DECOUPLED, I2C_RESET_RC, INVERTING, LED_GPIO, LED_SINK, LOW_SIDE, NONINVERTING, PULLS, TEMPLATE_CIRCUITS } from "./support/template-circuits.js";
 
 const dir = join(import.meta.dirname, "..", "cases");
 const load = (f: string) => JSON.parse(readFileSync(join(dir, f), "utf8")) as Project;
@@ -207,6 +207,15 @@ describe("the other templates", () => {
     expect(pinAt(r, "U2", "6").at[1] - scl).toBeLessThanOrEqual(3);
     expect(pinAt(r, "C1", "1").at[1]).toBeLessThan(scl);
     expect(q.valid).toBe(true);
+  });
+
+  it("I2C bus corridor: a reset RC in a column the bus crosses sits above the bus, so both trunks run straight", () => {
+    const { r, q } = run(I2C_RESET_RC);
+    expect(r.notes.filter((n) => n.includes("blocked"))).toEqual([]);
+    const sda = pinAt(r, "U1", "3").at[1];
+    expect(pinAt(r, "C1", "2").at[1]).toBeLessThan(sda);
+    expect(horizontalRuns(r).some((w) => w[0]![1] === sda && Math.abs(w[w.length - 1]![0] - w[0]![0]) > 20)).toBe(true);
+    expect([q.valid, q.metrics.crossings]).toEqual([true, 1]);
   });
 
   it("a battery loop (case 1) matches no template: a series loop is drawn as a loop", () => {

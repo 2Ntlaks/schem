@@ -2,7 +2,7 @@
 
 export { TEMPLATES } from "./library.js";
 export {
-  apartPairs, isBoundary, linkConstraints, matchTemplates, slotOf, solveInterior, templateLabel, templateOrient, templateRanks, templateSides, trunkRuns,
+  apartPairs, isBoundary, linkConstraints, matchTemplates, slotOf, solveInterior, templateLabel, templateOrient, templateRanks, templateSides, trunkRows, trunkRuns,
   type Geo, type Interior, type Region, type TemplateGraph,
 } from "./engine.js";
 export type { Template } from "./types.js";
