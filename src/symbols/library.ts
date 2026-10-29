@@ -313,6 +313,16 @@ const FUSE: SymbolDef = {
   labelPrefer: ["above", "below", "right", "left"],
 };
 
+/** IEEE coil: four semicircles on one side of the lead, the same length as the resistor. */
+const INDUCTOR: SymbolDef = {
+  id: "inductor", version: 1, refPrefix: "L", source: "original", kind: "two-pin",
+  pins: [pin("1", "1", [0, 0], "left", "passive", { chain: "in" }), pin("2", "2", [6, 0], "right", "passive", { chain: "out" })],
+  align: [3, 0],
+  graphics: [{ d: "M0 0 H0.6 A0.6 0.6 0 0 1 1.8 0 A0.6 0.6 0 0 1 3 0 A0.6 0.6 0 0 1 4.2 0 A0.6 0.6 0 0 1 5.4 0 H6" }],
+  art: { x: 0, y: -0.6, w: 6, h: 0.6 },
+  labelPrefer: ["above", "below", "right", "left"],
+};
+
 const ACSOURCE: SymbolDef = {
   id: "ac-source", version: 1, refPrefix: "V", source: "original", kind: "source",
   pins: [pin("1", "1", [0, 0], "left", "passive"), pin("2", "2", [6, 0], "right", "passive")],
@@ -362,7 +372,7 @@ const RELAY: SymbolDef = {
 export const BUILTIN: Record<string, SymbolDef> = Object.fromEntries(
   [RESISTOR, CAPACITOR, LED, BATTERY, VSOURCE, OPAMP, GROUND, SUPPLY,
     DIODE, POLCAP, POTENTIOMETER, bjt("npn"), bjt("pnp"), mosfet("nmos"), mosfet("pmos"),
-    SPST, PUSHBUTTON, BUZZER, MOTOR, RELAY, FUSE, ACSOURCE].map((s) => [s.id, s]),
+    SPST, PUSHBUTTON, BUZZER, MOTOR, RELAY, FUSE, INDUCTOR, ACSOURCE].map((s) => [s.id, s]),
 );
 
 /** Part types whose pins are declared on the part (SPEC 6.2 `pins`), with a generated symbol. */

@@ -202,6 +202,22 @@ export const SYMBOL_CIRCUITS: Record<string, { covers: string[]; project: Projec
       ],
     } },
   },
+  "lc-low-pass": {
+    covers: ["inductor"],
+    project: { meta: { title: "LC low-pass filter" }, circuit: {
+      parts: [
+        { id: "V1", type: "ac-source", props: { value: "1V" } },
+        { id: "L1", type: "inductor", props: { value: "10u" } },
+        { id: "C1", type: "capacitor", props: { value: "100n" } },
+        { id: "R1", type: "resistor", props: { value: "1k" } },
+      ],
+      nets: [
+        net("n1", undefined, "V1[1]", "L1[1]"),
+        net("n2", "OUT", "L1[2]", "C1[1]", "R1[1]"),
+        net("n3", "GND", "V1[2]", "C1[2]", "R1[2]"),
+      ],
+    } },
+  },
   "header-feeds-resistor": {
     covers: ["header"],
     project: { meta: { title: "Header feeding a resistor" }, circuit: {

@@ -342,7 +342,7 @@ window.addEventListener("resize", () => fit());
 // Parts: every symbol with its own artwork, the generic boxes, and the boards. A click adds one.
 
 const DEFAULT_PROPS: Record<string, Record<string, string>> = {
-  resistor: { value: "10k" }, capacitor: { value: "100n" }, "polarised-capacitor": { value: "10u" }, battery: { value: "9V" },
+  resistor: { value: "10k" }, capacitor: { value: "100n" }, "polarised-capacitor": { value: "10u" }, inductor: { value: "10u" }, battery: { value: "9V" },
   vsource: { value: "5V" }, "ac-source": { value: "1V" }, led: { color: "red" }, fuse: { value: "1A" }, potentiometer: { value: "10k" },
 };
 const BOX_PINS: Record<string, Json[]> = {
