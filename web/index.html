@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>schem playground</title>
+  <meta name="description" content="Write a circuit as a netlist and get a clean, verified schematic. Runs in your browser; nothing is uploaded.">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%231b2230'/%3E%3Cpath d='M4 16h5l2-5 4 10 4-10 4 10 2-5h3' fill='none' stroke='%23e9805f' stroke-width='2.4' stroke-linejoin='round' stroke-linecap='round'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="bar">
+    <a class="mark" href="./" aria-label="schem playground, start again">
+      <span class="mark-word">schem</span><span class="mark-tag">playground</span>
+    </a>
+    <p class="tagline">Netlist in, verified schematic out. <span>Runs in your browser; nothing is uploaded.</span></p>
+    <nav class="actions" aria-label="Playground actions">
+      <label class="examples">
+        <span class="sr">Load an example</span>
+        <select id="examples"><option value="">Examples</option></select>
+      </label>
+      <button type="button" id="parts-btn" class="btn" aria-expanded="false" aria-controls="parts">Parts</button>
+      <button type="button" id="share-btn" class="btn">Share</button>
+      <div class="menu">
+        <button type="button" id="dl-btn" class="btn btn-ink" aria-haspopup="menu" aria-expanded="false">Download</button>
+        <div class="menu-list" role="menu" id="dl-menu" hidden>
+          <button type="button" role="menuitem" data-dl="svg">Drawing, SVG</button>
+          <button type="button" role="menuitem" data-dl="png">Drawing, PNG</button>
+          <button type="button" role="menuitem" data-dl="json">Circuit file, JSON</button>
+          <button type="button" role="menuitem" data-dl="share">Copy a share link</button>
+        </div>
+      </div>
+      <a class="btn btn-quiet" href="https://github.com/2Ntlaks/schem" rel="noopener">GitHub</a>
+    </nav>
+  </header>
+
+  <div class="tabs" role="tablist" aria-label="View">
+    <button type="button" role="tab" id="tab-code" aria-selected="true" aria-controls="pane-code">Circuit</button>
+    <button type="button" role="tab" id="tab-sheet" aria-selected="false" aria-controls="pane-sheet">Drawing <span class="tab-dot" id="tab-dot"></span></button>
+  </div>
+
+  <main class="desk" data-view="code">
+    <section class="pane pane-code" id="pane-code" aria-label="Circuit file">
+      <div class="pane-head">
+        <span class="file" id="file-name">circuit.schem.json</span>
+        <span class="hint">Ctrl+Enter draws now</span>
+        <button type="button" id="tidy-btn" class="chip" title="One part and one net per line">Tidy</button>
+      </div>
+      <div class="editor" id="editor">
+        <div class="gutter" id="gutter" aria-hidden="true"></div>
+        <div class="scroller">
+          <pre class="hl" aria-hidden="true"><code id="hl"></code></pre>
+          <textarea id="src" spellcheck="false" autocapitalize="off" autocomplete="off" wrap="off" aria-label="Circuit file, JSON"></textarea>
+        </div>
+      </div>
+
+      <aside class="parts" id="parts" hidden aria-label="Parts">
+        <div class="parts-head">
+          <h2>Parts</h2>
+          <input type="search" id="parts-q" placeholder="Search: resistor, mosfet, esp32" aria-label="Search parts">
+          <button type="button" class="chip" id="parts-close" aria-label="Close parts">Close</button>
+        </div>
+        <p class="parts-note">Click a part to add it to the circuit. Pin names are what you write in a net, like <code>R1[2]</code> or <code>U1.SDA</code>.</p>
+        <div class="parts-list" id="parts-list"></div>
+      </aside>
+    </section>
+
+    <section class="pane pane-sheet" id="pane-sheet" aria-label="Drawing">
+      <div class="viewport" id="viewport">
+        <div class="stage" id="stage"><div class="sheet" id="sheet"></div></div>
+      </div>
+      <div class="zoom" role="group" aria-label="Zoom">
+        <button type="button" id="zoom-out" aria-label="Zoom out">&minus;</button>
+        <button type="button" id="zoom-fit" aria-label="Fit the drawing">Fit</button>
+        <button type="button" id="zoom-in" aria-label="Zoom in">+</button>
+      </div>
+
+      <div class="titleblock" id="titleblock" aria-live="polite">
+        <div class="tb-row tb-top"><span>schem playground &middot; sheet 1 of 1</span><span id="tb-ms"></span></div>
+        <div class="tb-title" id="tb-title">Loading the engine</div>
+        <div class="tb-row tb-verdict">
+          <span class="stamp" id="stamp" data-verdict="loading">Starting</span>
+          <span class="tb-stats" id="tb-stats">The first visit downloads about 1 MB, mostly the font.</span>
+        </div>
+        <ol class="problems" id="problems"></ol>
+      </div>
+    </section>
+  </main>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <script type="module" src="main.js"></script>
+</body>
+</html>
