@@ -2,7 +2,7 @@
 // line, both as source and after the browser build (scripts/lib/web-bundle.ts), which swaps the
 // font and module files for browser versions and stubs out node: imports.
 
-import { readdirSync, readFileSync, mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -18,7 +18,8 @@ import { renderDocs } from "../scripts/lib/docs-page.js";
 
 const EXAMPLES = readdirSync(join(ROOT, "examples")).filter((f) => f.endsWith(".schem.json")).sort();
 const cli = (f: string) => toSvg(layout(readProject(join(ROOT, "examples", f)).project!).render!);
-const WORK = mkdtempSync(join(tmpdir(), "schem-web-"));
+// realpath: on Windows the temp folder can be a short 8.3 name (RUNNER~1), which the test runner cannot load from.
+const WORK = realpathSync.native(mkdtempSync(join(tmpdir(), "schem-web-")));
 afterAll(() => rmSync(WORK, { recursive: true, force: true }));
 
 describe("playground engine (web/core.ts)", () => {
