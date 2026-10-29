@@ -17,12 +17,12 @@
     <nav class="actions" aria-label="Playground actions">
       <label class="examples">
         <span class="sr">Load an example</span>
-        <select id="examples"><option value="">Examples</option></select>
+        <select id="examples" class="primary"><option value="">Examples</option></select>
       </label>
       <button type="button" id="parts-btn" class="btn" aria-expanded="false" aria-controls="parts">Parts</button>
       <button type="button" id="share-btn" class="btn">Share</button>
       <div class="menu">
-        <button type="button" id="dl-btn" class="btn btn-ink" aria-haspopup="menu" aria-expanded="false">Download</button>
+        <button type="button" id="dl-btn" class="btn" aria-haspopup="menu" aria-expanded="false">Download</button>
         <div class="menu-list" role="menu" id="dl-menu" hidden>
           <button type="button" role="menuitem" data-dl="svg">Drawing, SVG</button>
           <button type="button" role="menuitem" data-dl="png">Drawing, PNG</button>
@@ -46,11 +46,15 @@
         <span class="hint">Ctrl+Enter draws now</span>
         <button type="button" id="tidy-btn" class="chip" title="One part and one net per line">Tidy</button>
       </div>
+      <div class="coach" id="coach" hidden>
+        <p><b>Try it.</b> Edit the circuit below or pick an Example: the drawing on the right redraws as you type, and every connection is checked. Add parts from <b>Parts</b>.</p>
+        <button type="button" class="chip" id="coach-ok">Got it</button>
+      </div>
       <div class="editor" id="editor">
-        <div class="gutter" id="gutter" aria-hidden="true"></div>
+        <div class="gutter" aria-hidden="true"><div id="gutter"></div></div>
         <div class="scroller">
           <pre class="hl" aria-hidden="true"><code id="hl"></code></pre>
-          <textarea id="src" spellcheck="false" autocapitalize="off" autocomplete="off" wrap="off" aria-label="Circuit file, JSON"></textarea>
+          <textarea id="src" spellcheck="false" autocapitalize="off" autocomplete="off" wrap="soft" aria-label="Circuit file, JSON"></textarea>
         </div>
       </div>
 

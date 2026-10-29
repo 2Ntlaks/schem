@@ -81,16 +81,21 @@ function highlightLine(line: string): string {
   return out + esc(line.slice(last));
 }
 
-let errorLine = 0;
+let errorLine = 0, addedLine = 0;
 function paint(): void {
   const lines = src.value.split("\n");
-  hl.innerHTML = lines.map((l, i) => `<span class="line${i + 1 === errorLine ? " err" : ""}">${highlightLine(l) || " "}</span>`).join("");
-  gutter.innerHTML = lines.map((_, i) => `<div${i + 1 === errorLine ? ' class="err"' : ""}>${i + 1}</div>`).join("");
+  // Long lines wrap; the highlighted copy must wrap at the same width, so it stops where the
+  // textarea's scrollbar starts, and each line number takes its line's wrapped height.
+  hlPre.style.right = `${src.offsetWidth - src.clientWidth}px`;
+  hl.innerHTML = lines.map((l, i) => `<span class="line${i + 1 === errorLine ? " err" : ""}${i + 1 === addedLine ? " added" : ""}">${highlightLine(l) || " "}</span>`).join("");
+  const rows = [...hl.children] as HTMLElement[];
+  gutter.innerHTML = lines.map((_, i) => `<div${i + 1 === errorLine ? ' class="err"' : ""} style="height:${rows[i]?.offsetHeight ?? 20}px">${i + 1}</div>`).join("");
   syncScroll();
 }
+window.addEventListener("resize", () => paint());
 function syncScroll(): void {
   hlPre.style.transform = `translate(${-src.scrollLeft}px, ${-src.scrollTop}px)`;
-  gutter.scrollTop = src.scrollTop;
+  gutter.style.transform = `translateY(${-src.scrollTop}px)`;
 }
 src.addEventListener("scroll", syncScroll);
 
@@ -109,8 +114,8 @@ function goTo(line: number, column = 1): void {
   showView("code");
   src.focus();
   src.setSelectionRange(offset, offset);
-  const lh = parseFloat(getComputedStyle(src).lineHeight);
-  src.scrollTop = Math.max(0, (line - 4) * lh);
+  const row = hl.children[line - 1] as HTMLElement | undefined;
+  src.scrollTop = Math.max(0, (row?.offsetTop ?? 0) - 3 * parseFloat(getComputedStyle(src).lineHeight));
 }
 
 src.addEventListener("keydown", (e) => {
@@ -127,6 +132,7 @@ src.addEventListener("input", onEdit);
 
 let typingTimer = 0;
 function onEdit(): void {
+  dismissCoach();
   paint();
   saveDraft();
   clearTimeout(typingTimer);
@@ -204,7 +210,6 @@ function show(r: DrawResult): void {
     void sheet.offsetWidth;
     sheet.classList.add("fresh");
     sizeSheet();
-    if (fitNext) { fit(); fitNext = false; }
   } else if (lastSvg) {
     sheet.classList.add("stale");
   }
@@ -213,8 +218,11 @@ function show(r: DrawResult): void {
     setStamp("valid", "Verified");
     tbStats.textContent = `Every connection checked against the netlist. ${r.stats!.overlaps} overlaps. ${counts}.`;
   } else if (r.verdict === "problems") {
-    setStamp("problems", "Drawn, check");
-    tbStats.textContent = `Drawn, but the checks found problems. ${counts}.`;
+    const onlyLayout = r.problems.every((p) => p.kind === "layout" || p.kind === "note" || p.kind === "warning");
+    setStamp("problems", "See notes");
+    tbStats.textContent = onlyLayout
+      ? `Every connection checked, but the layout is unsure of part of it. ${counts}.`
+      : `Drawn, but the checks found problems. ${counts}.`;
   } else {
     setStamp("error", "Not drawn");
     tbStats.textContent = lastSvg ? "Showing the last drawing that worked." : "Fix the circuit file to see a drawing.";
@@ -227,6 +235,8 @@ function show(r: DrawResult): void {
   errorLine = jsonErr?.line ?? 0;
   paint();
   renderProblems(r.problems);
+  // Fit last, once the title block has its final height.
+  if (r.svg && fitNext) { fit(); fitNext = false; }
 }
 
 function renderProblems(list: Problem[]): void {
@@ -265,12 +275,21 @@ function fit(): void {
   const r = viewport.getBoundingClientRect();
   const w = sheet.offsetWidth, h = sheet.offsetHeight;
   if (!w || !h || !r.width) return;
-  // Leave room for the title block in the lower right corner.
   const tb = $("titleblock").getBoundingClientRect();
-  const availH = r.height - Math.min(tb.height + 28, r.height * 0.45);
-  view.k = Math.max(0.15, Math.min(2.2, Math.min((r.width - 48) / w, (availH - 40) / h)));
-  view.x = (r.width - w * view.k) / 2;
-  view.y = Math.max(20, (availH - h * view.k) / 2);
+  if (r.width < 760) {
+    // Phone: as wide as the screen allows, near the top, under the zoom buttons.
+    const top = 56, availH = tb.top - r.top - top - 12;
+    view.k = Math.max(0.15, Math.min(2.2, (r.width - 16) / w, availH / h));
+    view.x = (r.width - w * view.k) / 2;
+    view.y = top;
+  } else {
+    // Wide: the sheet sits above the title block with their right edges in line, as a title
+    // block sits in the corner of a drawing sheet.
+    const right = tb.right - r.left, availH = tb.top - r.top - 36;
+    view.k = Math.max(0.15, Math.min(2.2, (right - 32) / w, availH / h));
+    view.x = right - w * view.k;
+    view.y = 24 + Math.max(0, (availH - h * view.k) / 2);
+  }
   apply();
 }
 function zoomAt(factor: number, cx: number, cy: number): void {
@@ -384,8 +403,15 @@ function addPart(p: PartType): void {
   parts.push(part);
   setText(tidy(doc), false);
   const line = src.value.split("\n").findIndex((l) => l.includes(`"id": "${id}"`)) + 1;
-  if (line) goTo(line, src.value.split("\n")[line - 1]!.indexOf(id) + 1);
+  toggleParts(false);
+  if (line) {
+    addedLine = line;
+    paint();
+    goTo(line, src.value.split("\n")[line - 1]!.indexOf(id) + 1);
+    setTimeout(() => { addedLine = 0; }, 1700);
+  }
   saveDraft();
+  dismissCoach();
   request(true);
   toast(`Added ${id}. Connect it by adding its pins to a net, like "${id}[${p.pins[0]?.number ?? "1"}]".`);
 }
@@ -416,6 +442,7 @@ function exampleText(file: string): string {
 }
 select.addEventListener("change", () => {
   if (!select.value) return;
+  dismissCoach();
   setText(exampleText(select.value));
   $("file-name").textContent = select.value;
   saveDraft();
@@ -510,6 +537,17 @@ $("tidy-btn").addEventListener("click", () => {
     request(false);
   }
 });
+
+// First visit: one line saying what to do, until the visitor does something.
+const SEEN_KEY = "schem-playground-seen";
+const coach = $("coach");
+function dismissCoach(): void {
+  if (coach.hidden) return;
+  coach.hidden = true;
+  try { localStorage.setItem(SEEN_KEY, "1"); } catch { /* fine */ }
+}
+try { coach.hidden = localStorage.getItem(SEEN_KEY) === "1"; } catch { coach.hidden = false; }
+$("coach-ok").addEventListener("click", dismissCoach);
 
 let toastTimer = 0;
 function toast(text: string): void {

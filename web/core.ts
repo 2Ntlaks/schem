@@ -72,7 +72,11 @@ export function draw(text: string): DrawResult {
     for (const e of quality.connections.errors) problems.push({ kind: "verifier", text: `${e.code} ${e.message}` });
     for (const o of quality.overlaps) problems.push({ kind: "overlap", text: `${o.code} ${o.message}` });
     for (const i of result.issues) problems.push({ kind: "issue", text: i });
-    if (result.status !== "valid") problems.push({ kind: "layout", text: result.status });
+    if (result.status === "valid_low_confidence") {
+      // The engine's own notes say which parts it was unsure how to place, in plain words.
+      const why = result.notes.filter((n) => n.includes("low confidence"));
+      problems.push(...(why.length ? why : ["The layout is unsure how to place part of this circuit."]).map((text) => ({ kind: "layout" as const, text })));
+    } else if (result.status !== "valid") problems.push({ kind: "layout", text: result.status });
   }
   return done({
     verdict: valid ? "valid" : "problems",
