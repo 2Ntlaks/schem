@@ -69,6 +69,24 @@ tscircuit 0.0.3035's package set has three undeclared imports (`@tscircuit/soup-
 `@tscircuit/infer-cable-insertion-point`, `format-si-unit`) and a `circuit-json` version mismatch with
 `@tscircuit/checks`; installing the versions above at the top level makes the headless import work.
 
+Schematic behaviour found in Part B (all reproduced with the versions above):
+
+- `schRotation` must be passed in the component constructor; setting `component.schRotation` after construction
+  does not reach the symbol chooser. `schOrientation` wins over `schRotation` when both are set, so a per-part
+  rotation has to clear the tool-wide orientation.
+- `Battery` accepts `voltage` but the schematic symbol prints only the reference; the battery value is never
+  drawn.
+- A chip's `schPinArrangement` can be built from case pin numbers; that is what the `pinSides` config lever
+  does. It only chooses sides and order, never coordinates.
+- Net names that start with a digit or contain `+`, `-`, a period or a space are rejected by tscircuit's net
+  selector. The converter gives them an internal `ALIAS_*` name and restores the real text on the source net and
+  its `schematic_net_label` elements after `getCircuitJson()`.
+- In case 4 the vertical n-MOSFET symbol is not drawn: tscircuit writes red "Could not match ports for symbol
+  (n_channel_e_mosfet_transistor_vert)" text in its place. Rotating Q2 to 90 made that copy draw; Q3 stayed
+  missing at 270. The schematic ports still exist, so the connection check can pass while the symbol is absent.
+- tscircuit sometimes ends a trace 0.015 units short of a schematic port (case 8 Q3 base). The check treats that
+  as an open connection, and the gap is visible when the PNG is enlarged.
+
 ## Verify
 
 ```

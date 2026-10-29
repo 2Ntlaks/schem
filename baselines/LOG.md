@@ -28,8 +28,8 @@ ATtiny85 board) or forced by bugs in the harness, and they apply to every case e
 - **schemdraw**: hand-written per case; `scripts/schemdraw_kit.py` checks connections from the drawing geometry.
   Free `S.text` is used for ref/value labels that are not net names, because element labels on rotated parts flip
   sides unpredictably. Free text never joins nets, so it cannot hide a connection.
-- **tscircuit** (Part A, cases 1 and 3 only): conversion rules in `scripts/tscircuit_draw.mjs` header. Tool-wide
-  settings chosen on the two neutral circuits in `scripts/tscircuit/neutral/`, then left unchanged:
+- **tscircuit** (Parts A and B): conversion rules in `scripts/tscircuit_draw.mjs` header. Tool-wide settings
+  chosen on the two neutral circuits in `scripts/tscircuit/neutral/`, then left unchanged:
   two-terminal passives horizontal (resistors, capacitors, polarised capacitors, inductors); a multi-pin signal
   net drawn as a star from the pin whose part has the most net memberships; net names printed on signal traces;
   power and ground nets as named rails. Default chip box sizes and tscircuit's own part placement are kept. The
@@ -41,7 +41,17 @@ ATtiny85 board) or forced by bugs in the harness, and they apply to every case e
   tscircuit auto-labelled traces "Q1_base" and "C2_pin2", worse), a4 (rotating the capacitors changed nothing),
   a6 (signal nets as `<net>`: tscircuit left some pins unrouted, check FAIL), attiny85 a1 (pin numbers were
   ordinal 1-6, not the real package numbers) and a3 (chip boxes 3.2x2.4 made large mostly-empty boxes). Chip box
-  size and per-part rotation are available in the config but are not part of the default setting.
+  size and per-part rotation are available in the config but are not part of the default setting. Part B used
+  only the allowed per-part levers (rotation, pin sides and order) and the converter fixes listed under Part B;
+  no coordinate or trace path is set.
+
+Part B converter fixes (tool-wide, before the counted attempts in each case): per-part `rotation` is now passed
+to the component constructor as `schRotation` (setting it after construction had no effect) and a part rotation
+now wins over the tool-wide horizontal default; chip boxes accept `pinSides` (`left`, `right`, optional
+`leftDirection`/`rightDirection`) so a revision can choose a pin side or order; and net names that tscircuit
+rejects (a leading digit, `+`, `-`, a period or a space) get a safe internal alias, with the real name restored
+on the source net and its drawn labels after `getCircuitJson()`. Only the label text changes; the layout is
+tscircuit's.
 
 ## Status after Part A
 
@@ -50,19 +60,21 @@ All eight validation cases have a `final.png` for all three tools. All 24 final 
 Attempts used: schemdraw 27 (max 4 in a case), SKiDL 16 (max 4), netlistsvg 19 (max 4). Two further SKiDL runs
 failed in the harness before producing an image (see case 4 and case 7 below); they are not counted as attempts.
 
-tscircuit is a separate later addition. Its Part A has attempt 1 on cases 1 and 3 only (both PASS) and no finals
-yet; the rest of the cases are Part B.
+tscircuit is a separate later addition. Part A had attempt 1 on cases 1 and 3 only (both PASS). Part B ran cases
+2 and 4-8 and chose finals for six cases; cases 5 and 8 have no final because every attempt's check fails (see
+below). Attempts used for tscircuit: 24 (case 1: 1; case 2: 2; case 3: 4; case 4: 4; case 5: 4; case 6: 1;
+case 7: 4; case 8: 4), so no case used more than the 1 + 3 budget.
 
-| Case | schemdraw final | SKiDL final | netlistsvg final |
-|---|---|---|---|
-| 1 | 3: "+" beside the positive plate | 1: wired loop; PWR label on the frame | 2: R1 horizontal, 470 clear of B1 |
-| 2 | 3: VOUT and "+" clear of wires | 1: C1 value runs into R2 | 1: clean |
-| 3 | 1: clean summing amplifier | 1: V1 label collides with V2 | 1: readable summer; R1 text crosses Rf wire |
-| 4 | 4: all part labels clear of wires | 4: ICs separated, J1 pile at top right | 2: logical port sides; M1 title crossed |
-| 5 | 4: pull-up labels off the buses | 1: U1 squeezed, R1 value on its body | 1: clean |
-| 6 | 4: R1 ends at the tap | 1: relay drawn; U1 value crossed | 4: titles clear of 5V/GND |
-| 7 | 4: SDA/SCL labels off the wires | 4: ICs only, passives hidden (tool failure) | 2: shorter titles, less crowding |
-| 8 | 4: labels clear, mirror wire orthogonal | 1: pair and mirror; Q3 value crossed | 1: clean pair and mirror |
+| Case | schemdraw final | SKiDL final | netlistsvg final | tscircuit final |
+|---|---|---|---|---|
+| 1 | 3: "+" beside the positive plate | 1: wired loop; PWR label on the frame | 2: R1 horizontal, 470 clear of B1 | 1: clean loop; B1 value not drawn |
+| 2 | 3: VOUT and "+" clear of wires | 1: C1 value runs into R2 | 1: clean | 2: C1 rotated, GND label clear |
+| 3 | 1: clean summing amplifier | 1: V1 label collides with V2 | 1: readable summer; R1 text crosses Rf wire | 1: conventional summer; SUM label vertical |
+| 4 | 4: all part labels clear of wires | 4: ICs separated, J1 pile at top right | 2: logical port sides; M1 title crossed | 4: Q3 symbol missing (tool error text) |
+| 5 | 4: pull-up labels off the buses | 1: U1 squeezed, R1 value on its body | 1: clean | none: all 4 checks FAIL (3V3 island) |
+| 6 | 4: R1 ends at the tap | 1: relay drawn; U1 value crossed | 4: titles clear of 5V/GND | 1: relay and contacts clear |
+| 7 | 4: SDA/SCL labels off the wires | 4: ICs only, passives hidden (tool failure) | 2: shorter titles, less crowding | 4: only PASS; U2 GND flag on SCL label |
+| 8 | 4: labels clear, mirror wire orthogonal | 1: pair and mirror; Q3 value crossed | 1: clean pair and mirror | none: all 4 checks FAIL (Q3 base gap) |
 
 ## Attempts
 
@@ -232,7 +244,7 @@ Case 8:
 - a1: clean pair and mirror. The OUT rail (Q2[C], Q4[C], RL[1]) and +12 V (Q3[E], Q4[E], V2[+]) are separate
   nets and their wires do not touch. Chosen.
 
-### tscircuit (Part A: neutral circuits, then cases 1 and 3)
+### tscircuit (Part A setup, then Part B: all eight cases)
 
 Neutral circuits (not counted attempts; they chose the tool-wide settings above):
 - `common-emitter` a1: tscircuit's default orientation; C1 overlaps R2 (the layout prints "1 chip overlaps
@@ -251,16 +263,81 @@ Neutral circuits (not counted attempts; they chose the tool-wide settings above)
 
 Case 1:
 - a1: check PASS. Battery at left with a PWR rail on + and GND on -; R1 horizontal to the LED; the LED cathode
-  goes to a GND rail. Clean. This is the only attempt (Part A stops after attempt 1).
+  goes to a GND rail. The three parts and the few wires are clear and the LED symbol is the right way round. B1
+  shows only its reference: tscircuit's Battery symbol accepts `voltage` but never draws it, so the 9 V value is
+  missing. This is the only attempt. Chosen final.
+
+Case 2:
+- a1: check PASS. R1/R2 divider with C1 across R2 at the top, op-amp and load below; the 9 V and GND rails are named
+  labels. The GND label box at C1's left plate sits on the wire: at 8x the wire runs into and through the box.
+  The VREF label is close to R2's reference but readable.
+- a2: check PASS. C1 rotation 180 moves its GND side to the right; the GND label now sits clear to the left of
+  the wire, and the C1/VREF/R2 network is readable. VREF text still nearly touches R2's reference, but both are
+  legible. Chosen final (fixes the only label-on-wire defect).
 
 Case 3:
-- a1: check PASS. The three sources and input resistors form one cluster; the op-amp with Rf and RL forms
-  another, joined by SUM, OUT and GND net labels. The summing node's SUM labels are vertical and one sits on a
-  wire; the op-amp's + input is tied to a boxed GND label. Honest tscircuit layout, no hand placement. This is
-  the only attempt (Part A stops after attempt 1).
+- a1: check PASS. Conventional left-to-right flow: V3/V2/V1 with R3/R2/R1 form the input cluster, the op-amp,
+  Rf and RL form the output cluster, joined by SUM, OUT and GND labels. The SUM label is vertical and its top
+  text sits on the summing wire; the op-amp + input is tied to a boxed GND label at the pin. Chosen final.
+- a2: check PASS. U1 rotation 90 produced a byte-identical image to a1: this run predates the constructor fix,
+  so the rotation never reached tscircuit.
+- a3: check PASS. U1 rotation 90 after the constructor fix: the op-amp points down, R3/V3 sit between it and
+  the rest, V2/R2 are pushed to the lower left and V1/R1 to the right. Every net is drawn but the arrangement is
+  much harder to read; OUT and SUM labels are vertical.
+- a4: check PASS. U1 rotation 180: the op-amp faces left with OUT at the top left and SUM on the right; the
+  source cluster is on the right and the op-amp cluster on the left, joined only by SUM/OUT/GND labels. Mirrored
+  but readable. Not chosen: the conventional a1 flow is easier to follow.
 
-No `final.png` has been chosen for tscircuit yet: Part A ends after attempt 1, and the final choice belongs to
-Part B.
+Case 4:
+- a1: check FAIL (n10 LA, n11 HB, n12 LB). J1's LA/HB/LB pins and R2/R3/R4 end in short stubs that do not join.
+  Q2 and Q3 are not drawn at all; their places show tscircuit's red "Could not match ports for symbol
+  (n_channel_e_mosfet_transistor...)" text. Q1 and Q4 are drawn.
+- a2: check FAIL (n12 LB only). J1 `pinSides` puts 1/4 on the left and 2/3/5 on the right, which joins LA and
+  HB; LB still ends in a stub at R4. Q2/Q3 still missing, same red text.
+- a3: check PASS. R4 rotation 180 joins LB. Q1/Q4 are drawn; Q2 and Q3 are still missing and their red error
+  text remains. The GND label at M1 sits on the OUTA wire, and auto net names ("Q1_pin3", "Q2_pin3") add extra
+  label boxes.
+- a4: check PASS. Q2 rotation 90 makes Q2 draw; Q3 is still missing and its red error text lies across the OUTB
+  label. The GND label no longer touches OUTA, but the layout is more tangled and still uses the auto net names.
+  Chosen final: one missing symbol instead of two, and no label on a wire.
+
+Case 5:
+- a1: check FAIL (n1 3V3). The 3V3 rail is drawn at R1/R2; U1/U2/U3's VIN pins form a separate bus with no 3V3
+  label, and the rail stub stops about 0.4 units short of the bus (clear gap at 6x). GND, SDA and SCL pass.
+- a2: check FAIL (n1). R2 rotation 180; same 3V3 split and same gap.
+- a3: check FAIL (n1). R2 rotation 180; same 3V3 split.
+- a4: check FAIL (n1). R2 rotation 180; same 3V3 split. SCL's vertical label at U1 pin 4 is clear of the wire.
+  No final: no attempt's check passes.
+
+Case 6:
+- a1: check PASS. 5 V and GND rails at the top and bottom; Q1 switches the relay coil and D1 is its flyback
+  diode; K1's contacts and J1 LOAD are separate boxes joined by the auto label "K1_COM" between K1.COM and
+  J1.COM. The relay box
+  shows A1/A2/COM/NO/NC with package numbers 1/2/11/14/12. D1 and Q1 show only their references (no 1N4148 or
+  2N2222A), and the "RELAY" net name at U1 pin 1 is small but readable. Chosen final; only attempt.
+
+Case 7:
+- a1: check FAIL (5V and GND merged). The GND label at U2's WP pin sits on the 5 V wire, so the check joins the
+  two nets. The SCL label is squeezed beside R3 and R2's wire.
+- a2: check FAIL (n1 5V). U1/U2 `pinSides`; the 5 V group lacks R2[1] and U2[8]. The SDA label lies on R2's
+  "4.7kΩ" value.
+- a3: check FAIL (n1 5V). R3 rotation 180; the 5 V group still lacks R2[1] and U2[8], and the SDA label still
+  covers R2's value.
+- a4: check PASS. R2 rotation 180 completes the 5 V group. U2's WP GND flag is drawn on top of the vertical SCL
+  label, so those two texts overlap and neither is fully readable; the capacitor bus is crowded. Chosen final
+  (the only passing attempt).
+
+Case 8:
+- a1: check FAIL (n6 MIRROR). Q3's base wire ends a hairline short of the base pin; at 8x there is a visible gap
+  between the green wire and the dark red pin line, so Q3[B] stays alone. The rest of the pair and mirror is
+  drawn.
+- a2: check FAIL (n6). Q3 rotation 90 puts the base at the bottom; the base wire still stops short of the pin.
+- a3: check FAIL (n6). Q3 rotation 90 after the constructor fix; the layout moves but the base gap remains.
+- a4: check FAIL (n6). Q3 rotation 270; the trace endpoint is 0.015 units from the port, the same hairline gap.
+  No final: no attempt's check passes.
+
+Finals: cases 1, 2, 3, 4, 6 and 7 have a `final.png` (attempt 1, 2, 1, 4, 1 and 4). Cases 5 and 8 have no
+`final.png`: every attempt's check fails, and the brief says a drawing whose check fails cannot be chosen.
 
 ## Known defects in the finals
 
@@ -287,9 +364,29 @@ in the tool's fixed symbol drawing):
   the part numbers "DevKitC V4" and "SRD-05VDC-SL-C" are no longer shown.
 - netlistsvg case 7: the shortened titles still sit directly above the VCC pin labels; that is the generic skin's
   fixed title position.
-- tscircuit case 3: the SUM net labels are vertical, and the label at R2's right pin sits on the summing wire; the
-  sources/resistors and the op-amp/feedback are placed as two separate clusters joined only by net labels. These
-  are tscircuit's own layout choices. Case 1 has no known defect.
+- tscircuit case 1: B1's "9V" value is not drawn. tscircuit's Battery symbol accepts `voltage` but prints only
+  the reference; the same happens to the battery in cases 2 and 4.
+- tscircuit case 2: the "VREF" label text and R2's reference nearly touch at the top of the divider. Both are
+  readable.
+- tscircuit case 3: the SUM net labels are vertical, and the label at the top of the summing wire sits on that
+  wire; the sources/resistors and the op-amp/feedback are placed as two separate clusters joined only by net
+  labels. These are tscircuit's own layout choices.
+- tscircuit case 4: Q3's symbol is not drawn at all. tscircuit prints red "Could not match ports for symbol
+  (n_channel_e_mosfet_transistor...)" text where Q3 should be, and that text lies across the OUTB label. The
+  layout also uses tscircuit's auto net names ("Q1_pin3", "Q2_pin3") as extra labels. This is a tool failure;
+  the check still passes because Q3's ports and traces exist. The MOSFETs and the battery show no part values.
+- tscircuit case 6: D1 and Q1 show only their references, not 1N4148 and 2N2222A; tscircuit's diode and
+  transistor symbols do not draw a value.
+- tscircuit case 7: U2's WP GND flag is drawn on top of the vertical SCL net label, so the two texts overlap and
+  neither is fully readable.
+- tscircuit case 8: no final (see below); the Q3 base gap would be the main defect if one were chosen.
+
+Tool failures with no final:
+
+- tscircuit case 5: in all four attempts the 3V3 rail is drawn only at R1/R2 and the U1/U2/U3 VIN group never
+  gets a 3V3 label; the rail stub also stops about 0.4 units short of the bus. The check fails on n1 3V3.
+- tscircuit case 8: in all four attempts Q3's base trace stops 0.015 units short of the base pin (a hairline gap
+  at 6x to 8x), so Q3[B] stays out of the MIRROR net. The check fails on n6 MIRROR.
 
 ## Note for the judge kit
 

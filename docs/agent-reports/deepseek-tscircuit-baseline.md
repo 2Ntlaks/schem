@@ -242,3 +242,164 @@ converter.
    keep the honest first drawing?
 3. Chip boxes show real package pin numbers when the case pin is numeric, and lowest free ordinals
    otherwise. Is that the convention the showcase wants for modules and relays?
+
+# tscircuit baseline, Part B
+
+Branch: `deepseek/tscircuit-baseline`. Part B commits on top of the Part A commit. Nothing was
+pushed or merged.
+
+Part B ran attempt 1 on cases 2 and 4-8, reviewed every attempt image, revised within the budget,
+and chose `final.png` for the cases whose check passes. Six cases have a passing final. Cases 5 and
+8 do not: every one of their four attempts fails the schematic-level check, and the brief says a
+drawing whose check fails cannot be chosen as final.
+
+## Converter changes made before the counted attempts
+
+All four are tool-wide behaviour, not per-case hand placement, and none sets a coordinate or a trace
+path.
+
+1. `parts.<ref>.rotation` is now passed to the component constructor as `schRotation`. Setting
+   `component.schRotation` after construction had no effect. A per-part rotation also clears the
+   tool-wide `schOrientation`, because tscircuit ignores `schRotation` when both are set.
+2. Chip boxes accept `parts.<ref>.pinSides = { left, right, leftDirection, rightDirection }`. The
+   arrays name case pin numbers; the converter maps them to tscircuit pin ordinals and rejects a list
+   that misses a drawn pin. This chooses a pin side or order only.
+3. Net names that tscircuit rejects (a leading digit, `+`, `-`, a period or a space) get an internal
+   `ALIAS_*` name. After `getCircuitJson()` the real name is restored on `source_net.name` and on the
+   matching `schematic_net_label.text`. Only text changes; the layout is untouched.
+4. The converter header now records the DC-source decision from Part A (`vsource` without a
+   frequency uses `Battery`, with a frequency uses `VoltageSource`), the alias rule and the
+   `pinSides` lever.
+
+## Results per case
+
+| Case | Attempts | Check | Final | Reason |
+|---|---|---|---|---|
+| 1 | 1 | PASS | a1 | clean loop and correct LED; only B1's value is missing |
+| 2 | 2 | PASS | a2 | a1's GND label sits on C1's wire; C1 rotated 180 fixes it |
+| 3 | 4 | PASS | a1 | conventional left-to-right summer; a4 is mirrored, a3 is scattered |
+| 4 | 4 | PASS | a4 | one missing MOSFET symbol (Q3) instead of two, and GND is off the OUTA wire |
+| 5 | 4 | FAIL | none | the 3V3 rail never reaches the U1/U2/U3 VIN group |
+| 6 | 1 | PASS | a1 | relay, flyback diode, contacts and load are all drawn clearly |
+| 7 | 4 | PASS | a4 | only passing attempt; U2's GND flag overlaps the SCL label |
+| 8 | 4 | FAIL | none | Q3's base trace stops 0.015 units short of the pin |
+
+Attempts used: 24 in total, at most 4 in any case, so every case stayed inside the 1 + 3 budget.
+
+## Image review
+
+I opened every attempt PNG at full size. I cropped and enlarged the areas that needed a closer
+look, at 2x to 10x: the battery and LED in case 1; the GND label at C1 in case 2; the op-amp and
+SUM labels in case 3; the MOSFETs and M1 labels in case 4; the 3V3 rail in case 5; the relay in
+case 6; U2 and the capacitor bus in case 7; and the Q3 base in case 8. I did not call an image clean
+from the whole-sheet view alone.
+
+What the review found:
+
+- Case 1: the battery, PWR/GND rails, R1 and the LED are clear at 4x. B1 prints only its reference;
+  tscircuit's `Battery` symbol accepts `voltage` but never draws it.
+- Case 2 a1: at 8x the GND label box at C1's left plate has the C1 wire running through it. a2
+  rotates C1 and the label is clear; the "VREF" text still nearly touches R2's reference but both
+  are readable.
+- Case 3: a1 has the conventional orientation; its upper SUM label is vertical and sits on the
+  summing wire. a2 is byte-identical to a1 (the rotation never reached tscircuit). a3 points the
+  op-amp down and scatters the source cluster; a4 is mirrored. All four pass; a1 is the easiest to
+  read.
+- Case 4: a1 and a2 are missing both Q2 and Q3; tscircuit writes red "Could not match ports for
+  symbol (n_channel_e_mosfet_transistor...)" text in their places. a3 passes but still misses both
+  symbols, and its GND label sits on the OUTA wire. a4 rotates Q2 and draws it; Q3 is still missing
+  and the red text crosses the OUTB label. The layout also uses auto net names such as `Q1_pin3`.
+- Case 5: all four attempts draw the 3V3 rail at R1/R2 only. The U1/U2/U3 VIN bus has no 3V3 label,
+  and the rail stub stops about 0.4 units short of the bus; the gap is clear at 6x.
+- Case 6: the relay coil, D1, Q1, the contacts and J1 LOAD are clear at 6x. K1's contacts and J1 are
+  joined by the auto label `K1_COM`. D1 and Q1 show no part values.
+- Case 7: a1 merges 5V and GND because the GND label at U2's WP pin sits on the 5V wire. a2 and a3
+  leave R2[1] and U2[8] out of the 5V group and put the SDA label on R2's value. a4 passes, but U2's
+  WP GND flag is drawn on top of the vertical SCL label, so those two texts overlap.
+- Case 8: a1 to a4 all leave Q3's base disconnected. At 6x to 8x the base trace stops a hairline
+  short of the pin (0.015 units at a4). Rotations 90 and 270 move the layout but not the gap.
+
+## Nets joined only by same-named labels
+
+`baselines/CONNECTIONS.md` records these per case. In summary:
+
+- Case 1: GND.
+- Case 2: 9V, VOUT, GND.
+- Case 3: GND.
+- Case 4: 12V, GND, OUTA, OUTB, plus the four unnamed gate nets joined by tscircuit's auto labels
+  `Q1_pin3` to `Q4_pin3`.
+- Case 5: no final; the failing 3V3 net has labels only on the R1/R2 group.
+- Case 6: 5V, GND, plus the unnamed base net (`Q1_base`) and relay common net (`K1_COM`).
+- Case 7: 5V, GND, SCL.
+- Case 8: no final; the attempts join +12V, -12V and GND by name.
+
+## Files changed in Part B
+
+- `baselines/scripts/tscircuit_draw.mjs`: the four converter changes above.
+- `baselines/LOG.md`: Part B status, all 24 attempts, per-image observations, final choices, known
+  defects and the two tool failures.
+- `baselines/CONNECTIONS.md`: tscircuit final and check paths for cases 1, 2, 3, 4, 6 and 7; the
+  label-joined nets; the case 5 and 8 failures.
+- `baselines/README.md`: Part B status, six finals, the `pinSides` lever.
+- `baselines/VERSIONS.md`: schematic behaviour notes for rotation, battery values, pin sides, net
+  aliases, the missing n-MOSFET symbol and the 0.015-unit trace gap.
+- `docs/agent-reports/deepseek-tscircuit-baseline.md`: this Part B report.
+
+The attempt configs, SVGs, PNGs, check files and `final.png` copies are under
+`baselines/out/tscircuit/validation/`, which is gitignored. Six `final.png` files were copied:
+case 1 a1, case 2 a2, case 3 a1, case 4 a4, case 6 a1, case 7 a4. Cases 5 and 8 have none.
+
+Not touched: `README.md`, `SPEC.md`, `phase0/`, `tests/fixtures/`, `src/`, `package.json`,
+`baselines/scripts/rasterize.mjs`, `baselines/scripts/normalize.ts`.
+
+## Commands run and results
+
+```
+npm run typecheck
+> tsc --noEmit
+(no errors)
+
+npm test
+Test Files  17 passed (17)
+Tests       461 passed (461)
+
+npm run phase0
+case01-led to case08-diffpair: all 8 status "valid"
+(the runner reports gates 1-6 as incomplete because held-out test cases and blind owner
+ ratings are outside this run)
+```
+
+The Part B tscircuit runs were made with:
+
+```
+"C:\Program Files\Git\bin\bash.exe" baselines/scripts/run_tscircuit.sh validation NN K
+```
+
+Each printed `check: PASS` or `check: FAIL`; the per-attempt result is in
+`baselines/out/tscircuit/validation/caseNN/attempt-K.check.txt` and is logged in `LOG.md`.
+
+I checked that the changed text has no en or em dashes, and ran the replay check on every attempt
+input to confirm the recorded PASS/FAIL results.
+
+## Skipped or could not do
+
+- Cases 5 and 8 have no `final.png`. Their four attempts each fail the check. I did not run a fifth
+  attempt because the budget is 1 initial attempt plus at most 3 revisions per case.
+- Case 4's final still has Q3 missing. The check passes because Q3's schematic ports and traces
+  exist, but the symbol is not drawn. A fifth attempt rotating Q3 to 90 might draw it (Q2 did at 90),
+  but that is outside the budget.
+- No held-out test set was opened, listed or run, and `normalize.ts` was not run.
+- No test was changed to make it pass. No package was added to the repo.
+
+## Open questions for the lead
+
+1. Cases 5 and 8 cannot meet "every validation case has a final with a passing check" inside the
+   budget. Should they be accepted as documented tool failures with no final, as recorded in
+   `LOG.md` and `CONNECTIONS.md`, or do you authorise a fifth attempt for each outside the budget?
+   For case 5 the blocker is tscircuit placing all 3V3 labels on the R1/R2 island; for case 8 it is
+   the 0.015-unit base trace gap.
+2. Case 4's final passes but has no Q3 symbol. Is a passing check with one missing symbol acceptable
+   as the honest tscircuit final, or should case 4 also be reported as a tool failure with no final?
+3. Should the showcase text state that tscircuit does not draw battery values, diode and transistor
+   part numbers, or does it want those listed only in `LOG.md`?
+

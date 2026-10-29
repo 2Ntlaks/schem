@@ -10,21 +10,29 @@
 //
 // Conversion rules (attempt 1; a config file can change per-part settings for a revision, see README):
 // - built-in parts use tscircuit's own schematic symbols: resistor, capacitor, polarised-capacitor, inductor,
-//   diode, LED, battery, voltage source, NPN/PNP transistor, N-MOSFET/P-MOSFET, op-amp and crystal;
+//   diode, LED, battery, DC voltage source, AC voltage source, NPN/PNP transistor, N-MOSFET/P-MOSFET, op-amp
+//   and crystal. tscircuit has no DC source symbol (its VoltageSource draws an ac_voltmeter), so a vsource
+//   without a frequency is drawn with Battery, tscircuit's only DC source symbol; a vsource with a frequency
+//   is drawn with VoltageSource;
 // - every other part type (header, IC, module, relay, motor, and any unknown type) becomes a tscircuit
 //   <chip> box labelled with its reference and value/type, showing only the pins that appear in a net or in
 //   the netlist's nc list. Each pin keeps its real name; a name that repeats on the same box is made unique by
 //   appending the pin number (for example GND_4 and GND_22). A numeric case pin number is also the chip's pin
 //   number, so the box shows the real package number (an ATtiny's VCC pin is 8, not its position in the used
 //   set); a pin whose number is not a positive integer (relay A1, module J2-1) takes the lowest free number
-//   and keeps its real name as the label. Pins are placed in the order they appear in the netlist: the first
-//   half on the left, the second half on the right, so the numbers run counter-clockwise like a DIP package.
-//   This is the only pin-side/order setting used; no coordinate or trace path is set;
+//   and keeps its real name as the label. By default pins are placed in the order they appear in the netlist:
+//   the first half on the left, the second half on the right, so the numbers run counter-clockwise like a DIP
+//   package. A config may set `parts.<ref>.pinSides = { left: [case pins], right: [case pins] }` (plus
+//   leftDirection/rightDirection) to choose a different side or order for a revision. No coordinate or trace
+//   path is set;
 // - two-terminal passives are drawn horizontally (the tool-wide default, chosen on the neutral circuits); a
 //   config can set any part's orientation or rotation, or a chip box's width and height;
 // - power and ground nets are expressed as tscircuit <net> elements. tscircuit draws a rail symbol at every
 //   pin that is otherwise unconnected, and the rail symbols are joined by their net name. This is the
-//   schematic convention for supplies and keeps long supply wires off the drawing;
+//   schematic convention for supplies and keeps long supply wires off the drawing. tscircuit refuses net
+//   names that start with a digit or contain "+", "-", a period or a space, so such a net gets a safe internal
+//   name for tscircuit and the real name (9V, +12V and so on) is restored on the source net and its drawn
+//   labels after the circuit is built. Only the text changes; the layout is untouched;
 // - every other net is drawn as tscircuit <trace> elements between pins. A net with more than two pins is a
 //   star: one trace from the pin whose part has the most net memberships to each of the other pins. No
 //   coordinates or trace paths are given; tscircuit's own schematic router lays the wires out;
@@ -110,44 +118,49 @@ const BUILTIN = {
     pins: { "+": 1, "-": 2 },
   },
   vsource: {
-    make: (p) =>
-      new VoltageSource({
-        name: p.id,
-        voltage: text(p.props.value ?? p.label) || "1V",
-        ...(p.props.frequency ? { frequency: text(p.props.frequency) } : {}),
-      }),
+    // tscircuit has no DC voltage-source symbol: VoltageSource draws symbol_name "ac_voltmeter", a meter,
+    // not a source. A vsource without a frequency therefore uses tscircuit's only DC source symbol, Battery
+    // (the same choice netlistsvg makes). A vsource with a frequency stays VoltageSource, an AC source.
+    make: (p, o) => {
+      const voltage = text(p.props.value ?? p.label) || "1V";
+      return p.props.frequency
+        ? new VoltageSource({ name: p.id, voltage, frequency: text(p.props.frequency), ...ori(o) })
+        : new Battery({ name: p.id, voltage, ...ori(o) });
+    },
     pins: { "+": 1, "-": 2 },
   },
   npn: {
-    make: (p) =>
+    make: (p, o) =>
       new Transistor({
         name: p.id,
         type: "npn",
         pinLabels: { pin1: "collector", pin2: "base", pin3: "emitter" },
+        ...ori(o),
       }),
     pins: { B: 2, C: 1, E: 3 },
   },
   pnp: {
-    make: (p) =>
+    make: (p, o) =>
       new Transistor({
         name: p.id,
         type: "pnp",
         pinLabels: { pin1: "collector", pin2: "base", pin3: "emitter" },
+        ...ori(o),
       }),
     pins: { B: 2, C: 1, E: 3 },
   },
   nmos: {
-    make: (p) =>
-      new Mosfet({ name: p.id, channelType: "n", mosfetMode: "enhancement" }),
+    make: (p, o) =>
+      new Mosfet({ name: p.id, channelType: "n", mosfetMode: "enhancement", ...ori(o) }),
     pins: { G: 3, D: 1, S: 2 },
   },
   pmos: {
-    make: (p) =>
-      new Mosfet({ name: p.id, channelType: "p", mosfetMode: "enhancement" }),
+    make: (p, o) =>
+      new Mosfet({ name: p.id, channelType: "p", mosfetMode: "enhancement", ...ori(o) }),
     pins: { G: 3, D: 1, S: 2 },
   },
   opamp: {
-    make: (p) => new OpAmp({ name: p.id }),
+    make: (p, o) => new OpAmp({ name: p.id, ...ori(o) }),
     // case IN- -> tscircuit inverting input, IN+ -> non-inverting input, OUT -> output
     pins: { 2: 2, 3: 1, 1: 3 },
   },
@@ -163,9 +176,14 @@ const BUILTIN = {
   },
 };
 
-// Per-part schematic orientation, when the netlist or the attempt config asks for one.
+// Per-part schematic orientation, when the netlist or the attempt config asks for one. Both props must go into
+// the constructor: tscircuit reads the parsed props when it chooses the symbol, so setting component.schRotation
+// afterwards has no effect.
 function ori(o) {
-  return o.orientation ? { schOrientation: o.orientation } : {};
+  return {
+    ...(o.orientation ? { schOrientation: o.orientation } : {}),
+    ...(o.rotation !== undefined ? { schRotation: o.rotation } : {}),
+  };
 }
 
 function text(v) {
@@ -253,10 +271,16 @@ function main() {
   const selector = {}; // "ref\u0000casePin" -> "ref.pinN"
 
   for (const p of nl.parts) {
+    const override = ov[p.id] ?? {};
+    // A per-part rotation must win over the tool-wide orientation: tscircuit ignores schRotation when
+    // schOrientation is also set (for example the horizontal default on passives).
     const o = {
-      ...(ov[p.id] ?? {}),
+      ...override,
       orientation:
-        ov[p.id]?.orientation ?? orientations[p.type] ?? p.props.schOrientation,
+        override.orientation ??
+        (override.rotation !== undefined
+          ? undefined
+          : orientations[p.type] ?? p.props.schOrientation),
     };
     const builtin = o.generic ? undefined : BUILTIN[p.type];
     let comp;
@@ -302,11 +326,37 @@ function main() {
       );
       const n = shown.length;
       const leftCount = n <= 3 ? n : Math.ceil(n / 2);
-      const left = ordinals.slice(0, leftCount);
-      const right = ordinals.slice(leftCount);
+      let left = ordinals.slice(0, leftCount);
+      let right = ordinals.slice(leftCount);
+      let leftDirection = "top-to-bottom";
+      let rightDirection = "bottom-to-top";
+      // Allowed per-part setting: which side each pin sits on, and their order. The arrays name case pins.
+      const sides = o.pinSides;
+      if (sides?.left || sides?.right) {
+        const ordinalOf = new Map(
+          shown.map((pin, i) => [text(pin.number).trim(), ordinals[i]]),
+        );
+        const pick = (list, side) =>
+          (list ?? []).map((pin) => {
+            const ord = ordinalOf.get(text(pin).trim());
+            if (ord === undefined) {
+              throw new Error(`${p.id}: pinSides.${side} names pin ${pin}, which is not drawn`);
+            }
+            return ord;
+          });
+        left = pick(sides.left, "left");
+        right = pick(sides.right, "right");
+        const named = new Set([...left, ...right]);
+        const missing = ordinals.filter((ord) => !named.has(ord));
+        if (missing.length) {
+          throw new Error(`${p.id}: pinSides must list every drawn pin (missing ${missing.join(", ")})`);
+        }
+        leftDirection = sides.leftDirection ?? leftDirection;
+        rightDirection = sides.rightDirection ?? rightDirection;
+      }
       const schPinArrangement = {
-        leftSide: { pins: left, direction: "top-to-bottom" },
-        ...(right.length ? { rightSide: { pins: right, direction: "bottom-to-top" } } : {}),
+        ...(left.length ? { leftSide: { pins: left, direction: leftDirection } } : {}),
+        ...(right.length ? { rightSide: { pins: right, direction: rightDirection } } : {}),
       };
       const value = partValue(p);
       const chipWidth = o.schWidth ?? chipSize.width;
@@ -327,12 +377,26 @@ function main() {
       });
     }
 
-    if (o.rotation !== undefined && builtin) comp.schRotation = o.rotation;
     board.add(comp);
   }
 
   // Supplies: a tscircuit <net> per named power/ground net. tscircuit draws a rail at each pin that is not
   // otherwise wired and joins same-named rails, which is how the check reads them back.
+  //
+  // tscircuit resolves a net name as a selector, so it refuses names that start with a digit or contain "+",
+  // "-", a period or a space (the cases use 9V, 12V, 3V3, 5V, +12V, -12V). Such a net gets a safe internal
+  // name for tscircuit and the real name is restored on the source net and its drawn labels after the circuit
+  // is built (see netAliases below). Nothing about the layout changes; the drawing shows the case's own name.
+  const netAliases = [];
+  const usedNetNames = new Set(nl.nets.map((n) => n.name).filter(Boolean));
+  const safeNetName = (n) => {
+    if (/^[A-Za-z][A-Za-z0-9_-]*$/.test(n.name)) return n.name;
+    let alias = `ALIAS_${n.id.replace(/[^A-Za-z0-9_]/g, "_")}`;
+    while (usedNetNames.has(alias)) alias += "_";
+    usedNetNames.add(alias);
+    netAliases.push({ alias, real: n.name });
+    return alias;
+  };
   for (const n of nl.nets) {
     if (!(supplyKinds.has(n.kind) && n.name)) continue;
     const connectsTo = n.members.map((m) => selector[`${m.part}\u0000${m.pin}`]);
@@ -341,7 +405,7 @@ function main() {
     }
     board.add(
       new Net({
-        name: n.name,
+        name: safeNetName(n),
         connectsTo,
         isPowerNet: n.kind === "power",
         isGroundNet: n.kind === "ground",
@@ -382,6 +446,22 @@ function main() {
   }
 
   const circuitJson = circuit.getCircuitJson();
+  // Restore the real names of nets that tscircuit could not use as selectors. Only the text changes; the
+  // layout, ports and traces are exactly what tscircuit produced (see the supply loop above).
+  for (const { alias, real } of netAliases) {
+    const netIds = new Set();
+    for (const e of circuitJson) {
+      if (e.type === "source_net" && e.name === alias) {
+        netIds.add(e.source_net_id);
+        e.name = real;
+      }
+    }
+    for (const e of circuitJson) {
+      if (e.type === "schematic_net_label" && netIds.has(e.source_net_id) && e.text === alias) {
+        e.text = real;
+      }
+    }
+  }
   const input = {
     generator: "baselines/scripts/tscircuit_draw.mjs",
     packages: { "@tscircuit/core": "0.0.2229", "circuit-to-svg": "0.0.454" },

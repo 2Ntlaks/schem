@@ -2,8 +2,9 @@
 
 These are independent drawings of the eight Phase 0 validation circuits, made with four open-source tools
 that also turn a netlist into a schematic. They are the comparison side of the showcase; our engine's own
-drawings are made by `npm run phase0`. tscircuit is being added in three parts; this file and the rest of the
-folder currently describe its Part A (setup, the neutral circuits, and attempt 1 on cases 1 and 3).
+drawings are made by `npm run phase0`. tscircuit is being added in three parts; Parts A and B are done, so this
+file and the rest of the folder describe the full tscircuit baseline. Six cases have a passing final; cases 5
+and 8 are tool failures and have no final.
 
 - `LOG.md`: the attempt budget, the tool-wide settings, every attempt and the final choice per case.
 - `CONNECTIONS.md`: the nets each final drawing shows, taken from the final `.check.txt` files.
@@ -99,8 +100,8 @@ The check answers one question: does the drawing show exactly the case's nets? I
   through the source ports and compares. A pin with neither a wire nor a label stays alone and counts as
   missing. The source netlist is used only for the expected groups and the pin names.
 
-A FAIL cannot be chosen as final. All 24 finals of the first three tools PASS, and tscircuit's Part A attempts
-on cases 1 and 3 PASS; see `CONNECTIONS.md`.
+A FAIL cannot be chosen as final. All 24 finals of the first three tools PASS. tscircuit's finals PASS in cases
+1, 2, 3, 4, 6 and 7; cases 5 and 8 have no final because every attempt's check fails. See `CONNECTIONS.md`.
 
 ## Config levers used in the revisions
 
@@ -117,8 +118,9 @@ on cases 1 and 3 PASS; see `CONNECTIONS.md`.
 - **tscircuit** (`attempt-K.config.json`): `signalTopology` (`star` default or `chain`), `signalNetLabels`
   (default true), `signalElements` (`trace` default or `net`), `orientations.<part type>` (default
   `horizontal` for resistors, capacitors, polarised capacitors and inductors), `chip.width`/`chip.height`,
-  and `parts.<ref>.orientation`, `rotation`, `generic`, `schWidth`, `schHeight`. None of these sets a
-  coordinate or a trace path.
+  and `parts.<ref>.orientation`, `rotation`, `generic`, `schWidth`, `schHeight`, `pinSides`
+  (`{ left: [case pins], right: [case pins], leftDirection, rightDirection }`). A per-part `rotation` wins
+  over the tool-wide orientation. None of these sets a coordinate or a trace path.
 
 The final drawings keep the tool's own layout. Where a tool's placer or router produced a bad result, the
 defect is recorded in `LOG.md` rather than patched by hand.
