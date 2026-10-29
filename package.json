@@ -13,6 +13,7 @@
     "typecheck": "tsc --noEmit && tsc --noEmit -p web",
     "draw": "tsx scripts/draw.ts",
     "schem": "tsx src/cli.ts",
+    "mcp": "tsx src/mcp/main.ts",
     "docs:parts": "tsx scripts/parts-doc.ts",
     "phase0": "tsx scripts/phase0.ts",
     "gates": "tsx scripts/gates.ts",
