@@ -10,7 +10,7 @@ import { hintParts, type Hint, type HintPriority, type Intent, type LayoutState,
 import { layout, pinDefsOf, type LayoutResult, type Project, type Status } from "../layout/layout.js";
 import { checkDrawing, type DrawingCheck } from "../quality/index.js";
 import { BUILTIN, ORIENTS, type SymPin } from "../symbols/library.js";
-import { changeReport, type ChangeReport } from "./report.js";
+import { changeReport, stabilityBreaks, type ChangeReport } from "./report.js";
 
 export type VisualOp =
   | { op: "lock"; part: string; at?: Pt; rot?: Rot; flip?: boolean }
@@ -33,13 +33,19 @@ export interface EditRequest {
   ops: EditOp[];
   expectedRevision?: string;
   expectedLayout?: string;
+  /**
+   * Refuse, instead of saving with its change report, an edit whose layout moves untouched parts past
+   * SPEC 15 gate 4. The whole-sheet layout is then not tried either, unless the operations ask for it
+   * (`relayout canonical`, `setSpacing`).
+   */
+  strict?: boolean;
 }
 
 export type EditMode = "incremental" | "incremental-reroute" | "canonical";
 
 export interface EditResult {
   saved: boolean;
-  status: Status | "conflict";
+  status: Status | "conflict" | "unstable";
   /** The edited project if saved, else the unchanged input. */
   project: Project;
   layout?: LayoutResult;
@@ -94,27 +100,44 @@ export function edit(req: EditRequest): EditResult {
   const affected = affectedBy(before.circuit, circuit, before.intent ?? {}, unpruned, req.ops, previous);
 
   // 2. Lay out: keep routes, then reroute, then the whole sheet (SPEC 9.5 widening, 0b version).
+  // An incremental result that moves untouched parts past gate 4 is kept only if no later
+  // incremental attempt is stable: first new parts below the drawing, then every net rerouted.
   const attempts: Array<{ mode: EditMode; run: () => LayoutResult }> = [];
   if (previous && !canonical) {
     attempts.push({ mode: "incremental", run: () => layout(project, { previous, affected: affected.parts }) });
+    if (circuit.parts.some((p) => !previous.parts[p.id])) {
+      attempts.push({ mode: "incremental", run: () => layout(project, { previous, affected: affected.parts, newPartsBelow: true }) });
+    }
     attempts.push({ mode: "incremental-reroute", run: () => layout(project, { previous, affected: affected.parts, reuseRoutes: false }) });
   }
-  attempts.push({ mode: "canonical", run: () => layout(project) });
+  if (!(req.strict && previous && !canonical)) attempts.push({ mode: "canonical", run: () => layout(project) });
   const issues: string[] = [];
   let last: LayoutResult | undefined;
+  let unstable: EditResult | undefined;
   for (const a of attempts) {
+    if (unstable && a.mode === "canonical") return unstable;
     const r = a.run();
     last = r;
     if (!r.render || !r.status.startsWith("valid")) { issues.push(`${a.mode}: ${r.status}${r.issues.length ? ` (${r.issues[0]})` : ""}`); if (r.status === "infeasible" || r.status === "invalid_input") break; continue; }
     const q = checkDrawing(circuit, r.pinDefs, r.render);
     if (!q.valid) { issues.push(`${a.mode}: drawing failed checks (${[...q.connections.errors, ...q.overlaps].map((i) => i.code).join(", ")})`); continue; }
     const locked = new Set((intent.locks ?? []).map((l) => l.part));
-    return {
-      saved: true, status: r.status, project, layout: r, check: q, mode: a.mode, affected, removedHints, issues,
-      ...(previous ? { report: changeReport(previous, r.state!, new Set(affected.parts), new Set(affected.nets), locked) } : {}),
+    const report = previous ? changeReport(previous, r.state!, new Set(affected.parts), new Set(affected.nets), locked) : undefined;
+    const result: EditResult = {
+      saved: true, status: r.status, project, layout: r, check: q, mode: a.mode, affected, removedHints, issues: [...issues],
+      ...(report ? { report } : {}),
       revision: revision(project), layoutToken: layoutToken(project, r.state!),
     };
+    const breaks = report && a.mode !== "canonical" ? stabilityBreaks(report) : [];
+    if (!breaks.length) return result;
+    unstable ??= result;
+    issues.push(`${a.mode}: moves untouched parts (${breaks.join("; ")})`);
   }
+  if (unstable && req.strict) {
+    return { ...unchanged("unstable", [`edit refused (strict): every layout that keeps the drawing moves untouched parts too far. ${issues.join("; ")}`]), affected, removedHints, report: unstable.report! };
+  }
+  if (unstable) return unstable;
+  if (req.strict && previous && !canonical) issues.push("strict: the whole-sheet layout was not tried");
   const status = last?.status && !last.status.startsWith("valid") ? last.status : "budget_exhausted";
   return { ...unchanged(status, [`edit rejected: no valid layout (D4). ${issues.join("; ")}`]), affected, removedHints };
 }

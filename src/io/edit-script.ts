@@ -108,9 +108,10 @@ export interface ScriptRun {
 
 /**
  * Apply an edit script to a loaded project as one transaction (SPEC 11.3). `previous` is the
- * layout the project was last drawn with; without it the edit lays out canonically.
+ * layout the project was last drawn with; without it the edit lays out canonically. `strict` refuses
+ * an edit that would move untouched parts past SPEC 15 gate 4 (see EditRequest).
  */
-export function applyEditScript(project: LoadedProject, script: EditScript, previous?: LayoutState): ScriptRun {
+export function applyEditScript(project: LoadedProject, script: EditScript, previous?: LayoutState, opts: { strict?: boolean } = {}): ScriptRun {
   const refuse = (issues: string[]): ScriptRun => ({
     result: { saved: false, status: "invalid_input", project, affected: { parts: [], nets: [] }, issues, revision: revision(project) },
     asExpected: script.expect?.ok === false || script.expect?.ok === "either" || script.expect?.ok === undefined,
@@ -135,7 +136,7 @@ export function applyEditScript(project: LoadedProject, script: EditScript, prev
   }
 
   const result = edit({
-    project, ops, ...(previous ? { previous } : {}),
+    project, ops, ...(previous ? { previous } : {}), ...(opts.strict ? { strict: true } : {}),
     ...(script.expectedRevision ? { expectedRevision: script.expectedRevision } : {}), ...(script.expectedLayout ? { expectedLayout: script.expectedLayout } : {}),
   });
   const expected = script.expect?.affectedParts;

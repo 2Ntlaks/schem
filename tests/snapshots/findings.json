@@ -42,11 +42,10 @@
               "rot": 270
             }
           ],
-          "expectedLayout": "0232d27a1bccb511b00b7241ce5ede31186d30e5c2137c6fbb4b1c5f22c067bb",
+          "expectedLayout": "08db84f3fcfd3bdb1e01011baea5503fab191d68ac8aef1d3025d83d53f56429",
           "changesCircuit": false,
           "expect": {
-            "bends": -2,
-            "wireLength": -6
+            "wireLength": -9
           },
           "tradeoff": null
         }
@@ -79,7 +78,7 @@
               "factor": 1.5
             }
           ],
-          "expectedLayout": "da973315da86cb4490db1e932d5b6737332f4719526b4cd728a5c16069f811c3",
+          "expectedLayout": "c6126a10f1ccd18a54fc512447f4ee7dcccdfc0d58457b2337680e3a69f4b844",
           "changesCircuit": false,
           "expect": {
             "breaches": -1,
@@ -93,26 +92,8 @@
       {
         "id": "L-squeezedRuns",
         "severity": "info",
-        "message": "Readability: wires of different nets squeezed onto adjacent tracks: 1 (at most 0).",
-        "fix": {
-          "ops": [
-            {
-              "op": "setOrientation",
-              "part": "R9",
-              "rot": 270,
-              "flip": false
-            }
-          ],
-          "expectedLayout": "da973315da86cb4490db1e932d5b6737332f4719526b4cd728a5c16069f811c3",
-          "changesCircuit": false,
-          "expect": {
-            "breaches": -1,
-            "crossings": -1,
-            "bends": 15,
-            "wireLength": 243
-          },
-          "tradeoff": null
-        }
+        "message": "Readability: wires of different nets squeezed onto adjacent tracks: 1 (at most 0). No checked fix found among 3 candidates.",
+        "fix": null
       }
     ]
   }

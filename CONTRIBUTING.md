@@ -6,10 +6,9 @@ Thank you for helping. schem is an early prototype, and the most useful help rig
 
 1. **A circuit that draws badly.** Open an issue with the circuit file and the PNG it produced, and say what looks wrong. Real circuits that break the layout are the most valuable input this project can get.
 2. **A new symbol.** See [Adding a symbol](#adding-a-symbol) below. [`docs/parts.md`](docs/parts.md) lists what exists.
-3. **An example circuit.** A small, real circuit in [`examples/`](examples/) that draws valid, with a line in [`examples/README.md`](examples/README.md).
-4. **Docs.** Anything in the README or [`docs/netlist-format.md`](docs/netlist-format.md) that confused you is worth fixing.
-
-Board modules (a new dev board or breakout with its real pinout) are wanted too, but the module library cannot take new boards yet: it is tied to the four boards the development circuits use. Opening it up is the next planned change; until then, please open an issue for the board you want.
+3. **A board.** A dev board or breakout with its real pinout, so circuits can use it by name. See [Adding a board](#adding-a-board).
+4. **An example circuit.** A small, real circuit in [`examples/`](examples/) that draws valid, with a line in [`examples/README.md`](examples/README.md).
+5. **Docs.** Anything in the README or [`docs/netlist-format.md`](docs/netlist-format.md) that confused you is worth fixing.
 
 Changes to the layout engine (`src/layout/`) are welcome, but please open an issue first and describe the drawing problem you want to fix. Placement and routing changes affect every circuit, and the checks below are strict.
 
@@ -58,6 +57,22 @@ Symbols live in [`src/symbols/library.ts`](src/symbols/library.ts). Each one is 
 6. Run `npm run docs:parts` to update [`docs/parts.md`](docs/parts.md), and commit that file too.
 
 Draw symbols yourself. Do not copy artwork from other projects unless their licence is compatible with MIT and you say where it came from; for example, circuitdiagram/components is GPL and cannot be copied here.
+
+## Adding a board
+
+A board (an Arduino, a sensor breakout, a regulator module) is a *module*: a JSON file in [`src/modules/`](src/modules/) that lists its real pins. It has no artwork; schem draws it as a labelled box. Every file in that folder is loaded and checked automatically, so adding a board needs no code.
+
+1. Find the board's official documentation: the maker's pinout page, user guide or datasheet. Every pin number and name must come from it. Do not work from memory or from a third-party pinout picture.
+2. Create `src/modules/<name>.json`, where `<name>` is the module id without `module:` (lower case, digits, `-` and `.`). Copy [`pololu-d24v10f5.json`](src/modules/pololu-d24v10f5.json) (5 pins) or [`esp32-devkitc-v4.json`](src/modules/esp32-devkitc-v4.json) (38 pins) as a starting point. The fields:
+   - `id` (`"module:<name>"`), `version` (`1`), `kind` (`"module"`), `name` (the product name), `refPrefix` (`"U"` for most boards).
+   - `controller`: `true` for a microcontroller board, which the layout treats as where signals start.
+   - `doc`: `url` and `revision` are required and say exactly where the pins come from. Add `title`, `retrieved` (the date you read it), `pinNumbering` (how you numbered the pins if the document does not) and `notes`, like the existing boards.
+   - `pins`: one entry per physical pin, each with a `number` (as printed on the board or in the document, for example `"J2-10"`), a `name`, and a `role`: `power_in`, `power_out`, `ground`, `input`, `output`, `bidir`, `passive` or `nc`. Optional: `aliases` (other names people use, such as `"GPIO26"`), `group` (pins that are the same net on the board, such as every `GND`, so a circuit can write `U1{GND}`), and `iface` (`i2c.sda`, `i2c.scl`, `spi.sck`, `spi.mosi`, `spi.miso`, `spi.ss`) when the documentation fixes a pin's role on a bus.
+3. Run `npm test`. A mistake (a duplicate pin number, an unknown role, a file name that does not match the id) fails with a message naming the pin.
+4. Draw a small circuit that uses the board with `npm run schem -- draw <file>` and open the PNG.
+5. Run `npm run docs:parts` and commit the updated [`docs/parts.md`](docs/parts.md) with your file.
+
+In the pull request, link the documentation you used. A reviewer checks the pins against it.
 
 ## Pull requests
 

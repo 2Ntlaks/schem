@@ -107,6 +107,11 @@ their rules are described in `SPEC.md`.
 
 <!-- checked: src/io/project.ts loadProject() (INTENT keys; intent is optional) -->
 
+A file saved by `schem edit` also has a `layout` section: the drawing as it was saved, so the
+next draw or edit keeps it. You never write it yourself. See [`editing.md`](editing.md).
+
+<!-- checked: src/io/layout-cache.ts, src/cli.ts draw() -->
+
 ## Worked example
 
 `examples/led.schem.json` in full:

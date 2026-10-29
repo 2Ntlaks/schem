@@ -31,7 +31,7 @@ An agent can tell you that an ESP32 drives a relay through a transistor with a f
 - **You write a netlist.** Parts and the pins they connect. No coordinates, no wires, no layout.
 - **schem draws it the way an engineer would.** Power at the top, ground at the bottom, signals flowing left to right, familiar circuits in their textbook arrangement.
 - **Then it checks its own work.** The connections are rebuilt from the finished drawing and compared with your netlist, and parts and labels are checked for overlaps. If the picture does not say exactly what the netlist says, you are told.
-- **Edits stay put.** Change a value or add a part, and the rest of the drawing stays where it was (untouched parts may shift a little, within a measured limit). A figure in your report does not reshuffle itself between versions.
+- **Edits stay put.** Change a value or add a part with `schem edit`, and the rest of the drawing stays where it was (untouched parts may shift a little, within a measured limit; 136 of 140 random test edits stay inside it, and `--strict` refuses the rest). A figure in your report does not reshuffle itself between versions.
 
 ## Quick start
 
@@ -49,6 +49,8 @@ esp32-relay: valid. Wrote out/esp32-relay.svg and out/esp32-relay.png (190 ms)
 ```
 
 Five circuits to try are in [`examples/`](examples/). Add `-o <folder>` to write somewhere else. The exit code is `0` for a valid drawing, `1` when the drawing has problems (the files are still written and the problems listed), and `2` when the file could not be drawn, with a message saying what is wrong and where.
+
+To change a circuit without reshuffling its drawing, list the changes in a small JSON file and run `npm run schem -- edit <file> --ops <changes.json>`. [`docs/editing.md`](docs/editing.md) shows how.
 
 ## How it works
 
@@ -102,7 +104,7 @@ The same six circuits, drawn by schem and three open-source tools. SKiDL and net
 - Each tool had one first attempt plus at most three revisions per circuit, using only that tool's own options. Every attempt, what changed and why, is logged in [`baselines/LOG.md`](baselines/LOG.md), along with the known defects in the chosen drawings.
 - schem's drawings are used exactly as the engine makes them, rendered with the same settings as the others.
 - SKiDL's case 7 is a tool failure: its fallback placement stacked eight parts behind one chip.
-- Our own weakest circuit, a differential pair, is left out because schem draws it poorly. It is not hidden: it is in the log.
+- Case 8, a differential pair, was left out when schem drew it poorly. It now draws in its textbook shape and is being added back; the old attempts stay in the log.
 - This is our comparison, not a blind one. A blind rating by outside judges is planned.
 
 Open [`docs/showcase/index.html`](docs/showcase/index.html) locally for the full-size page, or rebuild it with `npm run showcase`.
@@ -148,6 +150,7 @@ schem is an early prototype. It is useful today for small and medium circuits, a
 - 22 symbols: passives, diodes, LEDs, BJTs, MOSFETs, op-amps, relays, switches, sources and more
 - Chips as labelled boxes, connectors, and 4 boards with their real pinouts (Arduino Uno, ESP32-DevKitC, a Pololu regulator, an I2C LCD)
 - All 8 development circuits draw valid; a generated 30-part circuit draws in under 3 seconds
+- Edits from the command line that keep the drawing and report anything that moved
 - Byte-identical output on Windows and Linux
 - Clear errors for broken input
 
@@ -155,9 +158,8 @@ schem is an early prototype. It is useful today for small and medium circuits, a
     <td valign="top">
 
 - Dense boards with several chips spread out too far
-- Circuits that want mirror symmetry, like a differential pair, come out messy
-- The library is small, and new boards cannot be added yet
-- Edits work in the engine (`src/edit/`) but not yet from the command line
+- Circuits with no template yet, such as Sallen-Key filters and oscillators, are drawn by the general rules and can come out messy
+- The symbol and board library is small
 - Not on npm, so no `npx schem` yet
 - No blind rating by outside judges yet
 
@@ -171,6 +173,7 @@ There is a lot to do, and much of it needs no knowledge of the layout engine.
 
 - **Send a circuit that draws badly.** Open an issue with the file and the PNG. Real circuits that break the layout are the most useful thing this project can get.
 - **Draw a symbol.** The library is small; [`CONTRIBUTING.md`](CONTRIBUTING.md#adding-a-symbol) walks through adding one, and the tests check it in all eight orientations.
+- **Add your board.** A dev board or breakout is one JSON file listing its real pins, no code needed. See [adding a board](CONTRIBUTING.md#adding-a-board).
 - **Add an example**, or fix anything in the docs that confused you.
 
 Coding agents are welcome too: [`AGENTS.md`](AGENTS.md) holds their rules. Start with [`CONTRIBUTING.md`](CONTRIBUTING.md).

@@ -57,6 +57,11 @@ export interface LayoutOptions {
   /** Keep the previous routes of nets whose drawn terminals did not change (default true). */
   reuseRoutes?: boolean;
   /**
+   * Incremental mode: start new parts below the existing drawing instead of among the existing
+   * parts. An edit's fallback when placing them among the others moves untouched parts.
+   */
+  newPartsBelow?: boolean;
+  /**
    * Pattern templates (SPEC 9.4): on by default (off when `place` is given). `false` turns them off;
    * `skip` leaves out matches by region key (the step 5 fallback when a region cannot be solved).
    */
@@ -117,7 +122,9 @@ export function layout(project: Project, opts: LayoutOptions = {}): LayoutResult
   /** Previous geometry of a part the edit did not touch (orientation and pin sides are kept). */
   const prevOf = (id: string) => (opts.previous && !affected.has(id) ? opts.previous.parts[id] : undefined);
   /** Previous position of any part that existed before (positions and order are kept where possible). */
-  const prevPos = (id: string) => opts.previous?.parts[id];
+  const prevPos = (id: string): { at: Pt } | undefined => opts.previous?.parts[id] ?? (newOrigins.has(id) ? { at: newOrigins.get(id)! } : undefined);
+  /** Incremental mode: where a new part starts (below the existing drawing; set before the solve). */
+  const newOrigins = new Map<string, Pt>();
   const circuit = project.circuit;
   const defs = pinDefsOf(circuit);
   if (!circuit.parts.length) return { status: "invalid_input", pinDefs: defs, issues: ["the circuit has no parts, so there is nothing to draw."], notes };
@@ -238,6 +245,24 @@ export function layout(project: Project, opts: LayoutOptions = {}): LayoutResult
     const on = pinsOn(id);
     const tap = membersOf(blockOf(id)).length === 1 && !fixedRank.has(id) && sym?.kind === "two-pin" && on.filter((p) => portNet.has(p.net)).length === 1 && on.filter((p) => !portNet.has(p.net)).length === 1;
     colValue.set(id, rank.get(id)! - (tap && rank.get(id)! > 0 ? 0.5 : 0));
+  }
+  // Incremental mode (SPEC 9.5): existing parts keep their previous column. Adding or removing a
+  // connection changes graph distances, and re-ranking would slide whole columns of untouched parts.
+  // A new part joins the previous column of the existing parts its fresh ranking puts it with; with
+  // no such parts, it takes the mean of its wired neighbours' columns. A previous layout saved
+  // without columns (an older engine) uses each part's x as its column.
+  const legacy = !!opts.previous && Object.values(opts.previous.parts).every((p) => p.column === undefined);
+  const oldCol = (id: string) => { const p = opts.previous?.parts[id]; return p ? (legacy ? p.at[0] : p.column) : undefined; };
+  if (opts.previous && ids.some((id) => oldCol(id) !== undefined)) {
+    const fresh = new Map(colValue);
+    for (const id of ids) {
+      if (oldCol(id) !== undefined) { colValue.set(id, oldCol(id)!); continue; }
+      const votes = new Map<number, number>();
+      for (const o of ids) if (o !== id && oldCol(o) !== undefined && fresh.get(o) === fresh.get(id)) votes.set(oldCol(o)!, (votes.get(oldCol(o)!) ?? 0) + 1);
+      const peer = [...votes].sort((a, b) => b[1] - a[1] || a[0] - b[0])[0]?.[0];
+      const near = [...neighbours.get(id)!].sort(cmpStr).flatMap((n) => (oldCol(n) !== undefined ? [oldCol(n)!] : []));
+      colValue.set(id, peer ?? (near.length ? near.reduce((a, b) => a + b, 0) / near.length : fresh.get(id)!));
+    }
   }
   const colVals = [...new Set(colValue.values())].sort((a, b) => a - b);
   const colOf = new Map(ids.map((id) => [id, colVals.indexOf(colValue.get(id)!)]));
@@ -387,6 +412,9 @@ export function layout(project: Project, opts: LayoutOptions = {}): LayoutResult
   }
   for (const [id, child] of childOffsets) clusterEnv.set(child.host, unionBox(clusterEnv.get(child.host)!, shifted(placed.get(id)!.env, child.at)));
   const envOf = (id: string) => clusterEnv.get(id)!;
+  // A host's own envelope: without its child slots, and without the supply ports moved on top of them.
+  const served = new Set(decouplers.filter((m) => childOffsets.has(m.part)).map((m) => `${m.host}[${m.pin}]`));
+  const ownEnv = (id: string): Box => { const P = placed.get(id)!; return [P.ko, ...P.labels.map((l) => gridBox(l.box)), ...P.ports.filter((q) => !served.has(`${id}[${q.pin}]`)).map((q) => q.box)].reduce(unionBox); };
   const withoutDecoupling = (reason: string): LayoutResult => {
     const r = layout(project, { ...opts, decoupling: false });
     r.notes.unshift(`decoupling@1: child slots yielded to ${reason}; used generic placement`);
@@ -395,7 +423,7 @@ export function layout(project: Project, opts: LayoutOptions = {}): LayoutResult
 
   // Step 5: region interiors, each solved on its own; a region then moves as one rigid block.
   // A host's envelope includes its decoupling child slots, so a template keeps room for them.
-  const geo = (id: string): Geo => { const P = placed.get(id)!; return { pins: P.pins, ko: P.ko, env: envOf(id) }; };
+  const geo = (id: string): Geo => { const P = placed.get(id)!; return { pins: P.pins, ko: P.ko, env: envOf(id), own: ownEnv(id) }; };
   const interior = new Map<Region, Interior>();
   for (const r of regions) {
     const res = solveInterior(r, geo);
@@ -433,6 +461,21 @@ export function layout(project: Project, opts: LayoutOptions = {}): LayoutResult
       columns[c] = [...columns[c]!].sort((a, b) => bary(a) - bary(b) || cur.get(a)! - cur.get(b)! || cmpStr(a, b));
     }
   }
+  // Incremental fallback: a new part starts below the existing drawing, under the parts of its column,
+  // so no existing part has to make room for it (SPEC 9.5 stability). The spot is its soft anchor.
+  if (opts.previous && opts.newPartsBelow) {
+    const was = (id: string) => opts.previous!.parts[id];
+    let bottom = Math.max(MARGIN, ...ids.filter((id) => was(id)).map((id) => was(id)!.at[1] + envOf(id).y + envOf(id).h));
+    for (const col of columns) for (const id of col) {
+      if (was(id)) continue;
+      const e = blockEnv(id);
+      const xs = col.flatMap((o) => (was(o) ? [was(o)!.at[0]] : []));
+      const near = xs.length ? xs : [...neighbours.get(id)!].sort(cmpStr).flatMap((o) => (was(o) ? [was(o)!.at[0]] : []));
+      const x = near.length ? Math.round(near.reduce((a, b) => a + b, 0) / near.length) : MARGIN - e.x;
+      newOrigins.set(id, [Math.max(MARGIN - e.x, x), bottom + 2 - e.y]);
+      bottom += 2 + e.h;
+    }
+  }
   // Incremental mode: parts from the previous layout keep their previous top-to-bottom order;
   // new or affected parts keep the slots the sweeps gave them (SPEC 9.5 ordering cost).
   if (opts.previous) for (let c = 0; c < columns.length; c++) {
@@ -463,6 +506,17 @@ export function layout(project: Project, opts: LayoutOptions = {}): LayoutResult
     cons.push({ a: vx(id), b: X0, c: MARGIN - e.x, priority: "structural", why: `margin ${id}` });
     cons.push({ a: vy(id), b: X0, c: MARGIN - e.y, priority: "structural", why: `margin ${id}` });
   }
+  // Incremental mode: two untouched parts whose present outlines would still clear each other (by
+  // 1 G) at their previous positions need no more distance than they had. The channel widths count
+  // crossing nets, so an edit that adds one net would otherwise slide whole columns. Next to an
+  // affected part the full gap stands, so the part the edit changed can make room for itself.
+  const keptGap = (a: string, b: string, axis: 0 | 1, need: number): number => {
+    const pa = opts.previous?.parts[a], pb = opts.previous?.parts[b];
+    if (!pa || !pb || affected.has(a) || affected.has(b)) return need;
+    const ea = shift(blockEnv(a), pa.at), eb = shift(blockEnv(b), pb.at);
+    const clear = ea.x + ea.w + 1 <= eb.x || eb.x + eb.w + 1 <= ea.x || ea.y + ea.h + 1 <= eb.y || eb.y + eb.h + 1 <= ea.y;
+    return clear ? Math.min(need, pb.at[axis] - pa.at[axis]) : need;
+  };
   for (let c = 0; c + 1 < columns.length; c++) {
     const gap = 2 + spans(c) + internal(c) + internal(c + 1) + spacing;
     for (const a of columns[c]!) for (const b of columns[c + 1]!) {
@@ -471,7 +525,7 @@ export function layout(project: Project, opts: LayoutOptions = {}): LayoutResult
       // did not overlap, with 1 G to spare) need no horizontal separation (SPEC 9.5 stability).
       const pa = prevPos(a), pb = prevPos(b);
       if (pa && pb && (pa.at[1] + ea.y + ea.h + 1 <= pb.at[1] + eb.y || pb.at[1] + eb.y + eb.h + 1 <= pa.at[1] + ea.y)) continue;
-      cons.push({ a: vx(b), b: vx(a), c: gap + ea.x + ea.w - eb.x, priority: "structural", why: `column ${c} before ${c + 1}` });
+      cons.push({ a: vx(b), b: vx(a), c: keptGap(a, b, 0, gap + ea.x + ea.w - eb.x), priority: "structural", why: `column ${c} before ${c + 1}` });
     }
   }
   // Parts a template keeps apart sideways (staggered sources) are not stacked.
@@ -482,7 +536,7 @@ export function layout(project: Project, opts: LayoutOptions = {}): LayoutResult
     for (let i = 0; i + 1 < col.length; i++) {
       if (apart.has(`${col[i]}|${col[i + 1]}`)) continue;
       const ea = blockEnv(col[i]!), eb = blockEnv(col[i + 1]!);
-      cons.push({ a: vy(col[i + 1]!), b: vy(col[i]!), c: gapY + ea.y + ea.h - eb.y, priority: "structural", why: `order in column ${c}` });
+      cons.push({ a: vy(col[i + 1]!), b: vy(col[i]!), c: keptGap(col[i]!, col[i + 1]!, 1, gapY + ea.y + ea.h - eb.y), priority: "structural", why: `order in column ${c}` });
     }
   }
   // Regions are rigid blocks; templates link them to the parts around them (SPEC 9.2 step 6).
@@ -749,7 +803,7 @@ export function layout(project: Project, opts: LayoutOptions = {}): LayoutResult
   const state: LayoutState = { parts: {}, routes: {} };
   for (const id of ids) {
     const P = placed.get(id)!;
-    const entry: LayoutState["parts"][string] = { at: at(id), orient: P.orient };
+    const entry: LayoutState["parts"][string] = { at: at(id), orient: P.orient, column: colValue.get(id)! };
     if (P.sym.kind === "ic") {
       const side = (d: Dir): Side => (d === "left" ? "left" : d === "right" ? "right" : d === "up" ? "top" : "bottom");
       const sides: Partial<Record<Side, string[]>> = {};

@@ -6,7 +6,8 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { layout, type Project } from "../src/layout/layout.js";
 import { edit, revision, type EditOp } from "../src/edit/edit.js";
-import { stabilityBreaks } from "../src/edit/report.js";
+import { changeReport, stabilityBreaks } from "../src/edit/report.js";
+import type { LayoutState } from "../src/core/intent.js";
 import { circuitEquals } from "../src/core/equals.js";
 import { pinDefsOf } from "../src/layout/layout.js";
 import { EDIT_SCRIPTS } from "./support/edit-scripts.js";
@@ -118,10 +119,10 @@ describe("transactions (D4)", () => {
 });
 
 describe("generated circuits under random edits (layer 5)", () => {
-  it("every saved edit passes layers 1-2, and at least 85% meet the stability gate", () => {
+  it("every saved edit passes layers 1-2, and at least 95% meet the stability gate", () => {
     let saved = 0, stable = 0;
     const unstable: string[] = [];
-    for (let seed = 1; seed <= 80; seed++) {
+    for (let seed = 1; seed <= 150; seed++) {
       const g = generate(seed, 5);
       const base = layout({ circuit: g.circuit });
       if (!base.state || !base.status.startsWith("valid")) continue;
@@ -134,7 +135,68 @@ describe("generated circuits under random edits (layer 5)", () => {
       const breaks = stabilityBreaks(r.report!);
       if (breaks.length) unstable.push(`#${seed} ${e.kind}: ${breaks.join("; ")}`); else stable++;
     }
-    expect(saved).toBeGreaterThan(60);
-    expect(stable / saved, unstable.join("\n")).toBeGreaterThanOrEqual(0.85);
-  }, 120_000);
+    expect(saved).toBeGreaterThan(120);
+    expect(stable / saved, unstable.join("\n")).toBeGreaterThanOrEqual(0.95);
+  }, 300_000);
+});
+
+describe("strict edits", () => {
+  // Generated circuit 38 with its random edit: its best layout moves one untouched part 8 G.
+  const g = generate(38, 5);
+  const previous = layout({ circuit: g.circuit }).state!;
+  const { ops } = randomEdit(g.circuit, 38 * 31);
+
+  it("an edit past the stability gate is saved by default and refused when strict", () => {
+    const loose = edit({ project: { circuit: g.circuit }, previous, ops });
+    expect(loose.saved).toBe(true);
+    expect(stabilityBreaks(loose.report!)).toEqual(["an untouched part moved 8 G (at most 6)"]);
+
+    const strict = edit({ project: { circuit: g.circuit }, previous, ops, strict: true });
+    expect(strict.saved).toBe(false);
+    expect(strict.status).toBe("unstable");
+    expect(strict.project.circuit).toBe(g.circuit);
+    expect(stabilityBreaks(strict.report!)).toEqual(["an untouched part moved 8 G (at most 6)"]);
+  });
+
+  it("strict still saves an edit that asks for the whole sheet to be redrawn", () => {
+    const r = edit({ project: { circuit: g.circuit }, previous, ops: [...ops, { op: "relayout", mode: "canonical" }], strict: true });
+    expect(r.saved).toBe(true);
+    expect(r.mode).toBe("canonical");
+  });
+
+  it("strict saves the stable development edits unchanged", () => {
+    for (const [f, scripts] of Object.entries(EDIT_SCRIPTS)) for (const ops of Object.values(scripts)) {
+      const s = start(f);
+      expect(JSON.stringify(edit({ ...s, ops, strict: true }).layout!.state)).toBe(JSON.stringify(edit({ ...s, ops }).layout!.state));
+    }
+  });
+});
+
+describe("stability report (SPEC 15 gate 4)", () => {
+  it("does not round a mean displacement just over the limit down to the limit", () => {
+    const before: LayoutState = { parts: {}, routes: {} };
+    const after: LayoutState = { parts: {}, routes: {} };
+    for (let i = 0; i < 100; i++) {
+      const id = `R${i}`;
+      before.parts[id] = { at: [i * 10, 0], orient: { rot: 0, flip: false } };
+      after.parts[id] = { at: [i * 10 + (i < 50 ? 0 : 4), i === 99 ? 1 : 0], orient: { rot: 0, flip: false } };
+    }
+    const report = changeReport(before, after, new Set(), new Set(), new Set());
+    expect(report.untouched.meanMove).toBeGreaterThan(2);
+    expect(stabilityBreaks(report)).toHaveLength(1);
+  });
+
+  it("allows one unrelated reroute and rejects two", () => {
+    const before: LayoutState = {
+      parts: {},
+      routes: { n1: { terminals: "A", runs: [[[0, 0], [2, 0]]] }, n2: { terminals: "B", runs: [[[0, 3], [2, 3]]] } },
+    };
+    const after = structuredClone(before);
+    after.routes.n1!.runs = [[[0, 1], [2, 1]]];
+    expect(stabilityBreaks(changeReport(before, after, new Set(), new Set(), new Set()))).toEqual([]);
+    after.routes.n2!.runs = [[[0, 4], [2, 4]]];
+    expect(stabilityBreaks(changeReport(before, after, new Set(), new Set(), new Set())))
+      .toEqual(["routes changed on 2 nets the edit did not involve (at most 1): n1, n2"]);
+    expect(stabilityBreaks(changeReport(before, after, new Set(), new Set(["n1"]), new Set()))).toEqual([]);
+  });
 });
