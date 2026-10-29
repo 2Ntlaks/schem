@@ -16,7 +16,7 @@ import { eq, solveWithDrops, X0, type Constraint } from "./solver.js";
 import { route, type NetRequest } from "./router.js";
 import { checkDrawing } from "../quality/index.js";
 import {
-  apartPairs, isBoundary, linkConstraints, matchTemplates, solveInterior, templateLabel, templateOrient, templateRanks, templateSides, trunkRuns, TEMPLATES,
+  apartPairs, isBoundary, linkConstraints, matchTemplates, solveInterior, templateLabel, templateOrient, templateRanks, templateSides, trunkRows, trunkRuns, TEMPLATES,
   type Geo, type Interior, type Region,
 } from "./templates/index.js";
 import { edgeForbidden } from "../geom/forbidden.js";
@@ -537,6 +537,52 @@ export function layout(project: Project, opts: LayoutOptions = {}): LayoutResult
       if (apart.has(`${col[i]}|${col[i + 1]}`)) continue;
       const ea = blockEnv(col[i]!), eb = blockEnv(col[i + 1]!);
       cons.push({ a: vy(col[i + 1]!), b: vy(col[i]!), c: keptGap(col[i]!, col[i + 1]!, 1, gapY + ea.y + ea.h - eb.y), priority: "structural", why: `order in column ${c}` });
+    }
+  }
+  // Bus corridors: a template run that crosses columns (an I2C trunk from the controller to its
+  // peripherals) keeps its rows clear. A part in a column the run crosses sits wholly above the rows
+  // when its wires to the run's owner leave the owner above them, wholly below when they leave below;
+  // a part with no wire to the owner, or one on the bus itself, is left alone.
+  for (const r of regions) {
+    const rows = trunkRows(r, geo);
+    for (const owner of [...new Set(rows.map((x) => x.part))].sort(cmpStr)) {
+      const mine = rows.filter((x) => x.part === owner);
+      const top = Math.min(...mine.map((x) => x.off)), bottom = Math.max(...mine.map((x) => x.off));
+      const bus = new Set(mine.map((x) => x.net));
+      const cols = [...new Set(mine.flatMap((x) => x.ends))].map((p) => colOf.get(p)!);
+      const priority = opts.previous ? "templateSoft" : "template";
+      for (let c = Math.min(...cols) + 1; c < Math.max(...cols); c++) {
+        const above: string[] = [], below: string[] = [];
+        for (const b of columns[c]!) {
+          if (regionOf.get(b) === r) continue;
+          const nets = new Set(membersOf(b).flatMap((m) => placed.get(m)!.pins.map((p) => drawnNet.get(`${m}[${p.number}]`)!)).filter((n) => n && !portNet.has(n)));
+          if ([...nets].some((n) => bus.has(n))) continue;
+          const ys = placed.get(owner)!.pins.filter((p) => nets.has(drawnNet.get(`${owner}[${p.number}]`)!)).map((p) => p.at[1]);
+          if (!ys.length) continue;
+          const y = ys.reduce((a, v) => a + v, 0) / ys.length, E = blockEnv(b);
+          if (y < top) {
+            above.push(b);
+            cons.push({ a: vy(owner), b: vy(b), c: E.y + E.h - top + 1, priority, why: `bus corridor: ${b} above the ${r.template.id} rows` });
+          } else if (y > bottom) {
+            below.push(b);
+            cons.push({ a: vy(b), b: vy(owner), c: bottom + 1 - E.y, priority, why: `bus corridor: ${b} below the ${r.template.id} rows` });
+          }
+        }
+        // In a fresh layout, more weakly: the parts above stay stacked just over the rows and the
+        // parts below just under them, so their wires to the owner stay short (in an edit, staying
+        // put decides instead). Each keeps at most 2 G more than the gap it needs to its neighbour.
+        if (opts.previous) continue;
+        const gapY = 2 + through(c) + spacing;
+        const close = (upper: string, lower: string) => {
+          const eu = blockEnv(upper), el = blockEnv(lower);
+          cons.push({ a: vy(upper), b: vy(lower), c: -(eu.y + eu.h + gapY - el.y + 2), priority: "align", why: `bus corridor: ${upper} close above ${lower}` });
+        };
+        for (let i = 0; i + 1 < above.length; i++) close(above[i]!, above[i + 1]!);
+        for (let i = 0; i + 1 < below.length; i++) close(below[i]!, below[i + 1]!);
+        const last = above.at(-1), first = below[0];
+        if (last) { const E = blockEnv(last); cons.push({ a: vy(last), b: vy(owner), c: top - 3 - E.y - E.h, priority: "align", why: `bus corridor: ${last} just above the ${r.template.id} rows` }); }
+        if (first) { const E = blockEnv(first); cons.push({ a: vy(owner), b: vy(first), c: E.y - bottom - 3, priority: "align", why: `bus corridor: ${first} just below the ${r.template.id} rows` }); }
+      }
     }
   }
   // Regions are rigid blocks; templates link them to the parts around them (SPEC 9.2 step 6).

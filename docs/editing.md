@@ -64,7 +64,7 @@ grid step, 0.1 inch). The limit is:
 - at most one net the edit did not involve is rerouted;
 - a locked part never moves.
 
-On 140 random test edits, 136 stay inside this limit. When an edit goes past it, schem still
+On 137 random test edits, 133 stay inside this limit. When an edit goes past it, schem still
 saves it and says so:
 
 ```

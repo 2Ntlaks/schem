@@ -7,8 +7,8 @@
 // four boards the Phase 0 cases use are byte-identical copies of phase0/modules/*.json (the frozen
 // case author's definitions); a test checks that. CONTRIBUTING.md explains how to add a board.
 
-import { readdirSync, readFileSync } from "node:fs";
 import type { Issue, PinDef, Role } from "../core/model.js";
+import { moduleFiles } from "./files.js";
 
 export interface ModuleDoc {
   title?: string;
@@ -42,13 +42,14 @@ type Obj = Record<string, unknown>;
 const isObj = (v: unknown): v is Obj => typeof v === "object" && v !== null && !Array.isArray(v);
 const isStrArray = (v: unknown): v is string[] => Array.isArray(v) && v.every((x) => typeof x === "string" && x.length > 0);
 
-/** Library file names, sorted by UTF-16 code units so the order is the same on every machine (SPEC 9.6). */
-const FILES = readdirSync(new URL(".", import.meta.url)).filter((f) => f.endsWith(".json")).sort();
+/** Library files (name, text), sorted by name in UTF-16 code units so the order is the same on every machine (SPEC 9.6). */
+const SOURCES = moduleFiles().sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0));
+const FILES = SOURCES.map(([f]) => f);
 
 /** The shipped module library, by module id (`module:esp32-devkitc-v4`). */
 export const MODULE_LIBRARY: Readonly<Record<string, ModuleDef>> = Object.freeze(Object.fromEntries(
-  FILES.map((f) => {
-    const def = JSON.parse(readFileSync(new URL(`./${f}`, import.meta.url), "utf8")) as ModuleDef;
+  SOURCES.map(([f, text]) => {
+    const def = JSON.parse(text) as ModuleDef;
     const issues = checkModuleDef(def, def.id);
     if (`module:${f.slice(0, -".json".length)}` !== def.id) issues.push({ code: "E202", message: `the file must be named after the module id ("${def.id}").`, at: f });
     if (issues.length) throw new Error(`module library ${f}: ${issues.map((i) => `${i.code} ${i.message}`).join("; ")}`);
