@@ -180,6 +180,52 @@ const DIVIDER: Template = {
 };
 
 /**
+ * RC / RL filter (SPEC 9.4): the series part lies flat on a signal path and one shunt stands
+ * down to ground at its output end. The search keeps one shunt, the lowest id that fits, so
+ * a capacitor on the output is taken before a load resistor. Both pins of the series part are
+ * signal nets, so a resistor from a supply does not match.
+ * The shunt is split in two copies. A capacitor or an inductor hangs on the output column and
+ * may share that net with a load. A resistor shunt matches only when the output net has two
+ * endpoints, the series part and the resistor: a busier net (an op-amp output with feedback
+ * and a load) stays with the pull-down template. That resistor stands 2 G to the right, with
+ * the corner pre-routed. On the same column its approach would sit on a series capacitor's
+ * keep-out, which reaches 1 G under the pin, and the route fails.
+ * Polarised capacitors are named in the type lists, but their pins are + and -, so they do
+ * not bind on pin names 1 and 2.
+ */
+function rcFilter(shuntTypes: string[], out: Template["nets"][string], dropX: number): Template {
+  return {
+    id: "rc-rl-filter", version: 1, priority: 9,
+    summary: "series element on a signal path; shunt element to ground",
+    nets: { IN: { kind: ["signal"] }, OUT: out, GND: { kind: ["ground"] } },
+    slots: [
+      { name: "series", types: ["resistor", "capacitor", "inductor", "polarised-capacitor"], role: "member", symmetric: true,
+        orient: { net: "IN", dir: "left" }, label: "above",
+        pins: [{ pin: "1", net: "IN" }, { pin: "2", net: "OUT" }] },
+      { name: "shunt", types: shuntTypes, role: "member", symmetric: true,
+        orient: { net: "GND", dir: "down" }, label: "right",
+        pins: [{ pin: "1", net: "OUT" }, { pin: "2", net: "GND" }] },
+    ],
+    interior: [
+      rel("x", pin("shunt", net("OUT")), "=", pin("series", net("OUT")), dropX, dropX === 0 ? "shunt under the output end of the series part" : "shunt just to the right of the series output, clear of its keep-out"),
+      rel("y", pin("shunt", net("OUT")), "=", pin("series", net("OUT")), 2, "a short wire down to the shunt"),
+    ],
+    boundary: [["series", { net: "IN" }], ["series", { net: "OUT" }]],
+    ...(dropX === 0 ? {} : { trunks: [{
+      net: "OUT", why: "corner from the series output pin down into the shunt",
+      points: [
+        { x: pin("series", net("OUT")), dx: 1, y: pin("series", net("OUT")) },
+        { x: pin("shunt", net("OUT")), y: pin("series", net("OUT")) },
+        { x: pin("shunt", net("OUT")), y: pin("shunt", net("OUT")), dy: -1 },
+      ],
+      require: [{ pin: ["series", net("OUT")], dir: "right" }, { pin: ["shunt", net("OUT")], dir: "up" }],
+    }] }),
+  };
+}
+const RC_RL = rcFilter(["capacitor", "polarised-capacitor", "inductor"], { kind: ["signal"] }, 0);
+const RC_RL_R = rcFilter(["resistor"], { kind: ["signal"], endpoints: 2 }, 2);
+
+/**
  * Pull-up / pull-down: vertical from the rail symbol to the signal wire. Only for a signal net
  * with a driver and a receiver (3+ endpoints); a two-endpoint net is a series path (LED template).
  */
@@ -495,5 +541,5 @@ const BRIDGE_RECTIFIER: Template = {
 export const TEMPLATES: readonly Template[] = [
   OPAMP_INVERTING, OPAMP_NONINVERTING, hBridge("pmos", "nmos"), hBridge("pnp", "npn"), diffPair("npn", "pnp"), diffPair("nmos", "pmos"), BRIDGE_RECTIFIER, I2C,
   lowSide("npn", "relay"), lowSide("nmos", "relay"), lowSide("npn", "two-pin"), lowSide("nmos", "two-pin"),
-  DIVIDER, PULL_UP, PULL_DOWN, LED_VERTICAL, LED_HORIZONTAL,
+  DIVIDER, RC_RL, RC_RL_R, PULL_UP, PULL_DOWN, LED_VERTICAL, LED_HORIZONTAL,
 ];

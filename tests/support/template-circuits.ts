@@ -282,7 +282,43 @@ export const I2C_RESET_RC: Project = {
   },
 };
 
+/** RC low-pass: series resistor on the signal, shunt capacitor to ground, load left outside the region. */
+export const RC_FILTER: Project = {
+  meta: { title: "RC low-pass filter" },
+  circuit: {
+    parts: [
+      { id: "V1", type: "vsource", props: { value: "1V" } },
+      { id: "R1", type: "resistor", props: { value: "1k" } },
+      { id: "C1", type: "capacitor", props: { value: "100n" } },
+      { id: "RL", type: "resistor", props: { value: "10k" } },
+    ],
+    nets: [
+      { id: "n1", name: "IN", endpoints: ["V1.+", "R1.1"] },
+      { id: "n2", name: "OUT", endpoints: ["R1.2", "C1.1", "RL.1"] },
+      { id: "n3", name: "GND", endpoints: ["V1.-", "C1.2", "RL.2"] },
+    ],
+  },
+};
+
+/** RC high-pass: series capacitor, and a resistor to ground that is the only other part on the output. */
+export const RC_HIGHPASS: Project = {
+  meta: { title: "RC high-pass filter" },
+  circuit: {
+    parts: [
+      { id: "V1", type: "vsource", props: { value: "1V" } },
+      { id: "C1", type: "capacitor", props: { value: "100n" } },
+      { id: "R1", type: "resistor", props: { value: "10k" } },
+    ],
+    nets: [
+      { id: "n1", name: "IN", endpoints: ["V1.+", "C1.1"] },
+      { id: "n2", name: "OUT", endpoints: ["C1.2", "R1.1"] },
+      { id: "n3", name: "GND", endpoints: ["V1.-", "R1.2"] },
+    ],
+  },
+};
+
 export const TEMPLATE_CIRCUITS: Record<string, Project> = {
   "noninverting": NONINVERTING, "inverting": INVERTING, "divider": DIVIDER, "pulls": PULLS, "led-gpio": LED_GPIO, "led-sink": LED_SINK,
   "bridge": BRIDGE, "hbridge-bjt": HBRIDGE_BJT, "low-side": LOW_SIDE, "diff-pair": DIFF_PAIR, "i2c-decoupled": I2C_DECOUPLED, "i2c-reset-rc": I2C_RESET_RC,
+  "rc-filter": RC_FILTER, "rc-highpass": RC_HIGHPASS,
 };

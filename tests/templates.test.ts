@@ -10,7 +10,7 @@ import { checkDrawing } from "../src/quality/index.js";
 import { toSvg } from "../src/render/svg.js";
 import { TEMPLATES } from "../src/layout/templates/index.js";
 import type { DrawnPin } from "../src/render/model.js";
-import { BRIDGE, DIFF_PAIR, DIVIDER, HBRIDGE_BJT, I2C_DECOUPLED, I2C_RESET_RC, INVERTING, LED_GPIO, LED_SINK, LOW_SIDE, NONINVERTING, PULLS, TEMPLATE_CIRCUITS } from "./support/template-circuits.js";
+import { BRIDGE, DIFF_PAIR, DIVIDER, HBRIDGE_BJT, I2C_DECOUPLED, I2C_RESET_RC, INVERTING, LED_GPIO, LED_SINK, LOW_SIDE, NONINVERTING, PULLS, RC_FILTER, RC_HIGHPASS, TEMPLATE_CIRCUITS } from "./support/template-circuits.js";
 
 const dir = join(import.meta.dirname, "..", "cases");
 const load = (f: string) => JSON.parse(readFileSync(join(dir, f), "utf8")) as Project;
@@ -130,6 +130,28 @@ describe("the other templates", () => {
     expect([q.valid, q.metrics.crossings, q.conventions, q.breaches]).toEqual([true, 0, [], []]);
   });
 
+  it("RC low-pass: series resistor horizontal, shunt capacitor under its output, load left outside", () => {
+    const { r, q } = run(RC_FILTER);
+    expect(r.state!.templates).toEqual(["pull-down@1:RL", "rc-rl-filter@1:C1,R1"]);
+    const [rIn, rOut] = [pinAt(r, "R1", "1"), pinAt(r, "R1", "2")];
+    const [cTop, cBot] = [pinAt(r, "C1", "1"), pinAt(r, "C1", "2")];
+    expect([rIn.at[1] === rOut.at[1], rIn.at[0] < rOut.at[0]]).toEqual([true, true]);
+    expect([cTop.at[0], cTop.at[1]]).toEqual([rOut.at[0], rOut.at[1] + 2]);
+    expect([cBot.at[0] === cTop.at[0], cBot.at[1] > cTop.at[1]]).toEqual([true, true]);
+    expect([q.valid, q.metrics.crossings, q.conventions, q.breaches]).toEqual([true, 0, [], []]);
+  });
+
+  it("RC high-pass: series capacitor horizontal, shunt resistor under its output", () => {
+    const { r, q } = run(RC_HIGHPASS);
+    expect(r.state!.templates).toEqual(["rc-rl-filter@1:C1,R1"]);
+    const [cIn, cOut] = [pinAt(r, "C1", "1"), pinAt(r, "C1", "2")];
+    const [rTop, rBot] = [pinAt(r, "R1", "1"), pinAt(r, "R1", "2")];
+    expect([cIn.at[1] === cOut.at[1], cIn.at[0] < cOut.at[0]]).toEqual([true, true]);
+    expect([rTop.at[0], rTop.at[1]]).toEqual([cOut.at[0] + 2, cOut.at[1] + 2]);
+    expect([rBot.at[0] === rTop.at[0], rBot.at[1] > rTop.at[1]]).toEqual([true, true]);
+    expect([q.valid, q.metrics.crossings, q.conventions, q.breaches]).toEqual([true, 0, [], []]);
+  });
+
   it("pull-up / pull-down: vertical, rail symbol on the far side", () => {
     const { r, q } = run(PULLS);
     expect(r.state!.templates).toEqual(["pull-down@1:R2", "pull-up@1:R1"]);
@@ -214,6 +236,7 @@ describe("the other templates", () => {
     expect(r.notes.filter((n) => n.includes("blocked"))).toEqual([]);
     const sda = pinAt(r, "U1", "3").at[1];
     expect(pinAt(r, "C1", "2").at[1]).toBeLessThan(sda);
+    expect((r.state!.templates ?? []).some((k) => k.startsWith("rc-rl-filter"))).toBe(false);
     expect(horizontalRuns(r).some((w) => w[0]![1] === sda && Math.abs(w[w.length - 1]![0] - w[0]![0]) > 20)).toBe(true);
     expect([q.valid, q.metrics.crossings]).toEqual([true, 1]);
   });
