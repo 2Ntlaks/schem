@@ -4,7 +4,7 @@ These are independent drawings of the eight Phase 0 validation circuits, made wi
 that also turn a netlist into a schematic. They are the comparison side of the showcase; our engine's own
 drawings are made by `npm run phase0`. tscircuit is being added in three parts; Parts A and B are done, so this
 file and the rest of the folder describe the full tscircuit baseline. Six cases have a passing final; cases 5
-and 8 are tool failures and have no final.
+and 7 are tool failures and have no final.
 
 - `LOG.md`: the attempt budget, the tool-wide settings, every attempt and the final choice per case.
 - `CONNECTIONS.md`: the nets each final drawing shows, taken from the final `.check.txt` files.
@@ -98,10 +98,13 @@ The check answers one question: does the drawing show exactly the case's nets? I
 - **tscircuit** (`tscircuit_draw.mjs`): reads only the schematic layer of the circuit JSON (schematic ports,
   schematic traces, schematic net labels), joins same-named net labels, maps schematic ports back to case pins
   through the source ports and compares. A pin with neither a wire nor a label stays alone and counts as
-  missing. The source netlist is used only for the expected groups and the pin names.
+  missing. The source netlist is used only for the expected groups and the pin names. Two drawn things touch
+  when the true distance between them is less than the drawn wire width, 0.02 schematic units: point-to-point
+  for pins and wire ends, point-to-segment for a pin, junction or label anchor on a wire. The `--replay` mode
+  reruns this check on an existing `attempt-K.input.json` and rewrites only its check file, with no new drawing.
 
 A FAIL cannot be chosen as final. All 24 finals of the first three tools PASS. tscircuit's finals PASS in cases
-1, 2, 3, 4, 6 and 7; cases 5 and 8 have no final because every attempt's check fails. See `CONNECTIONS.md`.
+1, 2, 3, 4, 6 and 8; cases 5 and 7 have no final because every attempt's check fails. See `CONNECTIONS.md`.
 
 ## Config levers used in the revisions
 

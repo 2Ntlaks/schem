@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Four ways to draw the same circuit</title>
-  <meta name="description" content="The same six validation circuits drawn by schem, SKiDL, netlistsvg and schemdraw.">
+  <title>Five ways to draw the same circuit</title>
+  <meta name="description" content="The same seven validation circuits drawn by schem, tscircuit, SKiDL, netlistsvg and schemdraw.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
@@ -54,7 +54,7 @@
       padding: 0;
       margin: 0;
       display: grid;
-      grid-template-columns: repeat(4, minmax(0, 1fr));
+      grid-template-columns: repeat(5, minmax(0, 1fr));
       gap: 16px;
     }
     .tool-list li {
@@ -100,7 +100,7 @@
     .parts { flex-basis: 100%; margin: 2px 0 0; color: var(--muted); font-size: 14.5px; }
     .grid {
       display: grid;
-      grid-template-columns: repeat(4, minmax(0, 1fr));
+      grid-template-columns: repeat(5, minmax(0, 1fr));
       gap: 18px;
       margin-top: 16px;
       align-items: stretch;
@@ -126,6 +126,15 @@
     .cell a { display: flex; flex: 1; align-items: center; justify-content: center; min-height: 120px; }
     .cell img { display: block; max-width: 100%; height: auto; }
     .failure { margin: 10px 4px 0; font-size: 13px; line-height: 1.45; color: var(--accent); }
+    .no-final {
+      margin: 0;
+      padding: 18px 14px;
+      align-self: center;
+      text-align: center;
+      color: var(--muted);
+      font-size: 15px;
+      line-height: 1.5;
+    }
     .notes { max-width: 940px; }
     .notes h3 { font-size: clamp(19px, 1.8vw, 24px); margin: 26px 0 8px; }
     .notes p { color: var(--soft); margin: 0; }
@@ -154,28 +163,29 @@
 <main>
   <header class="hero">
     <p class="eyebrow">schem showcase</p>
-    <h1>Four ways to draw the same circuit</h1>
-    <p class="lede">Six validation circuits, each drawn from the same netlist by our engine and by three open-source tools. This page shows the same grid as <a href="comparison.png">comparison.png</a> and links every drawing to its original PNG.</p>
+    <h1>Five ways to draw the same circuit</h1>
+    <p class="lede">Seven validation circuits, each drawn from the same netlist by our engine and by four open-source tools. This page shows the same grid as <a href="comparison.png">comparison.png</a> and links every drawing to its original PNG.</p>
   </header>
 
   <section>
-    <h2>The four tools</h2>
+    <h2>The five tools</h2>
     <ul class="tool-list">
-      <li><strong>schem (ours)</strong>This project's engine. It takes a netlist in JSON, lays the schematic out itself, and writes SVG and PNG. The six drawings here are the SVGs that <code>npm run phase0</code> produced, rasterised with the same settings as the baselines (1600 px on the long side, same fonts).</li>
+      <li><strong>schem (ours)</strong>This project's engine. It takes a netlist in JSON, lays the schematic out itself, and writes SVG and PNG. The seven drawings here are the SVGs that <code>npm run phase0</code> produced, rasterised with the same settings as the baselines (1600 px on the long side, same fonts).</li>
+      <li><strong>tscircuit</strong>A TypeScript library that describes a circuit in code and lays out its schematic automatically. These drawings come from <code>@tscircuit/core</code>'s circuit JSON, rendered by <code>circuit-to-svg</code>.</li>
       <li><strong>SKiDL</strong>A Python library for describing circuits in code. Its schematic generator places the parts and routes the wires automatically. The baseline harness falls back to SKiDL's label mode when its router fails.</li>
       <li><strong>netlistsvg</strong>A JavaScript tool that lays out a Yosys-style netlist with the ELK graph library and draws it with a replaceable skin. These drawings use the analog skin that ships with the tool.</li>
-      <li><strong>schemdraw</strong>A Python drawing library. Every symbol, label and wire is placed by code, so these six drawings were written by hand, while the other three tools, ours included, lay out the drawing automatically.</li>
+      <li><strong>schemdraw</strong>A Python drawing library. Every symbol, label and wire is placed by code, so these seven drawings were written by hand, while the other four tools, ours included, lay out the drawing automatically.</li>
     </ul>
   </section>
 
   <section class="fairness">
     <h2>How this was made fairly</h2>
     <ul>
-      <li>schemdraw is drawn by hand, one Python file per circuit. schem, SKiDL and netlistsvg are automatic: they take the netlist and place and route the drawing themselves.</li>
+      <li>schemdraw is drawn by hand, one Python file per circuit. schem, tscircuit, SKiDL and netlistsvg are automatic: they take the netlist and place and route the drawing themselves.</li>
       <li>Each baseline tool had one first attempt plus at most three revisions per circuit. Every attempt is logged in <a href="../../baselines/LOG.md">baselines/LOG.md</a>, with what changed and why.</li>
       <li>The chosen drawing for each tool and circuit is the attempt with the fewest drawing errors among those whose connection check passes. Known defects in the chosen drawings are listed in the same log.</li>
       <li>Some baselines shorten long part names to fit the drawing, for example <code>U1 ESP32</code> in netlistsvg case 6. The log records each of these.</li>
-      <li>Case 8 (differential pair) is left out because our own drawing of it is weak. It is not hidden from the log; it simply does not appear in this comparison.</li>
+      <li>A tool that produced no drawing passing the check in a circuit shows no drawing for that cell, only the reason. tscircuit did that in cases 5 and 7; the failing attempts are logged but not shown.</li>
     </ul>
   </section>
 
@@ -192,6 +202,10 @@
       <figure class="cell">
         <figcaption class="tool">schem (ours)</figcaption>
         <a href="img/case01-schem.png"><img src="img/case01-schem.png" alt="Case 1, LED and resistor, drawn by schem (ours)" width="1600" height="927"></a>
+      </figure>
+      <figure class="cell">
+        <figcaption class="tool">tscircuit</figcaption>
+        <a href="img/case01-tscircuit.png"><img src="img/case01-tscircuit.png" alt="Case 1, LED and resistor, drawn by tscircuit" width="1600" height="859"></a>
       </figure>
       <figure class="cell">
         <figcaption class="tool">SKiDL</figcaption>
@@ -219,6 +233,10 @@
         <a href="img/case03-schem.png"><img src="img/case03-schem.png" alt="Case 3, Op-amp summing amplifier, drawn by schem (ours)" width="1600" height="1368"></a>
       </figure>
       <figure class="cell">
+        <figcaption class="tool">tscircuit</figcaption>
+        <a href="img/case03-tscircuit.png"><img src="img/case03-tscircuit.png" alt="Case 3, Op-amp summing amplifier, drawn by tscircuit" width="1600" height="859"></a>
+      </figure>
+      <figure class="cell">
         <figcaption class="tool">SKiDL</figcaption>
         <a href="img/case03-skidl.png"><img src="img/case03-skidl.png" alt="Case 3, Op-amp summing amplifier, drawn by SKiDL" width="1577" height="1600"></a>
       </figure>
@@ -242,6 +260,11 @@
       <figure class="cell">
         <figcaption class="tool">schem (ours)</figcaption>
         <a href="img/case04-schem.png"><img src="img/case04-schem.png" alt="Case 4, H-bridge motor driver, drawn by schem (ours)" width="1600" height="714"></a>
+      </figure>
+      <figure class="cell">
+        <figcaption class="tool">tscircuit</figcaption>
+        <a href="img/case04-tscircuit.png"><img src="img/case04-tscircuit.png" alt="Case 4, H-bridge motor driver, drawn by tscircuit" width="1600" height="859"></a>
+        <p class="failure">Tool failure: Q3's symbol is not drawn; tscircuit prints an error in its place. See the note below.</p>
       </figure>
       <figure class="cell">
         <figcaption class="tool">SKiDL</figcaption>
@@ -269,6 +292,10 @@
         <a href="img/case05-schem.png"><img src="img/case05-schem.png" alt="Case 5, I2C sensors, drawn by schem (ours)" width="1600" height="777"></a>
       </figure>
       <figure class="cell">
+        <figcaption class="tool">tscircuit</figcaption>
+        <p class="no-final">no drawing passed the connection check (see notes)</p>
+      </figure>
+      <figure class="cell">
         <figcaption class="tool">SKiDL</figcaption>
         <a href="img/case05-skidl.png"><img src="img/case05-skidl.png" alt="Case 5, I2C sensors, drawn by SKiDL" width="1600" height="1343"></a>
       </figure>
@@ -294,6 +321,10 @@
         <a href="img/case06-schem.png"><img src="img/case06-schem.png" alt="Case 6, ESP32 relay, drawn by schem (ours)" width="1600" height="826"></a>
       </figure>
       <figure class="cell">
+        <figcaption class="tool">tscircuit</figcaption>
+        <a href="img/case06-tscircuit.png"><img src="img/case06-tscircuit.png" alt="Case 6, ESP32 relay, drawn by tscircuit" width="1600" height="859"></a>
+      </figure>
+      <figure class="cell">
         <figcaption class="tool">SKiDL</figcaption>
         <a href="img/case06-skidl.png"><img src="img/case06-skidl.png" alt="Case 6, ESP32 relay, drawn by SKiDL" width="1468" height="1600"></a>
       </figure>
@@ -316,7 +347,11 @@
       <div class="grid">
       <figure class="cell">
         <figcaption class="tool">schem (ours)</figcaption>
-        <a href="img/case07-schem.png"><img src="img/case07-schem.png" alt="Case 7, Two ICs with decoupling, drawn by schem (ours)" width="1600" height="1181"></a>
+        <a href="img/case07-schem.png"><img src="img/case07-schem.png" alt="Case 7, Two ICs with decoupling, drawn by schem (ours)" width="1600" height="972"></a>
+      </figure>
+      <figure class="cell">
+        <figcaption class="tool">tscircuit</figcaption>
+        <p class="no-final">no drawing passed the connection check (see notes)</p>
       </figure>
       <figure class="cell">
         <figcaption class="tool">SKiDL</figcaption>
@@ -333,14 +368,47 @@
       </figure>
       </div>
     </article>
+    <article class="circuit" id="case-8">
+      <header class="circuit-head">
+        <p class="case-no">Case 8</p>
+        <h3>Differential pair</h3>
+        <p class="parts">V1 1 mV, V2 and V3 12 V, Q1 and Q2 2N3904, Q3 and Q4 2N3906, RE 11k, RL 10k.</p>
+      </header>
+      <div class="grid">
+      <figure class="cell">
+        <figcaption class="tool">schem (ours)</figcaption>
+        <a href="img/case08-schem.png"><img src="img/case08-schem.png" alt="Case 8, Differential pair, drawn by schem (ours)" width="1600" height="1452"></a>
+      </figure>
+      <figure class="cell">
+        <figcaption class="tool">tscircuit</figcaption>
+        <a href="img/case08-tscircuit.png"><img src="img/case08-tscircuit.png" alt="Case 8, Differential pair, drawn by tscircuit" width="1600" height="859"></a>
+      </figure>
+      <figure class="cell">
+        <figcaption class="tool">SKiDL</figcaption>
+        <a href="img/case08-skidl.png"><img src="img/case08-skidl.png" alt="Case 8, Differential pair, drawn by SKiDL" width="1375" height="1600"></a>
+      </figure>
+      <figure class="cell">
+        <figcaption class="tool">netlistsvg</figcaption>
+        <a href="img/case08-netlistsvg.png"><img src="img/case08-netlistsvg.png" alt="Case 8, Differential pair, drawn by netlistsvg" width="1600" height="986"></a>
+      </figure>
+      <figure class="cell">
+        <figcaption class="tool">schemdraw</figcaption>
+        <a href="img/case08-schemdraw.png"><img src="img/case08-schemdraw.png" alt="Case 8, Differential pair, drawn by schemdraw" width="1493" height="1600"></a>
+      </figure>
+      </div>
+    </article>
   </section>
 
   <section class="notes">
-    <h2>Two notes on the set</h2>
+    <h2>Four notes on the set</h2>
     <h3>Case 7 in SKiDL: a tool failure</h3>
     <p>SKiDL's router failed on this circuit and the fallback placement stacked C1-C4, R1-R3 and J1 behind U1, so only the two ICs are visible. The connection check still passes, but the drawing does not show the circuit, so it is kept as the tool's honest output and marked as a tool failure rather than used as a fair comparison.</p>
-    <h3>Case 8 is not shown</h3>
-    <p>The differential pair is missing from this page because our own drawing of it is weak. The circuit, and the baselines for it, are still in the repository and in the log.</p>
+    <h3>Case 4 in tscircuit: a tool failure</h3>
+    <p>Q3's symbol is not drawn; tscircuit prints an error in its place. The circuit JSON still has Q3's ports and traces, so the connection check passes, but the drawing does not show the part. It is kept as the tool's honest output and marked as a tool failure.</p>
+    <h3>Cases 5 and 7 in tscircuit: no passing drawing</h3>
+    <p>Every attempt in these two circuits failed the connection check, so neither cell shows a drawing. In case 5 the 3V3 pull-ups never reach the U1/U2/U3 supply; in case 7 the most readable attempt draws the GND rail through C2's 5 V pin. The attempts and the check output are in the log.</p>
+    <h3>What tscircuit does not print</h3>
+    <p>tscircuit does not print battery voltages or diode and transistor part numbers. That is the tool, not the converter: the netlist and pin map are correct, and the details are in the log.</p>
   </section>
 </main>
 

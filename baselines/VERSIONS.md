@@ -84,8 +84,10 @@ Schematic behaviour found in Part B (all reproduced with the versions above):
 - In case 4 the vertical n-MOSFET symbol is not drawn: tscircuit writes red "Could not match ports for symbol
   (n_channel_e_mosfet_transistor_vert)" text in its place. Rotating Q2 to 90 made that copy draw; Q3 stayed
   missing at 270. The schematic ports still exist, so the connection check can pass while the symbol is absent.
-- tscircuit sometimes ends a trace 0.015 units short of a schematic port (case 8 Q3 base). The check treats that
-  as an open connection, and the gap is visible when the PNG is enlarged.
+- tscircuit sometimes ends a trace 0.015 units short of a schematic port (case 8 Q3 base). tscircuit draws wires
+  1.8 px wide at 89.9 px per unit, so the check counts anything closer than 0.02 schematic units as touching
+  and this gap is a connection. The same rule makes a pin that lands on the middle of another net's wire a
+  connection: in case 7 the GND rail is drawn through C2[1]'s pin, which shorts 5 V to GND.
 
 ## Verify
 

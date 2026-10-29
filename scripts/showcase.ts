@@ -2,9 +2,10 @@
 //
 // Usage: npm run showcase   (from the repo root)
 //
-// Copies the six chosen validation circuits into docs/showcase/img/ (ours from out/phase0/validation,
+// Copies the seven chosen validation circuits into docs/showcase/img/ (ours from out/phase0/validation,
 // each baseline tool from baselines/out/<tool>/validation/caseNN/final.png). Baseline files are copied as
 // they are; ours are rasterised from the phase0 SVG by the baselines' own rasteriser. Then it writes docs/showcase/comparison.png plus docs/showcase/index.html.
+// A tool that has no passing drawing for a case (tscircuit cases 5 and 7) gets a text cell, not an image.
 //
 // comparison.png is built as an SVG that embeds the PNGs and is rasterised with @resvg/resvg-js, the
 // same renderer the engine uses (src/render/png.ts). Text uses the repo's DejaVu fonts so the image does
@@ -24,7 +25,7 @@ const PHASE0 = path.join(ROOT, "out", "phase0", "validation");
 const BASELINES = path.join(ROOT, "baselines", "out");
 const FONT_DIR = path.join(ROOT, "node_modules", "dejavu-fonts-ttf", "ttf");
 
-type ToolKey = "schem" | "skidl" | "netlistsvg" | "schemdraw";
+type ToolKey = "schem" | "tscircuit" | "skidl" | "netlistsvg" | "schemdraw";
 
 interface Tool {
   key: ToolKey;
@@ -40,7 +41,7 @@ interface Circuit {
   parts: string;
 }
 
-// Cases chosen for the showcase (SPEC 15 / Part B). Case 8 is left out on purpose; the page says why.
+// Cases chosen for the showcase (SPEC 15 / Part B).
 const CIRCUITS: Circuit[] = [
   {
     n: 1,
@@ -84,16 +85,29 @@ const CIRCUITS: Circuit[] = [
     lines: ["Two ICs with", "decoupling"],
     parts: "U1 ATmega328P, U2 24LC256, C1-C4, R1 10k, R2 and R3 4.7k, J1 5 V input.",
   },
+  {
+    n: 8,
+    file: "case08-diffpair.png",
+    name: "Differential pair",
+    lines: ["Differential pair"],
+    parts: "V1 1 mV, V2 and V3 12 V, Q1 and Q2 2N3904, Q3 and Q4 2N3906, RE 11k, RL 10k.",
+  },
 ];
 
 const TOOLS: Tool[] = [
   { key: "schem", label: "schem (ours)", dir: null },
+  { key: "tscircuit", label: "tscircuit", dir: "tscircuit" },
   { key: "skidl", label: "SKiDL", dir: "skidl" },
   { key: "netlistsvg", label: "netlistsvg", dir: "netlistsvg" },
   { key: "schemdraw", label: "schemdraw", dir: "schemdraw" },
 ];
 
 const FAILURE_CAPTION = "tool failure, see notes";
+
+// tscircuit has no final for these cases: every attempt failed the harness's connection check. The cell
+// carries the reason as text instead of a drawing; no failing attempt is shown.
+const NO_FINAL = new Set(["tscircuit-5", "tscircuit-7"]);
+const NO_FINAL_TEXT = "no drawing passed the connection check (see notes)";
 
 function caseDir(n: number): string {
   return `case${String(n).padStart(2, "0")}`;
@@ -121,6 +135,7 @@ async function copyImages(): Promise<Map<string, { buf: Buffer; w: number; h: nu
 
   for (const c of CIRCUITS) {
     for (const t of TOOLS) {
+      if (NO_FINAL.has(`${t.key}-${c.n}`)) continue;
       let from: string;
       if (t.dir === null) {
         if (!phase0.includes(c.file)) {
@@ -153,6 +168,13 @@ async function copyImages(): Promise<Map<string, { buf: Buffer; w: number; h: nu
   return images;
 }
 
+function cellCaption(t: Tool, c: Circuit): string | null {
+  // A drawing that passes the check can still be a tool failure: the tool did not draw the whole circuit.
+  if (t.key === "skidl" && c.n === 7) return FAILURE_CAPTION;
+  if (t.key === "tscircuit" && c.n === 4) return FAILURE_CAPTION;
+  return null;
+}
+
 function comparisonSvg(images: Map<string, { buf: Buffer; w: number; h: number }>): string {
   const M = 46;
   const LABEL_W = 196;
@@ -165,7 +187,7 @@ function comparisonSvg(images: Map<string, { buf: Buffer; w: number; h: number }
   const TOP = 172;
   const ROWS_H = CIRCUITS.length * CELL_H + (CIRCUITS.length - 1) * ROW_GAP;
   const FOOT_RULE = TOP + ROWS_H + 24;
-  const HEIGHT = FOOT_RULE + 84;
+  const HEIGHT = FOOT_RULE + 106;
 
   const ink = "#182a38";
   const muted = "#66747d";
@@ -175,9 +197,9 @@ function comparisonSvg(images: Map<string, { buf: Buffer; w: number; h: number }
   const parts: string[] = [];
   parts.push(`<svg xmlns="http://www.w3.org/2000/svg" width="${WIDTH}" height="${HEIGHT}" viewBox="0 0 ${WIDTH} ${HEIGHT}">`);
   parts.push(`<rect width="${WIDTH}" height="${HEIGHT}" fill="#ffffff"/>`);
-  parts.push(`<text x="${M}" y="56" font-family="DejaVu Sans" font-weight="bold" font-size="36" fill="${ink}">Six circuits, four drawings each</text>`);
+  parts.push(`<text x="${M}" y="56" font-family="DejaVu Sans" font-weight="bold" font-size="36" fill="${ink}">Seven circuits, five drawings each</text>`);
   parts.push(
-    `<text x="${M}" y="88" font-family="DejaVu Sans" font-size="17" fill="${muted}">The same netlist drawn by our engine, SKiDL, netlistsvg and schemdraw. Validation cases 1, 3, 4, 5, 6 and 7.</text>`,
+    `<text x="${M}" y="88" font-family="DejaVu Sans" font-size="17" fill="${muted}">The same netlist drawn by our engine, tscircuit, SKiDL, netlistsvg and schemdraw. Validation cases 1, 3, 4, 5, 6, 7 and 8.</text>`,
   );
 
   TOOLS.forEach((t, i) => {
@@ -204,15 +226,26 @@ function comparisonSvg(images: Map<string, { buf: Buffer; w: number; h: number }
     TOOLS.forEach((t, i) => {
       const x = X0 + i * (CELL_W + GAP);
       const img = images.get(`${c.n}-${t.key}`);
-      if (img === undefined) throw new Error(`no image for case ${c.n}, ${t.label}`);
-      const href = `data:image/png;base64,${img.buf.toString("base64")}`;
       parts.push(`<rect x="${num(x)}" y="${num(y)}" width="${CELL_W}" height="${CELL_H}" rx="10" fill="#ffffff" stroke="${line}" stroke-width="1.5"/>`);
+      if (img === undefined) {
+        if (!NO_FINAL.has(`${t.key}-${c.n}`)) throw new Error(`no image for case ${c.n}, ${t.label}`);
+        const tx = x + CELL_W / 2;
+        const ty = y + CELL_H / 2;
+        parts.push(
+          `<text x="${num(tx)}" y="${num(ty - 10)}" font-family="DejaVu Sans" font-size="15" fill="${muted}" text-anchor="middle">no drawing passed</text>`,
+          `<text x="${num(tx)}" y="${num(ty + 12)}" font-family="DejaVu Sans" font-size="15" fill="${muted}" text-anchor="middle">the connection check</text>`,
+          `<text x="${num(tx)}" y="${num(ty + 34)}" font-family="DejaVu Sans" font-size="15" fill="${muted}" text-anchor="middle">(see notes)</text>`,
+        );
+        return;
+      }
+      const href = `data:image/png;base64,${img.buf.toString("base64")}`;
       parts.push(
         `<image x="${num(x + 10)}" y="${num(y + 10)}" width="${CELL_W - 20}" height="${CELL_H - 42}" preserveAspectRatio="xMidYMid meet" href="${href}"/>`,
       );
-      if (t.key === "skidl" && c.n === 7) {
+      const caption = cellCaption(t, c);
+      if (caption !== null) {
         parts.push(
-          `<text x="${num(x + CELL_W / 2)}" y="${num(y + CELL_H - 12)}" font-family="DejaVu Sans" font-size="13" fill="${accent}" text-anchor="middle">${FAILURE_CAPTION}</text>`,
+          `<text x="${num(x + CELL_W / 2)}" y="${num(y + CELL_H - 12)}" font-family="DejaVu Sans" font-size="13" fill="${accent}" text-anchor="middle">${caption}</text>`,
         );
       }
     });
@@ -220,10 +253,13 @@ function comparisonSvg(images: Map<string, { buf: Buffer; w: number; h: number }
 
   parts.push(`<line x1="${M}" y1="${num(FOOT_RULE)}" x2="${num(WIDTH - M)}" y2="${num(FOOT_RULE)}" stroke="${line}" stroke-width="1.5"/>`);
   parts.push(
-    `<text x="${M}" y="${num(FOOT_RULE + 28)}" font-family="DejaVu Sans" font-size="15" fill="${muted}">Case 8 (differential pair) is not shown because our own drawing of it is weak.</text>`,
+    `<text x="${M}" y="${num(FOOT_RULE + 28)}" font-family="DejaVu Sans" font-size="15" fill="${muted}">Each cell is scaled to fit the same box, so the drawing scales differ. SKiDL case 7 and tscircuit case 4 are marked as tool failures.</text>`,
   );
   parts.push(
-    `<text x="${M}" y="${num(FOOT_RULE + 50)}" font-family="DejaVu Sans" font-size="15" fill="${muted}">Each cell is scaled to fit the same box, so the drawing scales differ. SKiDL case 7 is marked as a tool failure.</text>`,
+    `<text x="${M}" y="${num(FOOT_RULE + 50)}" font-family="DejaVu Sans" font-size="15" fill="${muted}">tscircuit has no drawing in cases 5 and 7 because every attempt failed the connection check; those cells carry the reason instead.</text>`,
+  );
+  parts.push(
+    `<text x="${M}" y="${num(FOOT_RULE + 72)}" font-family="DejaVu Sans" font-size="15" fill="${muted}">tscircuit does not print battery voltages or diode and transistor part numbers; that is the tool, not the converter.</text>`,
   );
   parts.push(`</svg>`);
   return parts.join("\n");
@@ -244,16 +280,23 @@ function renderPng(svg: string): Buffer {
 
 function figure(c: Circuit, t: Tool, images: Map<string, { buf: Buffer; w: number; h: number }>): string {
   const img = images.get(`${c.n}-${t.key}`);
-  if (img === undefined) throw new Error(`no image for case ${c.n}, ${t.label}`);
   const src = `img/${caseDir(c.n)}-${t.key}.png`;
   const alt = `Case ${c.n}, ${c.name}, drawn by ${t.label}`;
+  let body: string;
+  if (img === undefined) {
+    if (!NO_FINAL.has(`${t.key}-${c.n}`)) throw new Error(`no image for case ${c.n}, ${t.label}`);
+    body = `\n        <p class="no-final">${NO_FINAL_TEXT}</p>`;
+  } else {
+    body = `\n        <a href="${src}"><img src="${src}" alt="${esc(alt)}" width="${img.w}" height="${img.h}"></a>`;
+  }
   const failure =
     t.key === "skidl" && c.n === 7
       ? `\n        <p class="failure">Tool failure: the passives are stacked behind U1, so only the two ICs are visible. See the note below.</p>`
-      : "";
+      : t.key === "tscircuit" && c.n === 4
+        ? `\n        <p class="failure">Tool failure: Q3's symbol is not drawn; tscircuit prints an error in its place. See the note below.</p>`
+        : "";
   return `      <figure class="cell">
-        <figcaption class="tool">${esc(t.label)}</figcaption>
-        <a href="${src}"><img src="${src}" alt="${esc(alt)}" width="${img.w}" height="${img.h}"></a>${failure}
+        <figcaption class="tool">${esc(t.label)}</figcaption>${body}${failure}
       </figure>`;
 }
 
@@ -277,8 +320,8 @@ ${figs}
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Four ways to draw the same circuit</title>
-  <meta name="description" content="The same six validation circuits drawn by schem, SKiDL, netlistsvg and schemdraw.">
+  <title>Five ways to draw the same circuit</title>
+  <meta name="description" content="The same seven validation circuits drawn by schem, tscircuit, SKiDL, netlistsvg and schemdraw.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
@@ -328,7 +371,7 @@ ${figs}
       padding: 0;
       margin: 0;
       display: grid;
-      grid-template-columns: repeat(4, minmax(0, 1fr));
+      grid-template-columns: repeat(5, minmax(0, 1fr));
       gap: 16px;
     }
     .tool-list li {
@@ -374,7 +417,7 @@ ${figs}
     .parts { flex-basis: 100%; margin: 2px 0 0; color: var(--muted); font-size: 14.5px; }
     .grid {
       display: grid;
-      grid-template-columns: repeat(4, minmax(0, 1fr));
+      grid-template-columns: repeat(5, minmax(0, 1fr));
       gap: 18px;
       margin-top: 16px;
       align-items: stretch;
@@ -400,6 +443,15 @@ ${figs}
     .cell a { display: flex; flex: 1; align-items: center; justify-content: center; min-height: 120px; }
     .cell img { display: block; max-width: 100%; height: auto; }
     .failure { margin: 10px 4px 0; font-size: 13px; line-height: 1.45; color: var(--accent); }
+    .no-final {
+      margin: 0;
+      padding: 18px 14px;
+      align-self: center;
+      text-align: center;
+      color: var(--muted);
+      font-size: 15px;
+      line-height: 1.5;
+    }
     .notes { max-width: 940px; }
     .notes h3 { font-size: clamp(19px, 1.8vw, 24px); margin: 26px 0 8px; }
     .notes p { color: var(--soft); margin: 0; }
@@ -428,28 +480,29 @@ ${figs}
 <main>
   <header class="hero">
     <p class="eyebrow">schem showcase</p>
-    <h1>Four ways to draw the same circuit</h1>
-    <p class="lede">Six validation circuits, each drawn from the same netlist by our engine and by three open-source tools. This page shows the same grid as <a href="comparison.png">comparison.png</a> and links every drawing to its original PNG.</p>
+    <h1>Five ways to draw the same circuit</h1>
+    <p class="lede">Seven validation circuits, each drawn from the same netlist by our engine and by four open-source tools. This page shows the same grid as <a href="comparison.png">comparison.png</a> and links every drawing to its original PNG.</p>
   </header>
 
   <section>
-    <h2>The four tools</h2>
+    <h2>The five tools</h2>
     <ul class="tool-list">
-      <li><strong>schem (ours)</strong>This project's engine. It takes a netlist in JSON, lays the schematic out itself, and writes SVG and PNG. The six drawings here are the SVGs that <code>npm run phase0</code> produced, rasterised with the same settings as the baselines (1600 px on the long side, same fonts).</li>
+      <li><strong>schem (ours)</strong>This project's engine. It takes a netlist in JSON, lays the schematic out itself, and writes SVG and PNG. The seven drawings here are the SVGs that <code>npm run phase0</code> produced, rasterised with the same settings as the baselines (1600 px on the long side, same fonts).</li>
+      <li><strong>tscircuit</strong>A TypeScript library that describes a circuit in code and lays out its schematic automatically. These drawings come from <code>@tscircuit/core</code>'s circuit JSON, rendered by <code>circuit-to-svg</code>.</li>
       <li><strong>SKiDL</strong>A Python library for describing circuits in code. Its schematic generator places the parts and routes the wires automatically. The baseline harness falls back to SKiDL's label mode when its router fails.</li>
       <li><strong>netlistsvg</strong>A JavaScript tool that lays out a Yosys-style netlist with the ELK graph library and draws it with a replaceable skin. These drawings use the analog skin that ships with the tool.</li>
-      <li><strong>schemdraw</strong>A Python drawing library. Every symbol, label and wire is placed by code, so these six drawings were written by hand, while the other three tools, ours included, lay out the drawing automatically.</li>
+      <li><strong>schemdraw</strong>A Python drawing library. Every symbol, label and wire is placed by code, so these seven drawings were written by hand, while the other four tools, ours included, lay out the drawing automatically.</li>
     </ul>
   </section>
 
   <section class="fairness">
     <h2>How this was made fairly</h2>
     <ul>
-      <li>schemdraw is drawn by hand, one Python file per circuit. schem, SKiDL and netlistsvg are automatic: they take the netlist and place and route the drawing themselves.</li>
+      <li>schemdraw is drawn by hand, one Python file per circuit. schem, tscircuit, SKiDL and netlistsvg are automatic: they take the netlist and place and route the drawing themselves.</li>
       <li>Each baseline tool had one first attempt plus at most three revisions per circuit. Every attempt is logged in <a href="../../baselines/LOG.md">baselines/LOG.md</a>, with what changed and why.</li>
       <li>The chosen drawing for each tool and circuit is the attempt with the fewest drawing errors among those whose connection check passes. Known defects in the chosen drawings are listed in the same log.</li>
       <li>Some baselines shorten long part names to fit the drawing, for example <code>U1 ESP32</code> in netlistsvg case 6. The log records each of these.</li>
-      <li>Case 8 (differential pair) is left out because our own drawing of it is weak. It is not hidden from the log; it simply does not appear in this comparison.</li>
+      <li>A tool that produced no drawing passing the check in a circuit shows no drawing for that cell, only the reason. tscircuit did that in cases 5 and 7; the failing attempts are logged but not shown.</li>
     </ul>
   </section>
 
@@ -460,11 +513,15 @@ ${sections}
   </section>
 
   <section class="notes">
-    <h2>Two notes on the set</h2>
+    <h2>Four notes on the set</h2>
     <h3>Case 7 in SKiDL: a tool failure</h3>
     <p>SKiDL's router failed on this circuit and the fallback placement stacked C1-C4, R1-R3 and J1 behind U1, so only the two ICs are visible. The connection check still passes, but the drawing does not show the circuit, so it is kept as the tool's honest output and marked as a tool failure rather than used as a fair comparison.</p>
-    <h3>Case 8 is not shown</h3>
-    <p>The differential pair is missing from this page because our own drawing of it is weak. The circuit, and the baselines for it, are still in the repository and in the log.</p>
+    <h3>Case 4 in tscircuit: a tool failure</h3>
+    <p>Q3's symbol is not drawn; tscircuit prints an error in its place. The circuit JSON still has Q3's ports and traces, so the connection check passes, but the drawing does not show the part. It is kept as the tool's honest output and marked as a tool failure.</p>
+    <h3>Cases 5 and 7 in tscircuit: no passing drawing</h3>
+    <p>Every attempt in these two circuits failed the connection check, so neither cell shows a drawing. In case 5 the 3V3 pull-ups never reach the U1/U2/U3 supply; in case 7 the most readable attempt draws the GND rail through C2's 5 V pin. The attempts and the check output are in the log.</p>
+    <h3>What tscircuit does not print</h3>
+    <p>tscircuit does not print battery voltages or diode and transistor part numbers. That is the tool, not the converter: the netlist and pin map are correct, and the details are in the log.</p>
   </section>
 </main>
 

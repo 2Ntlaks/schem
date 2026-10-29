@@ -5,6 +5,10 @@
 // attempt-K.svg, attempt-K.png and attempt-K.check.txt (the connections read back from the schematic part of
 // the circuit JSON, compared with the case).
 //
+// Replay only (no new drawing): node baselines/scripts/tscircuit_draw.mjs --replay \
+//   <attempt-K.input.json> <netlist.json> <attempt-K.check.txt>
+// Reads an existing attempt input, runs the same connection check and rewrites its check file.
+//
 // tscircuit is installed outside this repo. Point SCHEM_BASELINES at its parent folder (default
 // $HOME/schem-baselines). The packages and exact API calls are recorded in baselines/VERSIONS.md.
 //
@@ -228,7 +232,23 @@ function uniqueLabels(pins) {
 }
 
 function main() {
-  const [netlistPath, configPath, outDir, k] = process.argv.slice(2);
+  const args = process.argv.slice(2);
+  if (args[0] === "--replay") {
+    // Re-run the check on an existing attempt input and rewrite only its check file. No drawing is made.
+    const [, inputPath, netlistPath, checkPath] = args;
+    if (!inputPath || !netlistPath || !checkPath) {
+      throw new Error(
+        "usage: tscircuit_draw.mjs --replay <attempt-K.input.json> <netlist.json> <attempt-K.check.txt>",
+      );
+    }
+    const input = JSON.parse(readFileSync(inputPath, "utf8"));
+    const nl = JSON.parse(readFileSync(netlistPath, "utf8"));
+    const check = connectionCheck(nl, input);
+    writeFileSync(checkPath, check.lines.join("\n") + "\n");
+    console.log(`${checkPath}: ${check.pass ? "PASS" : "FAIL"}`);
+    return;
+  }
+  const [netlistPath, configPath, outDir, k] = args;
   if (!netlistPath || !configPath || !outDir || !k) {
     throw new Error("usage: tscircuit_draw.mjs <netlist.json> <attempt-K.config.json> <out-dir> <K>");
   }
@@ -488,6 +508,11 @@ function main() {
 // Read the schematic layer only: schematic ports, schematic traces (their edges and junctions) and schematic
 // net labels joined by name. Source ports are used only to turn a schematic port back into a case pin; the
 // netlist is used only for the expected groups and the pin names. No connection is read from the input.
+//
+// Touch tolerance: two drawn things count as touching when the true distance between them is less than the
+// drawn wire width, TOUCH = 0.02 schematic units (tscircuit draws wires 1.8 px wide at 89.9 px per unit).
+// Pins and wire ends use point-to-point distance. Pins, junctions and label anchors on a wire use
+// point-to-segment distance, so a label one wire width from another net's wire looks connected to it.
 function connectionCheck(nl, input) {
   const cj = input.circuitJson;
   const pinMap = input.pinMap;
@@ -501,7 +526,8 @@ function connectionCheck(nl, input) {
   const traces = cj.filter((e) => e.type === "schematic_trace");
   const labels = cj.filter((e) => e.type === "schematic_net_label");
 
-  const EPS = 1e-4;
+  // tscircuit draws wires 1.8 px wide at 89.9 px per unit, so anything closer than 0.02 units looks joined.
+  const TOUCH = 0.02;
   const RAIL_STEM = 0.2;
   const parent = new Map();
   const find = (x) => {
@@ -526,22 +552,25 @@ function connectionCheck(nl, input) {
     find(k);
     return k;
   };
-  const same = (a, b) => Math.hypot(a.x - b.x, a.y - b.y) <= EPS;
-  const onSegment = (p, a, b) => {
-    const cross = (b.x - a.x) * (p.y - a.y) - (b.y - a.y) * (p.x - a.x);
-    if (Math.abs(cross) > EPS) return false;
-    const len2 = (b.x - a.x) ** 2 + (b.y - a.y) ** 2;
-    if (len2 < EPS) return false;
-    const dot = (p.x - a.x) * (b.x - a.x) + (p.y - a.y) * (b.y - a.y);
-    return dot >= -EPS && dot <= len2 + EPS;
+  const distance = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+  const touching = (a, b) => distance(a, b) < TOUCH;
+  const segmentDistance = (p, a, b) => {
+    const dx = b.x - a.x;
+    const dy = b.y - a.y;
+    const len2 = dx * dx + dy * dy;
+    if (len2 === 0) return distance(p, a);
+    let t = ((p.x - a.x) * dx + (p.y - a.y) * dy) / len2;
+    t = Math.max(0, Math.min(1, t));
+    return Math.hypot(p.x - (a.x + t * dx), p.y - (a.y + t * dy));
   };
+  const onWire = (p, a, b) => segmentDistance(p, a, b) < TOUCH;
 
   const tracePoints = [];
   for (const t of traces) {
     const pts = [];
     for (const e of t.edges ?? []) {
       for (const p of [e.from, e.to]) {
-        if (pts.length === 0 || !same(pts[pts.length - 1], p)) pts.push(p);
+        if (pts.length === 0 || key(pts[pts.length - 1]) !== key(p)) pts.push(p);
       }
     }
     for (let i = 0; i < pts.length; i++) point(pts[i]);
@@ -549,23 +578,31 @@ function connectionCheck(nl, input) {
     for (const j of t.junctions ?? []) {
       const jk = point(j);
       for (let i = 1; i < pts.length; i++) {
-        if (onSegment(j, pts[i - 1], pts[i])) union(jk, key(pts[i - 1]));
+        if (onWire(j, pts[i - 1], pts[i])) union(jk, key(pts[i - 1]));
       }
     }
     tracePoints.push({ trace: t, pts });
   }
+
+  // Two wire ends that meet within one wire width are the same conductor, whatever trace they belong to.
+  const ends = tracePoints.flatMap(({ pts }) => (pts.length ? [pts[0], pts[pts.length - 1]] : []));
+  for (const a of ends) for (const b of ends) if (touching(a, b)) union(point(a), point(b));
 
   const portKey = {};
   for (const p of schematicPorts) {
     const pk = point(p.center);
     portKey[p.schematic_port_id] = pk;
     for (const { trace, pts } of tracePoints) {
-      // a port connects only at a vertex or a junction, not where a wire merely crosses it
+      // point-to-point at a vertex, point-to-segment when the pin lands on the middle of a wire
       for (let i = 0; i < pts.length; i++) {
-        if (same(p.center, pts[i])) union(pk, key(pts[i]));
+        if (touching(p.center, pts[i])) union(pk, key(pts[i]));
+      }
+      for (let i = 1; i < pts.length; i++) {
+        const inMiddle = onWire(p.center, pts[i - 1], pts[i]);
+        if (inMiddle) union(pk, key(pts[i - 1]));
       }
       for (const j of trace.junctions ?? []) {
-        if (same(p.center, j)) union(pk, key(j));
+        if (touching(p.center, j)) union(pk, key(j));
       }
     }
   }
@@ -594,11 +631,13 @@ function connectionCheck(nl, input) {
       union(lk, point(stem));
     }
     for (const p of schematicPorts) {
-      if (same(anchor, p.center) || same(stem, p.center)) union(lk, portKey[p.schematic_port_id]);
+      if (touching(anchor, p.center) || touching(stem, p.center)) {
+        union(lk, portKey[p.schematic_port_id]);
+      }
     }
     for (const { pts } of tracePoints) {
       for (let i = 1; i < pts.length; i++) {
-        if (onSegment(anchor, pts[i - 1], pts[i]) || onSegment(stem, pts[i - 1], pts[i])) {
+        if (onWire(anchor, pts[i - 1], pts[i]) || onWire(stem, pts[i - 1], pts[i])) {
           union(lk, key(pts[i - 1]));
         }
       }

@@ -9,15 +9,17 @@ SKiDL writes the netlist that its drawing used and maps it back to the case pin 
 reads its own converter output, where power and ground nets become separate symbols that join by
 name. tscircuit reads the schematic part of its circuit JSON: schematic ports, schematic traces and
 schematic net labels, with same-named labels joined (tscircuit ends a short wire at a named label
-rather than routing a long wire). Every final check below reports each net as `OK` and ends with
-`RESULT PASS`.
+rather than routing a long wire). Its check counts two drawn things as touching when the true distance
+between them is less than the drawn wire width, 0.02 schematic units, using point-to-point distance for
+pins and wire ends and point-to-segment distance for a pin, junction or label anchor on a wire. Every
+final check below reports each net as `OK` and ends with `RESULT PASS`.
 
 Unnamed nets have no label and are joined only by drawn wires. Named supply nets may be drawn as
 several symbols with the same name; those symbols are one net for a reader.
 
 All 24 finals of the first three tools: schemdraw 8, SKiDL 8, netlistsvg 8, all PASS. tscircuit has finals for
-six of the eight cases, so there are 30 finals in all. Its checks PASS for cases 1, 2, 3, 4, 6 and 7. Cases 5
-and 8 have no tscircuit final because every attempt's check fails; those failures are described under those
+six of the eight cases, so there are 30 finals in all. Its checks PASS for cases 1, 2, 3, 4, 6 and 8. Cases 5
+and 7 have no tscircuit final because every attempt's check fails; those failures are described under those
 cases and in `LOG.md`.
 
 For tscircuit, a net is sometimes drawn as two or more groups joined only by same-named labels rather than by a
@@ -87,16 +89,19 @@ R3 resistor 10k, Rf resistor 20k, U1 opamp, RL resistor 2k2.
 | OUT | U1[1], Rf[2], RL[1] |
 | GND | V1[-], V2[-], V3[-], U1[3], RL[2] |
 
-Final drawings: schemdraw attempt 1, SKiDL attempt 1, netlistsvg attempt 1, tscircuit attempt 1. Each final
+Final drawings: schemdraw attempt 1, SKiDL attempt 1, netlistsvg attempt 1, tscircuit attempt 4. Each final
 check reports every net above as OK, so all four results are PASS.
 
-tscircuit joins GND only by name: the three source returns, the op-amp ground pin and RL[2] are three separate
-wire groups with the same-named GND label. SUM, OUT and the three source input nets are drawn as wires.
+tscricuit joins GND only by name: the three source returns (V1[-]/V2[-]/V3[-], with the GND label at the bottom
+of the sources) and RL[2] with U1[3] (the GND label beside RL) are two wire groups with the same-named GND
+label. SUM, OUT and the three source input nets are drawn as wires. The GND lead under the op-amp in attempts 1
+and 2 is 0.031 units from the SUM wire but is not connected: the SUM wire hops over the GND wire and the label
+lead points away from it.
 
 Checks: `out/schemdraw/validation/case03/attempt-1.check.txt`,
 `out/skidl/validation/case03/attempt-1.check.txt`,
 `out/netlistsvg/validation/case03/attempt-1.check.txt`,
-`out/tscircuit/validation/case03/attempt-1.check.txt`.
+`out/tscircuit/validation/case03/attempt-4.check.txt`.
 
 ## Case 4: H-bridge motor driver
 
@@ -207,21 +212,22 @@ R3 resistor 4.7k.
 | SDA | R2[2], U1[27], U2[5] |
 | SCL | R3[2], U1[28], U2[6] |
 
-Final drawings: schemdraw attempt 4, SKiDL attempt 4, netlistsvg attempt 2, tscircuit attempt 4. Each final
-check reports every net above as OK, so all four results are PASS.
+Final drawings: schemdraw attempt 4, SKiDL attempt 4, netlistsvg attempt 2. Each final check reports
+every net above as OK, so all three results are PASS.
 
 SKiDL case 7 is a tool failure: the passives are stacked behind U1, so only the two ICs are visible. The
 attempt is kept as the tool's honest final, and its check still PASS.
 
-tscircuit joins 5V and GND only by name: 5V is in five groups (the four capacitors; J1[1]; R1[1]/U1[7]/U1[20];
-R2[1]/R3[1]; U2[8]) and GND in four (the capacitors with U2[1]/U2[2]/U2[3]/U2[4]; J1[2];
-U1[8]/U1[22]; U2[7]) with same-named rails. SCL is split into R3[2]/U2[6] and U1[28], joined by the SCL label.
-RESET and SDA are drawn as wires.
+tscircuit has no final for this case. Under the 0.02-unit touch rule, the most readable attempt (a4) joins 5V
+and GND: the GND rail from C1[2] to C2[2] is drawn straight through C2[1]'s pin at (-2.510, 3.562), so the pin
+lands on the middle of that wire. At 8x the green wire is visible between the capacitor plates. The other three
+attempts fail for other reasons: a1 puts the GND label at U2's WP pin on the 5 V wire, and a2/a3 leave the 5 V
+group without R2[1] and U2[8]. a4 also draws U2's WP GND flag on top of the SCL label.
 
 Checks: `out/schemdraw/validation/case07/attempt-4.check.txt`,
 `out/skidl/validation/case07/attempt-4.check.txt`,
 `out/netlistsvg/validation/case07/attempt-2.check.txt`,
-`out/tscircuit/validation/case07/attempt-4.check.txt`.
+`out/tscircuit/validation/case07/attempt-4.check.txt` (FAIL).
 
 ## Case 8: differential pair
 
@@ -240,15 +246,15 @@ Q3 pnp 2N3906, Q4 pnp 2N3906, RE resistor 11k, RL resistor 10k.
 | MIRROR | Q1[C], Q3[B], Q3[C], Q4[B] |
 | OUT | Q2[C], Q4[C], RL[1] |
 
-Final drawings: schemdraw attempt 4, SKiDL attempt 1, netlistsvg attempt 1. Each final check reports
-every net above as OK, so all three results are PASS.
+Final drawings: schemdraw attempt 4, SKiDL attempt 1, netlistsvg attempt 1, tscircuit attempt 4. Each final
+check reports every net above as OK, so all four results are PASS.
 
-tscircuit has no final for this case. All four attempts fail n6 MIRROR because Q3[B] is not connected: the base
-trace stops 0.015 units short of the base pin (a hairline gap at 6x to 8x), so Q3[B] stays out of the group.
-The rest of the mirror pair is drawn. The +12V, -12V and GND nets are joined by same-named rails in the
-attempts; MIRROR itself is split into three groups and only two of them carry MIRROR labels.
+tscircuit joins +12V, -12V and GND only by name, with same-named rails. MIRROR is drawn as wires: the base
+trace to Q3 ends 0.015 units from the base pin, which is thinner than the 0.02-unit wire, so the check counts
+it as touching and Q3[B] is in the group. IN, TAIL and OUT are also drawn as wires, and the +12V rail at RL and
+the Q2 collector wire use hops to show the crossings that are not connected.
 
 Checks: `out/schemdraw/validation/case08/attempt-4.check.txt`,
 `out/skidl/validation/case08/attempt-1.check.txt`,
 `out/netlistsvg/validation/case08/attempt-1.check.txt`,
-`out/tscircuit/validation/case08/attempt-4.check.txt` (FAIL).
+`out/tscircuit/validation/case08/attempt-4.check.txt`.
