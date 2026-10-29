@@ -67,7 +67,7 @@ const lines: string[] = [
   "- `D1.anode` uses the pin name or an alias after a dot.",
   "- `U1{GND}` uses a pin group, which joins every pin in that group.",
   "",
-  "The Pins column gives each pin number in backticks, then its name, then any aliases.",
+  "The Pins column gives each pin number, then its name, then any aliases.",
   "Two more types take their pins from the part itself, in its own `pins` list: `ic` (a chip",
   "drawn as a box) and `header` (a connector).",
   "",

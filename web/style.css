@@ -329,10 +329,11 @@ code { font-family: var(--mono); font-size: 0.92em; }
   .actions { gap: 6px; }
   .btn, .examples select { height: 32px; padding: 0 10px; font-size: 12.5px; }
   .examples select { padding-right: 26px; max-width: 112px; }
-  .btn-quiet, #share-btn { display: none; }
+  .wide-only, #share-btn { display: none; }
   .tabs { display: flex; height: 42px; border-bottom: 1px solid var(--rule); background: var(--paper-deep); }
   .tabs button { flex: 1; border: 0; background: none; font: 600 13px/1 var(--sans); color: var(--muted); cursor: pointer; border-bottom: 2px solid transparent; }
   .tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--accent); }
+  .tab-link { flex: 0 0 76px; display: grid; place-items: center; font: 600 13px/1 var(--sans); color: var(--muted); text-decoration: none; border-left: 1px solid var(--rule); }
   .tab-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-left: 6px; background: var(--muted); vertical-align: 1px; }
   .tab-dot[data-verdict="valid"] { background: var(--ok); }
   .tab-dot[data-verdict="problems"] { background: var(--warn); }

@@ -5,6 +5,7 @@
 
 import { EXAMPLES } from "virtual:examples";
 import type { DrawResult, PartType, Problem } from "./core.js";
+import { pack, unpack } from "./share.js";
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 const src = $<HTMLTextAreaElement>("src");
@@ -449,18 +450,6 @@ select.addEventListener("change", () => {
   select.value = "";
 });
 
-const b64 = {
-  encode: (bytes: Uint8Array) => btoa(String.fromCharCode(...bytes)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, ""),
-  decode: (s: string) => Uint8Array.from(atob(s.replace(/-/g, "+").replace(/_/g, "/")), (c) => c.charCodeAt(0)),
-};
-async function pack(text: string): Promise<string> {
-  const stream = new Blob([text]).stream().pipeThrough(new CompressionStream("deflate-raw"));
-  return b64.encode(new Uint8Array(await new Response(stream).arrayBuffer()));
-}
-async function unpack(s: string): Promise<string> {
-  const stream = new Blob([b64.decode(s)]).stream().pipeThrough(new DecompressionStream("deflate-raw"));
-  return new Response(stream).text();
-}
 async function share(): Promise<void> {
   try {
     const url = `${location.origin}${location.pathname}#c=${await pack(src.value)}`;

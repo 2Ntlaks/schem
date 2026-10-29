@@ -3,13 +3,15 @@
 //   npm run web:build     one build, minified
 //   npm run web:serve     build, then serve on http://localhost:8080 and rebuild on change
 //
-// The page and the worker are bundled with esbuild (settings in scripts/lib/web-bundle.ts); the
-// HTML, the stylesheet and the DejaVu fonts are copied next to them. Everything is static, so
+// The page, the worker and the docs script are bundled with esbuild (settings in
+// scripts/lib/web-bundle.ts); the HTML, the stylesheets and the DejaVu fonts are copied next to
+// them, and docs.html is made from docs/*.md. Everything is static, so
 // out/web/ can be hosted anywhere (GitHub Pages).
 
-import { copyFileSync, mkdirSync, rmSync } from "node:fs";
+import { copyFileSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { context, build, type BuildOptions } from "esbuild";
+import { renderDocs } from "./lib/docs-page.js";
 import { common, ROOT } from "./lib/web-bundle.js";
 
 const OUT = path.join(ROOT, "out", "web");
@@ -17,14 +19,17 @@ const FONTS = ["DejaVuSans.ttf", "DejaVuSansMono.ttf", "DejaVuSansMono-Bold.ttf"
 
 function copyStatic(): void {
   mkdirSync(path.join(OUT, "fonts"), { recursive: true });
-  for (const f of ["index.html", "style.css"]) copyFileSync(path.join(ROOT, "web", f), path.join(OUT, f));
+  for (const f of ["index.html", "style.css", "docs.css"]) copyFileSync(path.join(ROOT, "web", f), path.join(OUT, f));
+  // The docs page, made from docs/*.md (scripts/lib/docs-page.ts).
+  const docs = renderDocs(ROOT);
+  writeFileSync(path.join(OUT, "docs.html"), readFileSync(path.join(ROOT, "web", "docs.html"), "utf8").replace("{{TOC}}", () => docs.toc).replace("{{BODY}}", () => docs.body));
   for (const f of FONTS) copyFileSync(path.join(ROOT, "node_modules", "dejavu-fonts-ttf", "ttf", f), path.join(OUT, "fonts", f));
 }
 
 const options: BuildOptions = {
   ...common,
   platform: "browser",
-  entryPoints: { main: path.join(ROOT, "web", "main.ts"), worker: path.join(ROOT, "web", "worker.ts") },
+  entryPoints: { main: path.join(ROOT, "web", "main.ts"), worker: path.join(ROOT, "web", "worker.ts"), docs: path.join(ROOT, "web", "docs.ts") },
   outdir: OUT,
   minify: true,
   sourcemap: "linked",
