@@ -2,21 +2,17 @@
 // are used for measuring and drawing. Phase 0a uses DejaVu Sans (free licence,
 // shipped via the dejavu-fonts-ttf package); the final font is chosen later.
 
-import { readFileSync } from "node:fs";
-import { createRequire } from "node:module";
-import { createHash } from "node:crypto";
 import opentype from "opentype.js";
-
-const require = createRequire(import.meta.url);
-export const FONT_PATH = require.resolve("dejavu-fonts-ttf/ttf/DejaVuSans.ttf");
+import { sha256 } from "../core/sha256.js";
+import { fontBytes } from "./font-file.js";
 
 let font: opentype.Font | undefined;
 let fontHash = "";
 
 function load(): opentype.Font {
   if (!font) {
-    const buf = readFileSync(FONT_PATH);
-    fontHash = createHash("sha256").update(buf).digest("hex");
+    const buf = fontBytes();
+    fontHash = sha256(buf);
     font = opentype.parse(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength));
   }
   return font;

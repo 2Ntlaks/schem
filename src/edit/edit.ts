@@ -1,7 +1,6 @@
 // Edit transactions (SPEC 11.3, 9.5): operations applied in order, laid out incrementally,
 // checked by verification layers 1-2, and saved only if the result is valid (D4).
 
-import { createHash } from "node:crypto";
 import { cmpStr, xformDir, xformPt, type Orient, type Pt, type Rot } from "../geom/geom.js";
 import { canonical as canonicalEp, CircuitError, netKind, type Circuit, type Net, type PinDefs } from "../core/model.js";
 import { applyOps, type CircuitOp } from "../core/ops.js";
@@ -11,6 +10,7 @@ import { layout, pinDefsOf, type LayoutResult, type Project, type Status } from 
 import { checkDrawing, type DrawingCheck } from "../quality/index.js";
 import { BUILTIN, ORIENTS, type SymPin } from "../symbols/library.js";
 import { changeReport, stabilityBreaks, type ChangeReport } from "./report.js";
+import { sha256 } from "../core/sha256.js";
 
 export type VisualOp =
   | { op: "lock"; part: string; at?: Pt; rot?: Rot; flip?: boolean }
@@ -305,7 +305,7 @@ export function layoutToken(p: Project, s: LayoutState): string {
   return sha(revision(p) + stable(s));
 }
 
-function sha(s: string): string { return createHash("sha256").update(s).digest("hex"); }
+function sha(s: string): string { return sha256(s); }
 
 /** JSON with object keys sorted, so equal content always hashes the same. */
 function stable(v: unknown): string {
