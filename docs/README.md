@@ -12,7 +12,7 @@
 
 - [`../SPEC.md`](../SPEC.md): the full design (data model, symbols, layout engine, verifier, phases and gates).
 - [`verification-stack.html`](verification-stack.html): the layers that check a drawing, from "shows exactly the netlist" up to blind rating. Open it in a browser.
-- [`showcase/`](showcase/): the comparison with SKiDL, netlistsvg and schemdraw (`npm run showcase` rebuilds it). The baselines and their attempt log are in [`../baselines/`](../baselines/).
+- [`showcase/`](showcase/): the comparison with tscircuit, SKiDL, netlistsvg and schemdraw (`npm run showcase` rebuilds it). The baselines and their attempt log are in [`../baselines/`](../baselines/).
 
 ## Project history
 

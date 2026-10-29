@@ -403,3 +403,15 @@ input to confirm the recorded PASS/FAIL results.
 3. Should the showcase text state that tscircuit does not draw battery values, diode and transistor
    part numbers, or does it want those listed only in `LOG.md`?
 
+
+# tscircuit baseline, Part C (finished by the lead)
+
+DeepSeek's usage ran out during Part C, after the work below and before its report. The lead committed its work as it stood (8089736), reviewed it, and finished the part.
+
+Done by DeepSeek, reviewed and kept:
+- The 0.02-unit touch rule in the connection check (true point-to-point and point-to-segment distances, labels included) and a `--replay` mode. All 24 attempt checks were replayed; no new attempt was made. The replay confirmed case 8 (all four attempts pass; the Q3 base gap is 0.015 units, thinner than the wire). It did not confirm the lead's prediction for case 3: attempts 1 and 2 still pass (the GND label's lead stops 0.031 units from the SUM wire), so case 3's final was chosen from all passing attempts; a4 stays, because a1 and a2 draw the GND label box over a wire. It also turned case 7 a4 into a fail, because the GND rail is drawn through C2[1]'s pin, which reads as 5 V shorted to ground. tscircuit therefore has finals for cases 1, 2, 3, 4, 6 and 8, and none for 5 and 7.
+- `scripts/showcase.ts`: tscircuit as the second column, case 8 back in, text cells for cases with no final, the tool-failure caption for tscircuit case 4, and the note on values tscircuit does not print.
+
+Finished by the lead:
+- Merged `main` (bus corridors, playground, docs page) and rebuilt our drawings (`npm run phase0`, 8 of 8 valid) and the page from a deleted `docs/showcase/`: 33 images (7 circuits x 5 tools, less tscircuit's cases 5 and 7), `comparison.png` 553 KB. Every cell checked for the right tool and circuit; cells are about 470 x 330 px in the overview, and the page opens every drawing at full size. The page has no broken images and no sideways scroll at 390 px.
+- README "How it compares", `docs/README.md` and `baselines/README.md` updated for five tools, the tscircuit tool failure and missing drawings, and case 8's return.

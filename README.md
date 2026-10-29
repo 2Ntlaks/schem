@@ -92,9 +92,9 @@ Drawn by schem from the files in [`examples/`](examples/), with no hand adjustme
 
 ## How it compares
 
-The same six circuits, drawn by schem and three open-source tools. SKiDL and netlistsvg lay out automatically, like schem; schemdraw drawings are written by hand in code.
+The same seven circuits, drawn by schem and four open-source tools. tscircuit, SKiDL and netlistsvg lay out automatically, like schem; schemdraw drawings are written by hand in code.
 
-<img src="docs/showcase/comparison.png" alt="A grid of six circuits, each drawn by schem, SKiDL, netlistsvg and schemdraw">
+<img src="docs/showcase/comparison.png" alt="A grid of seven circuits, each drawn by schem, tscircuit, SKiDL, netlistsvg and schemdraw">
 
 <details>
 <summary><b>How the comparison was made fair</b></summary>
@@ -103,8 +103,9 @@ The same six circuits, drawn by schem and three open-source tools. SKiDL and net
 - Every tool drew from the same netlist, and every drawing's connections were checked against it. A drawing that failed the check could not be chosen.
 - Each tool had one first attempt plus at most three revisions per circuit, using only that tool's own options. Every attempt, what changed and why, is logged in [`baselines/LOG.md`](baselines/LOG.md), along with the known defects in the chosen drawings.
 - schem's drawings are used exactly as the engine makes them, rendered with the same settings as the others.
-- SKiDL's case 7 is a tool failure: its fallback placement stacked eight parts behind one chip.
-- Case 8, a differential pair, was left out when schem drew it poorly. It now draws in its textbook shape and is being added back; the old attempts stay in the log.
+- SKiDL's case 7 is a tool failure: its fallback placement stacked eight parts behind one chip. So is tscircuit's case 4: one transistor's symbol is not drawn, and tscircuit prints an error in its place.
+- tscircuit has no drawing for cases 5 and 7: none of its attempts passed the connection check (in case 7, a ground wire runs through a 5 V pin). Two things count as connected when they are closer than the width of a drawn wire, because that is how they look.
+- Case 8, a differential pair, was left out of an earlier version of this comparison because schem drew it poorly. It now has a template and is back in; the old attempts stay in the log.
 - This is our comparison, not a blind one. A blind rating by outside judges is planned.
 
 Open [`docs/showcase/index.html`](docs/showcase/index.html) locally for the full-size page, or rebuild it with `npm run showcase`.
