@@ -104,7 +104,7 @@ The same six circuits, drawn by schem and three open-source tools. SKiDL and net
 - Each tool had one first attempt plus at most three revisions per circuit, using only that tool's own options. Every attempt, what changed and why, is logged in [`baselines/LOG.md`](baselines/LOG.md), along with the known defects in the chosen drawings.
 - schem's drawings are used exactly as the engine makes them, rendered with the same settings as the others.
 - SKiDL's case 7 is a tool failure: its fallback placement stacked eight parts behind one chip.
-- Our own weakest circuit, a differential pair, is left out because schem draws it poorly. It is not hidden: it is in the log.
+- Case 8, a differential pair, was left out when schem drew it poorly. It now draws in its textbook shape and is being added back; the old attempts stay in the log.
 - This is our comparison, not a blind one. A blind rating by outside judges is planned.
 
 Open [`docs/showcase/index.html`](docs/showcase/index.html) locally for the full-size page, or rebuild it with `npm run showcase`.
@@ -158,7 +158,7 @@ schem is an early prototype. It is useful today for small and medium circuits, a
     <td valign="top">
 
 - Dense boards with several chips spread out too far
-- Circuits that want mirror symmetry, like a differential pair, come out messy
+- Circuits with no template yet, such as Sallen-Key filters and oscillators, are drawn by the general rules and can come out messy
 - The symbol and board library is small
 - Not on npm, so no `npx schem` yet
 - No blind rating by outside judges yet

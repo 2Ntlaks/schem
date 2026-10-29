@@ -412,6 +412,9 @@ export function layout(project: Project, opts: LayoutOptions = {}): LayoutResult
   }
   for (const [id, child] of childOffsets) clusterEnv.set(child.host, unionBox(clusterEnv.get(child.host)!, shifted(placed.get(id)!.env, child.at)));
   const envOf = (id: string) => clusterEnv.get(id)!;
+  // A host's own envelope: without its child slots, and without the supply ports moved on top of them.
+  const served = new Set(decouplers.filter((m) => childOffsets.has(m.part)).map((m) => `${m.host}[${m.pin}]`));
+  const ownEnv = (id: string): Box => { const P = placed.get(id)!; return [P.ko, ...P.labels.map((l) => gridBox(l.box)), ...P.ports.filter((q) => !served.has(`${id}[${q.pin}]`)).map((q) => q.box)].reduce(unionBox); };
   const withoutDecoupling = (reason: string): LayoutResult => {
     const r = layout(project, { ...opts, decoupling: false });
     r.notes.unshift(`decoupling@1: child slots yielded to ${reason}; used generic placement`);
@@ -420,7 +423,7 @@ export function layout(project: Project, opts: LayoutOptions = {}): LayoutResult
 
   // Step 5: region interiors, each solved on its own; a region then moves as one rigid block.
   // A host's envelope includes its decoupling child slots, so a template keeps room for them.
-  const geo = (id: string): Geo => { const P = placed.get(id)!; return { pins: P.pins, ko: P.ko, env: envOf(id) }; };
+  const geo = (id: string): Geo => { const P = placed.get(id)!; return { pins: P.pins, ko: P.ko, env: envOf(id), own: ownEnv(id) }; };
   const interior = new Map<Region, Interior>();
   for (const r of regions) {
     const res = solveInterior(r, geo);

@@ -42,11 +42,10 @@
               "rot": 270
             }
           ],
-          "expectedLayout": "d5862f70829b4dac0734577870557f0f80c259c71128d6af25cac965f06bb03f",
+          "expectedLayout": "d48c4c9880eca1fd19b057d4765c112bed5118db065f0b3077ba957c36e14a73",
           "changesCircuit": false,
           "expect": {
-            "bends": -2,
-            "wireLength": -6
+            "wireLength": -9
           },
           "tradeoff": null
         }
@@ -79,7 +78,7 @@
               "factor": 1.5
             }
           ],
-          "expectedLayout": "ce8864945929a53679b90deae9e096aa0643520d2c8805d32cce8a1bc3295b50",
+          "expectedLayout": "c6126a10f1ccd18a54fc512447f4ee7dcccdfc0d58457b2337680e3a69f4b844",
           "changesCircuit": false,
           "expect": {
             "breaches": -1,

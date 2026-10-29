@@ -65,14 +65,16 @@ export interface Slot {
 }
 
 /**
- * A point coordinate on one axis: a slot's pin anchor, an edge of its keep-out (`box`) or of its
- * envelope with labels and port symbols (`env`), or a guide (a free variable of the region frame,
+ * A point coordinate on one axis: a slot's pin anchor, an edge of its keep-out (`box`), of its
+ * envelope with labels, port symbols and decoupling child slots (`env`), or of that envelope
+ * without the child slots (`own`), or a guide (a free variable of the region frame,
  * such as the summing-node column). For a many-slot, `agg` picks the extreme member (trunks only).
  */
 export type Ref =
   | { pin: [string, PinSel]; agg?: "min" | "max" }
   | { box: [string, "left" | "right" | "top" | "bottom"]; agg?: "min" | "max" }
   | { env: [string, "left" | "right" | "top" | "bottom"]; agg?: "min" | "max" }
+  | { own: [string, "left" | "right" | "top" | "bottom"]; agg?: "min" | "max" }
   | { guide: string };
 
 /**

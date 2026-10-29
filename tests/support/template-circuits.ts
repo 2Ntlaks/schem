@@ -201,7 +201,63 @@ export const LOW_SIDE: Project = {
   },
 };
 
+/**
+ * MOSFET differential pair with a current-mirror load and a resistor tail, both inputs driven,
+ * on a single supply (the input stage of a simple op-amp).
+ */
+export const DIFF_PAIR: Project = {
+  meta: { title: "MOSFET differential pair" },
+  circuit: {
+    parts: [
+      { id: "B1", type: "battery", props: { value: "5V" } },
+      { id: "V1", type: "vsource", props: { value: "2.5V" } },
+      { id: "V2", type: "vsource", props: { value: "2.5V" } },
+      { id: "Q1", type: "nmos", props: { partNumber: "2N7000" } },
+      { id: "Q2", type: "nmos", props: { partNumber: "2N7000" } },
+      { id: "Q3", type: "pmos", props: { partNumber: "BS250" } },
+      { id: "Q4", type: "pmos", props: { partNumber: "BS250" } },
+      { id: "RT", type: "resistor", props: { value: "4.7k" } },
+      { id: "RL", type: "resistor", props: { value: "47k" } },
+    ],
+    nets: [
+      { id: "n1", name: "VDD", endpoints: ["B1.+", "Q3[S]", "Q4[S]"] },
+      { id: "n2", name: "GND", endpoints: ["B1.-", "V1.-", "V2.-", "RT.2", "RL.2"] },
+      { id: "n3", name: "INP", endpoints: ["V1.+", "Q1[G]"] },
+      { id: "n4", name: "INN", endpoints: ["V2.+", "Q2[G]"] },
+      { id: "n5", endpoints: ["Q1[D]", "Q3[D]", "Q3[G]", "Q4[G]"] },
+      { id: "n6", name: "OUT", endpoints: ["Q2[D]", "Q4[D]", "RL.1"] },
+      { id: "n7", endpoints: ["Q1[S]", "Q2[S]", "RT.1"] },
+    ],
+  },
+};
+
+/** I2C bus to an EEPROM whose supply pin has two decoupling capacitors (the SPEC 9.2 child slot). */
+export const I2C_DECOUPLED: Project = {
+  meta: { title: "I2C EEPROM with decoupling" },
+  circuit: {
+    parts: [
+      ic("U1", "MCU", [["1", "VCC", "power_in"], ["2", "GND", "ground"], ["3", "SDA", "bidir", ["i2c.sda"]], ["4", "SCL", "bidir", ["i2c.scl"]]], { controller: "true" }),
+      ic("U2", "EEPROM", [["1", "A0", "input"], ["4", "VSS", "ground"], ["5", "SDA", "bidir", ["i2c.sda"]], ["6", "SCL", "bidir", ["i2c.scl"]], ["8", "VCC", "power_in"]]),
+      { id: "R1", type: "resistor", props: { value: "4.7k" } },
+      { id: "R2", type: "resistor", props: { value: "4.7k" } },
+      { id: "C1", type: "capacitor", props: { value: "100n" } },
+      { id: "C2", type: "capacitor", props: { value: "10u" } },
+    ],
+    nets: [
+      { id: "n1", name: "3V3", endpoints: ["U1.VCC", "U2.VCC", "R1.1", "R2.1", "C1.1", "C2.1"] },
+      { id: "n2", name: "GND", endpoints: ["U1.GND", "U2.VSS", "U2.A0", "C1.2", "C2.2"] },
+      { id: "n3", name: "SDA", endpoints: ["U1.SDA", "U2.SDA", "R1.2"] },
+      { id: "n4", name: "SCL", endpoints: ["U1.SCL", "U2.SCL", "R2.2"] },
+    ],
+  },
+  // Both chips are on 3V3, so the capacitors name the pin they serve.
+  intent: { hints: [
+    { id: "h1", type: "decouples", part: "C1", pin: "U2[8]", priority: "normal" },
+    { id: "h2", type: "decouples", part: "C2", pin: "U2[8]", priority: "normal" },
+  ] },
+};
+
 export const TEMPLATE_CIRCUITS: Record<string, Project> = {
   "noninverting": NONINVERTING, "inverting": INVERTING, "divider": DIVIDER, "pulls": PULLS, "led-gpio": LED_GPIO, "led-sink": LED_SINK,
-  "bridge": BRIDGE, "hbridge-bjt": HBRIDGE_BJT, "low-side": LOW_SIDE,
+  "bridge": BRIDGE, "hbridge-bjt": HBRIDGE_BJT, "low-side": LOW_SIDE, "diff-pair": DIFF_PAIR, "i2c-decoupled": I2C_DECOUPLED,
 };

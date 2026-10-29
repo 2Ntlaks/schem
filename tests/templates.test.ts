@@ -10,7 +10,7 @@ import { checkDrawing } from "../src/quality/index.js";
 import { toSvg } from "../src/render/svg.js";
 import { TEMPLATES } from "../src/layout/templates/index.js";
 import type { DrawnPin } from "../src/render/model.js";
-import { BRIDGE, DIVIDER, HBRIDGE_BJT, INVERTING, LED_GPIO, LED_SINK, LOW_SIDE, NONINVERTING, PULLS, TEMPLATE_CIRCUITS } from "./support/template-circuits.js";
+import { BRIDGE, DIFF_PAIR, DIVIDER, HBRIDGE_BJT, I2C_DECOUPLED, INVERTING, LED_GPIO, LED_SINK, LOW_SIDE, NONINVERTING, PULLS, TEMPLATE_CIRCUITS } from "./support/template-circuits.js";
 
 const dir = join(import.meta.dirname, "..", "cases");
 const load = (f: string) => JSON.parse(readFileSync(join(dir, f), "utf8")) as Project;
@@ -187,6 +187,28 @@ describe("the other templates", () => {
     expect([q.valid, q.metrics.crossings, q.conventions, q.breaches]).toEqual([true, 0, [], []]);
   });
 
+  it("differential pair (MOSFET): mirror above the pair on two legs, mirror gates facing, inputs outward, tail centred", () => {
+    const { r, q } = run(DIFF_PAIR);
+    expect(r.state!.templates).toEqual(["diff-pair-nmos-pmos-mirror@1:Q1,Q2,Q3,Q4,RL,RT"]);
+    const d = (id: string) => pinAt(r, id, "D");
+    expect([d("Q1").at[0] === d("Q3").at[0], d("Q2").at[0] === d("Q4").at[0], d("Q2").at[0] - d("Q1").at[0]]).toEqual([true, true, 14]);
+    expect([d("Q3").at[1] < d("Q1").at[1], d("Q3").at[1] === d("Q4").at[1], d("Q1").at[1] === d("Q2").at[1]]).toEqual([true, true, true]);
+    expect(["Q3", "Q4", "Q1", "Q2"].map((id) => pinAt(r, id, "G").dir)).toEqual(["right", "left", "left", "right"]);
+    const [rt, s1, s2] = [pinAt(r, "RT", "1"), pinAt(r, "Q1", "S"), pinAt(r, "Q2", "S")];
+    expect([rt.at[0] * 2 === s1.at[0] + s2.at[0], rt.at[1] > s1.at[1]]).toEqual([true, true]);
+    expect(pinAt(r, "RL", "1").at[0]).toBeGreaterThan(pinAt(r, "Q2", "G").at[0]);
+    expect([q.valid, q.conventions]).toEqual([true, []]);
+  });
+
+  it("I2C with a decoupled peripheral: the peripheral sits just under the bus, its capacitors rise beside it", () => {
+    const { r, q } = run(I2C_DECOUPLED);
+    expect(r.state!.templates).toEqual(["i2c-pullups@2:R1,R2,U1,U2"]);
+    const scl = pinAt(r, "U1", "4").at[1];
+    expect(pinAt(r, "U2", "6").at[1] - scl).toBeLessThanOrEqual(3);
+    expect(pinAt(r, "C1", "1").at[1]).toBeLessThan(scl);
+    expect(q.valid).toBe(true);
+  });
+
   it("a battery loop (case 1) matches no template: a series loop is drawn as a loop", () => {
     expect(layout(load("case01-led.json")).state!.templates).toBeUndefined();
   });
@@ -198,7 +220,7 @@ describe("template mechanics", () => {
   });
 
   it("priorities: the I2C template takes the bus pull-ups before the pull-up template", () => {
-    expect(layout(load("case05-i2c.json")).state!.templates).toEqual(["i2c-pullups@1:R1,R2,U1,U2,U3"]);
+    expect(layout(load("case05-i2c.json")).state!.templates).toEqual(["i2c-pullups@2:R1,R2,U1,U2,U3"]);
   });
 
   it("templates can be switched off (the fallback), giving the Phase 0a layout", () => {

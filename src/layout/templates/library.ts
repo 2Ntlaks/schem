@@ -10,6 +10,7 @@ import type { Ref, Rel, Template } from "./types.js";
 
 const pin = (slot: string, p: string | { net: string } | { iface: string }, agg?: "min" | "max"): Ref => ({ pin: [slot, p], ...(agg ? { agg } : {}) });
 const env = (slot: string, edge: "left" | "right" | "top" | "bottom"): Ref => ({ env: [slot, edge] });
+const own = (slot: string, edge: "left" | "right" | "top" | "bottom"): Ref => ({ own: [slot, edge] });
 const guide = (name: string): Ref => ({ guide: name });
 const net = (n: string) => ({ net: n });
 const SDA = { iface: "i2c.sda" }, SCL = { iface: "i2c.scl" };
@@ -121,7 +122,7 @@ const OPAMP_NONINVERTING: Template = {
  * peripheral gets its own column (one row of peripherals, left to right in canonical order).
  */
 const I2C: Template = {
-  id: "i2c-pullups", version: 1, priority: 5,
+  id: "i2c-pullups", version: 2, priority: 5,
   summary: "nets with i2c.sda / i2c.scl interface roles; a pull-up from each to one supply",
   nets: { SDA: { iface: "i2c.sda" }, SCL: { iface: "i2c.scl" }, RAIL: { kind: ["power"] } },
   slots: [
@@ -144,7 +145,9 @@ const I2C: Template = {
   link: [
     rel("y", pin("pu1", net("SDA")), "=", pin("ctrl", SDA), -2, "pull-up bodies just above the SDA trunk"),
     rel("x", pin("pu1", net("SDA")), ">=", pin("ctrl", SDA), 3, "SDA pull-up tap clear of the controller pin"),
-    rel("y", env("periph", "top"), ">=", pin("ctrl", SCL), 2, "peripheral labels clear of the SCL trunk"),
+    // Its own outline only: decoupling capacitors stand on the supply pin, right of the bus pins
+    // where the trunks end, so they may rise past the trunk rows.
+    rel("y", own("periph", "top"), ">=", pin("ctrl", SCL), 2, "peripheral labels clear of the SCL trunk"),
     rel("y", pin("periph", SDA), "=", pin("periph", SDA), 0, "peripherals in one row", { each: "chain" }),
   ],
   trunks: [
@@ -383,6 +386,80 @@ function lowSide(q: "npn" | "nmos", load: "relay" | "two-pin"): Template {
 }
 
 /**
+ * Differential pair with a current-mirror load and a resistor tail (the long-tailed pair), in its
+ * textbook shape: two vertical legs 14 G apart, the mirror on top (emitters or sources up to the
+ * supply), the pair below, the tail resistor centred under the pair. The mirror's bases face each
+ * other on one line; the diode-connected side is the left leg, its node tied up to that line. The
+ * pair's bases face outward: the left input from the left, the right input to the right; the
+ * output is the right leg's midpoint.
+ */
+function diffPair(pair: "npn" | "nmos", load: "pnp" | "pmos"): Template {
+  const P = Q[pair]!, M = Q[load]!;
+  const W = 14; // leg spacing: room for the base line, the diode tie and the labels
+  return {
+    id: `diff-pair-${pair}-${load}-mirror`, version: 1, priority: 3,
+    summary: `${pair} differential pair with a ${load} current-mirror load and a resistor tail`,
+    nets: { SUP: { kind: ["power"] }, MIR: { kind: ["signal"] }, OUT: { kind: ["signal"] }, TAIL: { kind: ["signal"] } },
+    slots: [
+      // The diode-connected mirror half first: its collector and base on one net fix MIR.
+      { name: "m1", types: [load], role: "member", orient: MIRROR, label: "left",
+        pins: [{ pin: M.ref, net: "SUP" }, { pin: M.main, net: "MIR" }, { pin: M.ctrl, net: "MIR" }] },
+      { name: "m2", types: [load], role: "member", orient: UPRIGHT, label: "right",
+        pins: [{ pin: M.ref, net: "SUP" }, { pin: M.main, net: "OUT" }, { pin: M.ctrl, net: "MIR" }] },
+      // The pair's labels go between the legs: the input wires take the outer sides.
+      { name: "q1", types: [pair], role: "member", orient: UPRIGHT, label: "right",
+        pins: [{ pin: P.main, net: "MIR" }, { pin: P.ref, net: "TAIL" }, { pin: P.ctrl, net: "*" }] },
+      { name: "q2", types: [pair], role: "member", orient: MIRROR, label: "left",
+        pins: [{ pin: P.main, net: "OUT" }, { pin: P.ref, net: "TAIL" }, { pin: P.ctrl, net: "*" }] },
+      { name: "rt", types: ["resistor"], role: "member", symmetric: true, orient: { net: "TAIL", dir: "up" },
+        pins: [{ pin: "1", net: "TAIL" }, { pin: "2", net: "*" }] },
+      // A load resistor on the output, hanging from the output node to the right.
+      { name: "rl", types: ["resistor"], role: "member", symmetric: true, many: { min: 0 }, orient: { net: "OUT", dir: "up" },
+        pins: [{ pin: "1", net: "OUT" }, { pin: "2", net: "*" }] },
+    ],
+    interior: [
+      rel("x", pin("m1", M.main), "=", pin("q1", P.main), 0, "left leg vertical"),
+      rel("x", pin("m2", M.main), "=", pin("q2", P.main), 0, "right leg vertical"),
+      rel("x", pin("q2", P.main), "=", pin("q1", P.main), W, "the legs side by side, 14 G apart"),
+      rel("y", pin("m2", M.main), "=", pin("m1", M.main), 0, "the mirror in one row"),
+      rel("y", pin("q2", P.main), "=", pin("q1", P.main), 0, "the pair in one row"),
+      rel("y", pin("q1", P.main), "=", pin("m1", M.main), 4, "mirror above the pair; the leg nodes between them"),
+      rel("x", pin("rt", net("TAIL")), "=", pin("q1", P.ref), W / 2, "tail resistor centred under the pair"),
+      rel("y", pin("rt", net("TAIL")), "=", pin("q1", P.ref), 3, "the tail line between the pair and the resistor"),
+      rel("y", pin("rl", net("OUT")), "=", pin("m2", M.main), 3, "load just below the output node row"),
+      rel("x", pin("rl", net("OUT")), "=", pin("q2", P.ctrl), 6, "load right of the right input and its symbol"),
+    ],
+    boundary: [["q1", P.ctrl], ["q2", P.ctrl], ["m2", M.main], ["rt", { net: "*" }], ["rl", { net: "*" }]],
+    trunks: [
+      { net: "MIR", why: "the mirror's base line",
+        points: [{ x: pin("m1", M.ctrl), dx: 1, y: pin("m1", M.ctrl) }, { x: pin("m2", M.ctrl), dx: -1, y: pin("m2", M.ctrl) }],
+        require: [{ pin: ["m1", M.ctrl], dir: "right" }, { pin: ["m2", M.ctrl], dir: "left" }] },
+      { net: "MIR", why: "the left leg: mirror input down to the pair",
+        points: [{ x: pin("m1", M.main), y: pin("m1", M.main), dy: 1 }, { x: pin("q1", P.main), y: pin("q1", P.main), dy: -1 }],
+        require: [{ pin: ["m1", M.main], dir: "down" }, { pin: ["q1", P.main], dir: "up" }] },
+      { net: "MIR", why: "the diode connection: the left leg node up to the base line",
+        points: [
+          { x: pin("m1", M.main), y: pin("m1", M.main), dy: 2 },
+          { x: pin("m1", M.ctrl), dx: 2, y: pin("m1", M.main), dy: 2 },
+          { x: pin("m1", M.ctrl), dx: 2, y: pin("m1", M.ctrl) },
+        ],
+        require: [{ pin: ["m1", M.ctrl], dir: "right" }, { pin: ["m1", M.main], dir: "down" }] },
+      { net: "OUT", why: "the right leg: mirror output down to the pair",
+        points: [{ x: pin("m2", M.main), y: pin("m2", M.main), dy: 1 }, { x: pin("q2", P.main), y: pin("q2", P.main), dy: -1 }],
+        require: [{ pin: ["m2", M.main], dir: "down" }, { pin: ["q2", P.main], dir: "up" }] },
+      { net: "TAIL", why: "the tail line: both emitters down to the resistor",
+        points: [
+          { x: pin("q1", P.ref), y: pin("q1", P.ref), dy: 1 },
+          { x: pin("q1", P.ref), y: pin("rt", net("TAIL")), dy: -1 },
+          { x: pin("q2", P.ref), y: pin("rt", net("TAIL")), dy: -1 },
+          { x: pin("q2", P.ref), y: pin("q2", P.ref), dy: 1 },
+        ],
+        require: [{ pin: ["q1", P.ref], dir: "down" }, { pin: ["q2", P.ref], dir: "down" }, { pin: ["rt", { net: "TAIL" }], dir: "up" }] },
+    ],
+  };
+}
+
+/**
  * Bridge rectifier, orthogonal convention: two vertical diode legs side by side, cathodes up to
  * the + output, anodes down to the - output, the AC inputs at the leg midpoints from the left.
  */
@@ -416,7 +493,7 @@ const BRIDGE_RECTIFIER: Template = {
 
 /** All templates; the engine sorts matches by priority. Decoupling is handled by src/layout/decoupling.ts. */
 export const TEMPLATES: readonly Template[] = [
-  OPAMP_INVERTING, OPAMP_NONINVERTING, hBridge("pmos", "nmos"), hBridge("pnp", "npn"), BRIDGE_RECTIFIER, I2C,
+  OPAMP_INVERTING, OPAMP_NONINVERTING, hBridge("pmos", "nmos"), hBridge("pnp", "npn"), diffPair("npn", "pnp"), diffPair("nmos", "pmos"), BRIDGE_RECTIFIER, I2C,
   lowSide("npn", "relay"), lowSide("nmos", "relay"), lowSide("npn", "two-pin"), lowSide("nmos", "two-pin"),
   DIVIDER, PULL_UP, PULL_DOWN, LED_VERTICAL, LED_HORIZONTAL,
 ];

@@ -39,7 +39,8 @@ export interface Region {
 }
 
 /** Oriented geometry of a placed part, relative to its origin. */
-export interface Geo { pins: ReadonlyArray<{ number: string; at: Pt; dir: Dir }>; ko: Box; env: Box }
+/** A part's pins, keep-out, envelope (with its decoupling child slots) and own envelope (without them). */
+export interface Geo { pins: ReadonlyArray<{ number: string; at: Pt; dir: Dir }>; ko: Box; env: Box; own: Box }
 
 // ---------------------------------------------------------------------------
 // Step 1: matching.
@@ -322,7 +323,7 @@ export function apartPairs(r: Region): Array<[string, string]> {
 }
 
 function refSlot(ref: Ref): string | undefined {
-  return "pin" in ref ? ref.pin[0] : "box" in ref ? ref.box[0] : "env" in ref ? ref.env[0] : undefined;
+  return "pin" in ref ? ref.pin[0] : "box" in ref ? ref.box[0] : "env" in ref ? ref.env[0] : "own" in ref ? ref.own[0] : undefined;
 }
 
 function term(ref: Ref, axis: "x" | "y", r: Region, geo: (id: string) => Geo, i: number): { v: string; off: number } | undefined {
@@ -336,8 +337,8 @@ function term(ref: Ref, axis: "x" | "y", r: Region, geo: (id: string) => Geo, i:
     const p = G.pins.find((q) => q.number === num);
     return p ? { v, off: p.at[axis === "x" ? 0 : 1] } : undefined;
   }
-  const [, edge] = "box" in ref ? ref.box : ref.env;
-  const box = "box" in ref ? G.ko : G.env;
+  const [, edge] = "box" in ref ? ref.box : "own" in ref ? ref.own : ref.env;
+  const box = "box" in ref ? G.ko : "own" in ref ? G.own : G.env;
   if ((edge === "left" || edge === "right") !== (axis === "x")) throw new Error(`template ${r.template.id}: edge ${edge} used on axis ${axis}`);
   return { v, off: edge === "left" ? box.x : edge === "right" ? box.x + box.w : edge === "top" ? box.y : box.y + box.h };
 }
@@ -396,8 +397,8 @@ export function trunkRuns(r: Region, geo: (id: string) => Geo, at: (id: string) 
         const p = G.pins.find((q) => q.number === num);
         if (p) vals.push(o[axis] + p.at[axis]);
       } else {
-        const [, edge] = "box" in ref ? ref.box : ref.env;
-        const box = "box" in ref ? G.ko : G.env;
+        const [, edge] = "box" in ref ? ref.box : "own" in ref ? ref.own : ref.env;
+        const box = "box" in ref ? G.ko : "own" in ref ? G.own : G.env;
         vals.push(o[axis] + (edge === "left" ? box.x : edge === "right" ? box.x + box.w : edge === "top" ? box.y : box.y + box.h));
       }
     }
