@@ -114,6 +114,11 @@ describe("symbol library: one small circuit per symbol", () => {
         }
         // A flyback diode stands with its cathode towards the supply.
         if (name === "relay-driver" || name === "nmos-motor-driver") expect(pinAt("D1[K]").at[1]).toBeLessThan(pinAt("D1[A]").at[1]);
+        // Zener shunt: anode to ground. Schottky feeds the load, anode on the left.
+        if (name === "zener-shunt") {
+          expect(pinAt("D1[K]").at[1]).toBeLessThan(pinAt("D1[A]").at[1]);
+          expect(pinAt("D2[A]").at[0]).toBeLessThan(pinAt("D2[K]").at[0]);
+        }
       });
 
       it("headers draw every pin, with its name and number", () => {

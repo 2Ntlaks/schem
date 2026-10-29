@@ -37,6 +37,8 @@ drawn as a box) and `header` (a connector).
 | `pushbutton` |  | `1`, `2` |  |
 | `relay` |  | `A1`, `A2`, `11` (COM), `12` (NC), `14` (NO) |  |
 | `resistor` |  | `1`, `2` |  |
+| `schottky` |  | `A` (anode; also `a`, `+`), `K` (cathode; also `k`, `-`) |  |
 | `spst` |  | `1`, `2` |  |
 | `supply` |  | `1` |  |
 | `vsource` |  | `+` (also `pos`, `p`), `-` (also `neg`, `n`) |  |
+| `zener` |  | `A` (anode; also `a`, `+`), `K` (cathode; also `k`, `-`) |  |

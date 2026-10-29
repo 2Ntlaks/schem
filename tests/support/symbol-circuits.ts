@@ -202,6 +202,24 @@ export const SYMBOL_CIRCUITS: Record<string, { covers: string[]; project: Projec
       ],
     } },
   },
+  "zener-shunt": {
+    covers: ["zener", "schottky"],
+    project: { meta: { title: "Zener shunt regulator" }, circuit: {
+      parts: [
+        { id: "B1", type: "battery", props: { value: "9V" } },
+        { id: "R1", type: "resistor", props: { value: "220" } },
+        { id: "D1", type: "zener", props: { value: "5.1V" } },
+        { id: "D2", type: "schottky", props: { partNumber: "1N5817" } },
+        { id: "R2", type: "resistor", props: { value: "1k" } },
+      ],
+      nets: [
+        net("n1", "9V", "B1[+]", "R1[1]"),
+        net("n2", "REG", "R1[2]", "D1[K]", "D2[A]"),
+        net("n3", "LOAD", "D2[K]", "R2[1]"),
+        net("n4", "GND", "B1[-]", "D1[A]", "R2[2]"),
+      ],
+    } },
+  },
   "header-feeds-resistor": {
     covers: ["header"],
     project: { meta: { title: "Header feeding a resistor" }, circuit: {
