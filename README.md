@@ -31,7 +31,7 @@ An agent can tell you that an ESP32 drives a relay through a transistor with a f
 - **You write a netlist.** Parts and the pins they connect. No coordinates, no wires, no layout.
 - **schem draws it the way an engineer would.** Power at the top, ground at the bottom, signals flowing left to right, familiar circuits in their textbook arrangement.
 - **Then it checks its own work.** The connections are rebuilt from the finished drawing and compared with your netlist, and parts and labels are checked for overlaps. If the picture does not say exactly what the netlist says, you are told.
-- **Edits stay put.** Change a value or add a part, and the rest of the drawing stays where it was (untouched parts may shift a little, within a measured limit; 136 of 140 random test edits stay inside it). A figure in your report does not reshuffle itself between versions.
+- **Edits stay put.** Change a value or add a part with `schem edit`, and the rest of the drawing stays where it was (untouched parts may shift a little, within a measured limit; 136 of 140 random test edits stay inside it, and `--strict` refuses the rest). A figure in your report does not reshuffle itself between versions.
 
 ## Quick start
 
@@ -49,6 +49,8 @@ esp32-relay: valid. Wrote out/esp32-relay.svg and out/esp32-relay.png (190 ms)
 ```
 
 Five circuits to try are in [`examples/`](examples/). Add `-o <folder>` to write somewhere else. The exit code is `0` for a valid drawing, `1` when the drawing has problems (the files are still written and the problems listed), and `2` when the file could not be drawn, with a message saying what is wrong and where.
+
+To change a circuit without reshuffling its drawing, list the changes in a small JSON file and run `npm run schem -- edit <file> --ops <changes.json>`. [`docs/editing.md`](docs/editing.md) shows how.
 
 ## How it works
 
@@ -148,6 +150,7 @@ schem is an early prototype. It is useful today for small and medium circuits, a
 - 22 symbols: passives, diodes, LEDs, BJTs, MOSFETs, op-amps, relays, switches, sources and more
 - Chips as labelled boxes, connectors, and 4 boards with their real pinouts (Arduino Uno, ESP32-DevKitC, a Pololu regulator, an I2C LCD)
 - All 8 development circuits draw valid; a generated 30-part circuit draws in under 3 seconds
+- Edits from the command line that keep the drawing and report anything that moved
 - Byte-identical output on Windows and Linux
 - Clear errors for broken input
 
@@ -157,7 +160,6 @@ schem is an early prototype. It is useful today for small and medium circuits, a
 - Dense boards with several chips spread out too far
 - Circuits that want mirror symmetry, like a differential pair, come out messy
 - The symbol and board library is small
-- Edits work in the engine (`src/edit/`) but not yet from the command line
 - Not on npm, so no `npx schem` yet
 - No blind rating by outside judges yet
 

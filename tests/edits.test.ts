@@ -140,6 +140,38 @@ describe("generated circuits under random edits (layer 5)", () => {
   }, 300_000);
 });
 
+describe("strict edits", () => {
+  // Generated circuit 38 with its random edit: its best layout moves one untouched part 8 G.
+  const g = generate(38, 5);
+  const previous = layout({ circuit: g.circuit }).state!;
+  const { ops } = randomEdit(g.circuit, 38 * 31);
+
+  it("an edit past the stability gate is saved by default and refused when strict", () => {
+    const loose = edit({ project: { circuit: g.circuit }, previous, ops });
+    expect(loose.saved).toBe(true);
+    expect(stabilityBreaks(loose.report!)).toEqual(["an untouched part moved 8 G (at most 6)"]);
+
+    const strict = edit({ project: { circuit: g.circuit }, previous, ops, strict: true });
+    expect(strict.saved).toBe(false);
+    expect(strict.status).toBe("unstable");
+    expect(strict.project.circuit).toBe(g.circuit);
+    expect(stabilityBreaks(strict.report!)).toEqual(["an untouched part moved 8 G (at most 6)"]);
+  });
+
+  it("strict still saves an edit that asks for the whole sheet to be redrawn", () => {
+    const r = edit({ project: { circuit: g.circuit }, previous, ops: [...ops, { op: "relayout", mode: "canonical" }], strict: true });
+    expect(r.saved).toBe(true);
+    expect(r.mode).toBe("canonical");
+  });
+
+  it("strict saves the stable development edits unchanged", () => {
+    for (const [f, scripts] of Object.entries(EDIT_SCRIPTS)) for (const ops of Object.values(scripts)) {
+      const s = start(f);
+      expect(JSON.stringify(edit({ ...s, ops, strict: true }).layout!.state)).toBe(JSON.stringify(edit({ ...s, ops }).layout!.state));
+    }
+  });
+});
+
 describe("stability report (SPEC 15 gate 4)", () => {
   it("does not round a mean displacement just over the limit down to the limit", () => {
     const before: LayoutState = { parts: {}, routes: {} };

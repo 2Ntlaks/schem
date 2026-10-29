@@ -33,13 +33,19 @@ export interface EditRequest {
   ops: EditOp[];
   expectedRevision?: string;
   expectedLayout?: string;
+  /**
+   * Refuse, instead of saving with its change report, an edit whose layout moves untouched parts past
+   * SPEC 15 gate 4. The whole-sheet layout is then not tried either, unless the operations ask for it
+   * (`relayout canonical`, `setSpacing`).
+   */
+  strict?: boolean;
 }
 
 export type EditMode = "incremental" | "incremental-reroute" | "canonical";
 
 export interface EditResult {
   saved: boolean;
-  status: Status | "conflict";
+  status: Status | "conflict" | "unstable";
   /** The edited project if saved, else the unchanged input. */
   project: Project;
   layout?: LayoutResult;
@@ -104,7 +110,7 @@ export function edit(req: EditRequest): EditResult {
     }
     attempts.push({ mode: "incremental-reroute", run: () => layout(project, { previous, affected: affected.parts, reuseRoutes: false }) });
   }
-  attempts.push({ mode: "canonical", run: () => layout(project) });
+  if (!(req.strict && previous && !canonical)) attempts.push({ mode: "canonical", run: () => layout(project) });
   const issues: string[] = [];
   let last: LayoutResult | undefined;
   let unstable: EditResult | undefined;
@@ -127,7 +133,11 @@ export function edit(req: EditRequest): EditResult {
     unstable ??= result;
     issues.push(`${a.mode}: moves untouched parts (${breaks.join("; ")})`);
   }
+  if (unstable && req.strict) {
+    return { ...unchanged("unstable", [`edit refused (strict): every layout that keeps the drawing moves untouched parts too far. ${issues.join("; ")}`]), affected, removedHints, report: unstable.report! };
+  }
   if (unstable) return unstable;
+  if (req.strict && previous && !canonical) issues.push("strict: the whole-sheet layout was not tried");
   const status = last?.status && !last.status.startsWith("valid") ? last.status : "budget_exhausted";
   return { ...unchanged(status, [`edit rejected: no valid layout (D4). ${issues.join("; ")}`]), affected, removedHints };
 }

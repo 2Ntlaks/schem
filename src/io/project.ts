@@ -40,7 +40,7 @@ export interface LoadedProject extends Project {
   assets: Assets;
   /** Inert metadata, preserved and never interpreted (SPEC 6.6). */
   ext: Record<string, unknown>;
-  /** SPEC 6.5 `layout`, kept as read. It is a cache; edits drop it. */
+  /** SPEC 6.5 `layout`, kept as read. It is a cache; edits drop it (src/io/layout-cache.ts reads and writes it). */
   layoutCache?: unknown;
   /** Fields outside `ext` this version does not know (SPEC 6.6): the file renders, edits are refused. */
   unknownFields: string[];
@@ -406,5 +406,24 @@ export function projectDocument(p: LoadedProject): Record<string, unknown> {
 /** Canonical file text (SPEC 6.5). Loading it again gives the same project. */
 export function saveProject(p: LoadedProject): string {
   if (p.unknownFields.length) throw new Error(`cannot write this project: it uses fields this engine does not know (${p.unknownFields.join(", ")}), and writing would lose them (SPEC 6.6).`);
-  return `${JSON.stringify(projectDocument(p), null, 2)}\n`;
+  const doc = projectDocument(p);
+  if (doc.layout === undefined) return `${JSON.stringify(doc, null, 2)}\n`;
+  // The saved layout is written one part and one route per line, so it does not drown the file.
+  const PLACE = "@@schem-layout@@";
+  const layoutDoc = doc.layout;
+  doc.layout = PLACE;
+  return `${JSON.stringify(doc, null, 2).replace(`"layout": "${PLACE}"`, () => `"layout": ${layoutText(layoutDoc)}`)}\n`;
+}
+
+/** A saved layout at the top level of the file, with its parts' and routes' entries one per line. */
+function layoutText(layout: unknown): string {
+  if (!isObj(layout)) return JSON.stringify(layout, null, 2).replace(/\n/g, "\n  ");
+  const block = (open: string, close: string, items: string[]) => (items.length ? `${open}\n${items.map((x) => `      ${x}`).join(",\n")}\n    ${close}` : `${open}${close}`);
+  const fields = Object.entries(layout).map(([k, v]) => {
+    let text = JSON.stringify(v);
+    if (k === "parts" && isObj(v)) text = block("{", "}", Object.entries(v).map(([id, x]) => `${JSON.stringify(id)}: ${JSON.stringify(x)}`));
+    else if (k === "routes" && Array.isArray(v)) text = block("[", "]", v.map((x) => JSON.stringify(x)));
+    return `    ${JSON.stringify(k)}: ${text}`;
+  });
+  return fields.length ? `{\n${fields.join(",\n")}\n  }` : "{}";
 }
