@@ -304,6 +304,19 @@ const MOTOR: SymbolDef = {
   labelPrefer: ["above", "below", "right", "left"],
 };
 
+/** IEEE crystal: a rectangle between two plates. Same length as the fuse. */
+const CRYSTAL: SymbolDef = {
+  id: "crystal", version: 1, refPrefix: "Y", source: "original", kind: "two-pin",
+  pins: [pin("1", "1", [0, 0], "left", "passive", { chain: "in" }), pin("2", "2", [6, 0], "right", "passive", { chain: "out" })],
+  align: [3, 0],
+  graphics: [
+    { d: "M0 0 H1.5 M1.5 -0.8 V0.8 M4.5 -0.8 V0.8 M4.5 0 H6" },
+    { d: "M2 -0.55 H4 V0.55 H2 Z" },
+  ],
+  art: { x: 0, y: -0.8, w: 6, h: 1.6 },
+  labelPrefer: ["above", "below", "right", "left"],
+};
+
 const FUSE: SymbolDef = {
   id: "fuse", version: 1, refPrefix: "F", source: "original", kind: "two-pin",
   pins: [pin("1", "1", [0, 0], "left", "passive", { chain: "in" }), pin("2", "2", [6, 0], "right", "passive", { chain: "out" })],
@@ -362,7 +375,7 @@ const RELAY: SymbolDef = {
 export const BUILTIN: Record<string, SymbolDef> = Object.fromEntries(
   [RESISTOR, CAPACITOR, LED, BATTERY, VSOURCE, OPAMP, GROUND, SUPPLY,
     DIODE, POLCAP, POTENTIOMETER, bjt("npn"), bjt("pnp"), mosfet("nmos"), mosfet("pmos"),
-    SPST, PUSHBUTTON, BUZZER, MOTOR, RELAY, FUSE, ACSOURCE].map((s) => [s.id, s]),
+    SPST, PUSHBUTTON, BUZZER, MOTOR, RELAY, FUSE, CRYSTAL, ACSOURCE].map((s) => [s.id, s]),
 );
 
 /** Part types whose pins are declared on the part (SPEC 6.2 `pins`), with a generated symbol. */

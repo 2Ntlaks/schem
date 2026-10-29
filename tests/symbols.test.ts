@@ -114,6 +114,11 @@ describe("symbol library: one small circuit per symbol", () => {
         }
         // A flyback diode stands with its cathode towards the supply.
         if (name === "relay-driver" || name === "nmos-motor-driver") expect(pinAt("D1[K]").at[1]).toBeLessThan(pinAt("D1[A]").at[1]);
+        // The crystal stands with pin 1 up, between the two clock pins.
+        if (name === "mcu-crystal") {
+          expect(pinAt("Y1[1]").at[0]).toBe(pinAt("Y1[2]").at[0]);
+          expect(pinAt("Y1[1]").at[1]).toBeLessThan(pinAt("Y1[2]").at[1]);
+        }
       });
 
       it("headers draw every pin, with its name and number", () => {
