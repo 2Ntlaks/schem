@@ -11,6 +11,7 @@ import { parseQuantity, quantityOf } from "../core/quantity.js";
 import { BUILTIN, checkSymbol, HEADER, icSymbol, keepOut, type SymbolDef } from "../symbols/library.js";
 import { defaultOrient, headerFor, headerPins } from "./kinds.js";
 import { decouplingMatches } from "./decoupling.js";
+import { powerPath } from "./power-path.js";
 import { measure } from "../text/font.js";
 import { eq, solveWithDrops, X0, type Constraint } from "./solver.js";
 import { route, type NetRequest } from "./router.js";
@@ -143,11 +144,14 @@ export function layout(project: Project, opts: LayoutOptions = {}): LayoutResult
   }
   const netById = new Map(circuit.nets.map((n) => [n.id, n]));
 
-  // Step 3 (0a): power/ground nets with 3+ endpoints become ports; everything else is wired.
+  // Step 3: a named power or ground net with 3+ endpoints is drawn as supply symbols.
+  // A series power path keeps its own pins as wires (SPEC 9.2). A path net with no load is all wires.
+  const path = powerPath(circuit, defs, vc);
+  notes.push(...path.notes);
   const portNet = new Set<string>();
   for (const n of circuit.nets) {
     const k = netKind(n);
-    if ((k === "power" || k === "ground") && n.name !== undefined && new Set(vc.endpoints.get(n.id)!.map(canonical)).size >= 3) portNet.add(n.id);
+    if ((k === "power" || k === "ground") && n.name !== undefined && new Set(vc.endpoints.get(n.id)!.map(canonical)).size >= 3 && !path.wireNets.has(n.id)) portNet.add(n.id);
   }
   const wired = circuit.nets.filter((n) => !portNet.has(n.id));
   const keepsPreviousLock = (id: string) => {
@@ -176,8 +180,13 @@ export function layout(project: Project, opts: LayoutOptions = {}): LayoutResult
   const neighbours = new Map<string, Set<string>>(circuit.parts.map((p) => [p.id, new Set<string>()]));
   for (const n of wired) for (const a of partsOfNet.get(n.id)!) for (const b of partsOfNet.get(n.id)!) if (a !== b) neighbours.get(a)!.add(b);
   // Flow ignores ground nets (SPEC 9.2 step 2.1); wired supply nets still carry flow from a source.
+  // A port net that a series element sits on carries flow too, so the path stays in order.
   const flowNeighbours = new Map<string, Set<string>>(circuit.parts.map((p) => [p.id, new Set<string>()]));
   for (const n of wired) if (netKind(n) !== "ground") for (const a of partsOfNet.get(n.id)!) for (const b of partsOfNet.get(n.id)!) if (a !== b) flowNeighbours.get(a)!.add(b);
+  for (const netId of path.continueByNet.keys()) for (const a of partsOfNet.get(netId)!) for (const b of partsOfNet.get(netId)!) if (a !== b) {
+    neighbours.get(a)!.add(b);
+    flowNeighbours.get(a)!.add(b);
+  }
 
   const ids = circuit.parts.map((p) => p.id).sort(cmpStr);
   const partOf = new Map(circuit.parts.map((p) => [p.id, p]));
@@ -313,6 +322,8 @@ export function layout(project: Project, opts: LayoutOptions = {}): LayoutResult
     for (const p of pins) {
       const netId = drawnNet.get(`${id}[${p.number}]`);
       if (!netId || !portNet.has(netId)) continue;
+      // A pin on the series path is wired later. It does not get its own supply symbol.
+      if (path.continuePins.has(`${id}[${p.number}]`)) continue;
       const net = netById.get(netId)!;
       const kind = netKind(net) === "ground" ? "ground" : "power";
       const want: Dir = kind === "ground" ? "down" : "up";
@@ -320,7 +331,8 @@ export function layout(project: Project, opts: LayoutOptions = {}): LayoutResult
       const half = Math.max(1, (portText(kind, net) ? measure(portText(kind, net)!, LABEL_SIZE).width / 10 : 0) / 2);
       const out = isHorizontal(p.dir) ? Math.max(1, Math.ceil(half)) : 1;
       let stub: Pt[];
-      if (p.dir === want) stub = [];
+      // A path shares this net, so the symbol steps off the pin and the wire can meet the stub.
+      if (p.dir === want) stub = path.continueByNet.has(netId) ? [p.at, step(p.at, want), step(p.at, want, 2)] : [];
       else if (isHorizontal(p.dir)) stub = [p.at, step(p.at, p.dir, out), step(step(p.at, p.dir, out), want)];
       else {
         // The pin faces away from where the symbol must point (a flipped pull-up): leave the pin,
@@ -721,7 +733,9 @@ export function layout(project: Project, opts: LayoutOptions = {}): LayoutResult
   }
 
   // Step 7: route wired nets; port stubs are pre-wired.
+  // A series pin on a port net is routed onto those stubs. Its signature still lists every pin.
   const requests: NetRequest[] = [];
+  const routeSig = new Map<string, string>();
   for (const n of circuit.nets) {
     const terms = [...drawnNet.entries()].filter(([, nn]) => nn === n.id).map(([t]) => {
       const p = el.pins.find((q) => `${q.part}[${q.number}]` === t)!;
@@ -730,16 +744,30 @@ export function layout(project: Project, opts: LayoutOptions = {}): LayoutResult
     terms.sort((a, b) => colOf.get(partOfTerm(a.id))! - colOf.get(partOfTerm(b.id))! || cmpStr(a.id, b.id));
     if (portNet.has(n.id)) {
       const prewired: Array<[Pt, Pt]> = [];
-      for (const id of ids) for (const q of placed.get(id)!.ports) if (q.net.id === n.id && q.stub.length) {
+      const seal: Pt[] = [];
+      for (const id of ids) for (const q of placed.get(id)!.ports) if (q.net.id === n.id) {
         const o = at(id);
-        const s = q.stub.map((p): Pt => [o[0] + p[0], o[1] + p[1]]);
-        prewired.push(...unitEdges(s));
+        if (q.stub.length) {
+          const s = q.stub.map((p): Pt => [o[0] + p[0], o[1] + p[1]]);
+          prewired.push(...unitEdges(s));
+        }
+        seal.push([o[0] + q.anchor[0], o[1] + q.anchor[1]]);
       }
       for (const w of childWires.get(n.id) ?? []) {
         const o = at(w.host);
         prewired.push(...unitEdges(w.run.map((p): Pt => [o[0] + p[0], o[1] + p[1]])));
       }
-      requests.push({ net: n.id, terminals: terms, prewired: [...new Map(prewired.map((e) => [edgeKey(...e), e])).values()], noRoute: true });
+      const wires = [...new Map(prewired.map((e) => [edgeKey(...e), e])).values()];
+      const open = path.continueByNet.get(n.id);
+      const hanging = open ? terms.filter((t) => open.has(t.id)) : [];
+      if (opts.previous && opts.reuseRoutes !== false && opts.previous.routes[n.id]?.terminals === signature(terms)) {
+        requests.push({ net: n.id, terminals: terms, prewired: opts.previous.routes[n.id]!.runs.flatMap((w) => unitEdges(w)), noRoute: true });
+      } else if (hanging.length) {
+        routeSig.set(n.id, signature(terms));
+        requests.push({ net: n.id, terminals: hanging, prewired: wires, seal, noRoute: false });
+      } else {
+        requests.push({ net: n.id, terminals: terms, prewired: wires, noRoute: true });
+      }
     } else if (opts.previous && opts.reuseRoutes !== false && opts.previous.routes[n.id]?.terminals === signature(terms)) {
       // Incremental mode: a net whose drawn terminals did not move keeps its route.
       requests.push({ net: n.id, terminals: terms, prewired: opts.previous.routes[n.id]!.runs.flatMap((w) => unitEdges(w)), noRoute: true });
@@ -860,7 +888,7 @@ export function layout(project: Project, opts: LayoutOptions = {}): LayoutResult
   }
   for (const r of routed) {
     const req = requests.find((q) => q.net === r.net)!;
-    state.routes[r.net] = { terminals: signature(req.terminals), runs: mergeRuns(r.edges), ...(portNet.has(r.net) ? { ports: true as const } : {}) };
+    state.routes[r.net] = { terminals: routeSig.get(r.net) ?? signature(req.terminals), runs: mergeRuns(r.edges), ...(portNet.has(r.net) ? { ports: true as const } : {}) };
   }
   if (regions.length) state.templates = regions.map((r) => r.key).sort(cmpStr);
   return state;
