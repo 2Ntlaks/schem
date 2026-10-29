@@ -387,7 +387,7 @@ function lowSide(q: "npn" | "nmos", load: "relay" | "two-pin"): Template {
 
 /**
  * Differential pair with a current-mirror load and a resistor tail (the long-tailed pair), in its
- * textbook shape: two vertical legs 14 G apart, the mirror on top (emitters or sources up to the
+ * textbook shape: two vertical legs 18 G apart, the mirror on top (emitters or sources up to the
  * supply), the pair below, the tail resistor centred under the pair. The mirror's bases face each
  * other on one line; the diode-connected side is the left leg, its node tied up to that line. The
  * pair's bases face outward: the left input from the left, the right input to the right; the
@@ -395,7 +395,7 @@ function lowSide(q: "npn" | "nmos", load: "relay" | "two-pin"): Template {
  */
 function diffPair(pair: "npn" | "nmos", load: "pnp" | "pmos"): Template {
   const P = Q[pair]!, M = Q[load]!;
-  const W = 14; // leg spacing: room for the base line, the diode tie and the labels
+  const W = 18; // leg spacing: the base line, the diode tie, and the pair's labels apart between the legs
   return {
     id: `diff-pair-${pair}-${load}-mirror`, version: 1, priority: 3,
     summary: `${pair} differential pair with a ${load} current-mirror load and a resistor tail`,
@@ -420,7 +420,7 @@ function diffPair(pair: "npn" | "nmos", load: "pnp" | "pmos"): Template {
     interior: [
       rel("x", pin("m1", M.main), "=", pin("q1", P.main), 0, "left leg vertical"),
       rel("x", pin("m2", M.main), "=", pin("q2", P.main), 0, "right leg vertical"),
-      rel("x", pin("q2", P.main), "=", pin("q1", P.main), W, "the legs side by side, 14 G apart"),
+      rel("x", pin("q2", P.main), "=", pin("q1", P.main), W, "the legs side by side, 18 G apart"),
       rel("y", pin("m2", M.main), "=", pin("m1", M.main), 0, "the mirror in one row"),
       rel("y", pin("q2", P.main), "=", pin("q1", P.main), 0, "the pair in one row"),
       rel("y", pin("q1", P.main), "=", pin("m1", M.main), 4, "mirror above the pair; the leg nodes between them"),

@@ -42,7 +42,7 @@
               "rot": 270
             }
           ],
-          "expectedLayout": "d48c4c9880eca1fd19b057d4765c112bed5118db065f0b3077ba957c36e14a73",
+          "expectedLayout": "08db84f3fcfd3bdb1e01011baea5503fab191d68ac8aef1d3025d83d53f56429",
           "changesCircuit": false,
           "expect": {
             "wireLength": -9

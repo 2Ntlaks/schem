@@ -191,7 +191,7 @@ describe("the other templates", () => {
     const { r, q } = run(DIFF_PAIR);
     expect(r.state!.templates).toEqual(["diff-pair-nmos-pmos-mirror@1:Q1,Q2,Q3,Q4,RL,RT"]);
     const d = (id: string) => pinAt(r, id, "D");
-    expect([d("Q1").at[0] === d("Q3").at[0], d("Q2").at[0] === d("Q4").at[0], d("Q2").at[0] - d("Q1").at[0]]).toEqual([true, true, 14]);
+    expect([d("Q1").at[0] === d("Q3").at[0], d("Q2").at[0] === d("Q4").at[0], d("Q2").at[0] - d("Q1").at[0]]).toEqual([true, true, 18]);
     expect([d("Q3").at[1] < d("Q1").at[1], d("Q3").at[1] === d("Q4").at[1], d("Q1").at[1] === d("Q2").at[1]]).toEqual([true, true, true]);
     expect(["Q3", "Q4", "Q1", "Q2"].map((id) => pinAt(r, id, "G").dir)).toEqual(["right", "left", "left", "right"]);
     const [rt, s1, s2] = [pinAt(r, "RT", "1"), pinAt(r, "Q1", "S"), pinAt(r, "Q2", "S")];
