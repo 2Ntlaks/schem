@@ -48,7 +48,7 @@ npm run schem -- draw examples/esp32-relay.schem.json
 esp32-relay: valid. Wrote out/esp32-relay.svg and out/esp32-relay.png (190 ms)
 ```
 
-Five circuits to try are in [`examples/`](examples/). Add `-o <folder>` to write somewhere else. The exit code is `0` for a valid drawing, `1` when the drawing has problems (the files are still written and the problems listed), and `2` when the file could not be drawn, with a message saying what is wrong and where.
+Eight circuits to try are in [`examples/`](examples/). Add `-o <folder>` to write somewhere else. The exit code is `0` for a valid drawing, `1` when the drawing has problems (the files are still written and the problems listed), and `2` when the file could not be drawn, with a message saying what is wrong and where.
 
 To change a circuit without reshuffling its drawing, list the changes in a small JSON file and run `npm run schem -- edit <file> --ops <changes.json>`. [`docs/editing.md`](docs/editing.md) shows how.
 
@@ -63,7 +63,7 @@ flowchart LR
     V -- problems --> F["drawn anyway,<br/>problems listed"]
 ```
 
-Placement solves a set of layout rules (signal flow, rails, alignment, spacing) and recognises common circuits, such as an op-amp stage or an I2C bus with pull-ups, to give them their usual shape. Wires are routed on a grid with costs for bends and crossings. The verifier works only from the finished drawing, so a layout bug cannot hide a wrong connection. Output is deterministic: the same file gives the same SVG, byte for byte, on Windows and Linux, which CI checks on every push.
+Placement solves a set of layout rules (signal flow, rails, alignment, spacing) and recognises common circuits, such as an op-amp filter, an H-bridge or an I2C bus with pull-ups, to give them their usual shape ([the full list](docs/templates.md)). Wires are routed on a grid with costs for bends and crossings. The verifier works only from the finished drawing, so a layout bug cannot hide a wrong connection. Output is deterministic: the same file gives the same SVG, byte for byte, on Windows and Linux, which CI checks on every push.
 
 The full design is in [`SPEC.md`](SPEC.md).
 
@@ -86,6 +86,22 @@ Drawn by schem from the files in [`examples/`](examples/), with no hand adjustme
     <td colspan="2">
       <img src="docs/showcase/img/case04-schem.png" alt="H-bridge motor driver with four MOSFETs, gate resistors and a four-input drive header">
       <br><sub><b>H-bridge motor driver</b>: four MOSFETs around the motor, gate networks, drive header. <a href="examples/h-bridge.schem.json">file</a></sub>
+    </td>
+  </tr>
+  <tr>
+    <td colspan="2">
+      <img src="docs/assets/gallery-sallen-key-filter.png" alt="Fourth-order low-pass filter: two Sallen-Key stages side by side, each with two series resistors into an op-amp, a capacitor arching over them to the output and a capacitor to ground">
+      <br><sub><b>Fourth-order low-pass filter</b>: two Sallen-Key stages, each found and drawn in its textbook shape. <a href="examples/sallen-key-filter.schem.json">file</a></sub>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <img src="docs/assets/gallery-wien-bridge.png" alt="Wien bridge oscillator: an op-amp with a series resistor and capacitor above it, a parallel resistor and capacitor to ground on the left, two gain resistors below and an output connector">
+      <br><sub><b>Wien bridge oscillator</b>: the frequency network above and left, the gain resistors below. <a href="examples/wien-bridge.schem.json">file</a></sub>
+    </td>
+    <td width="50%" valign="top">
+      <img src="docs/assets/gallery-relaxation-oscillator.png" alt="Relaxation oscillator: an op-amp with a timing resistor above it, a timing capacitor to ground on the left, a two-resistor divider below and an output connector">
+      <br><sub><b>Relaxation oscillator</b>: timing resistor and capacitor on top, the threshold divider below. <a href="examples/relaxation-oscillator.schem.json">file</a></sub>
     </td>
   </tr>
 </table>
@@ -150,6 +166,7 @@ schem is an early prototype. It is useful today for small and medium circuits, a
 
 - 22 symbols: passives, diodes, LEDs, BJTs, MOSFETs, op-amps, relays, switches, sources and more
 - Chips as labelled boxes, connectors, and 4 boards with their real pinouts (Arduino Uno, ESP32-DevKitC, a Pololu regulator, an I2C LCD)
+- Common circuits drawn in their textbook shape: op-amp amplifiers, Sallen-Key and other active filters, two oscillators, H-bridges, I2C buses and more ([the list](docs/templates.md))
 - All 8 development circuits draw valid; a generated 30-part circuit draws in under 3 seconds
 - Edits from the command line that keep the drawing and report anything that moved
 - Byte-identical output on Windows and Linux
@@ -159,7 +176,7 @@ schem is an early prototype. It is useful today for small and medium circuits, a
     <td valign="top">
 
 - Dense boards with several chips spread out too far
-- Circuits with no template yet, such as Sallen-Key filters and oscillators, are drawn by the general rules and can come out messy
+- Circuits with no template yet, such as single-transistor amplifiers, 555 timers and crystal oscillators, are drawn by the general rules and can come out messy
 - The symbol and board library is small
 - Not on npm, so no `npx schem` yet
 - No blind rating by outside judges yet

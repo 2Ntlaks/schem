@@ -19,6 +19,7 @@
     "showcase": "tsx scripts/showcase.ts",
     "draw:symbols": "tsx scripts/symbols.ts",
     "readme:art": "tsx scripts/readme-art.ts",
+    "readme:gallery": "tsx scripts/gallery.ts",
     "web:build": "tsx scripts/web.ts build",
     "web:serve": "tsx scripts/web.ts serve"
   },
