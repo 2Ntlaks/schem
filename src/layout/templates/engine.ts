@@ -373,7 +373,13 @@ export function solveInterior(r: Region, geo: (id: string) => Geo): Interior | {
   for (let i = 0; i < envs.length; i++) for (let j = i + 1; j < envs.length; j++) {
     if (boxesOverlap(envs[i]!.box, envs[j]!.box)) return { failed: `${envs[i]!.m} and ${envs[j]!.m} overlap inside the region` };
   }
-  return { offsets, guides, env: envs.map((e) => e.box).reduce((a, b) => unionBox(a, b)) };
+  let env = envs.map((e) => e.box).reduce((a, b) => unionBox(a, b));
+  // Reserved columns (`Template.reserve`) widen the envelope; its height stays the members' own.
+  for (const name of r.template.reserve ?? []) {
+    const g = guides.get(name);
+    if (g) env = unionBox(env, { x: g[0], y: env.y, w: 0, h: env.h });
+  }
+  return { offsets, guides, env };
 }
 
 /**

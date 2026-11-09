@@ -125,4 +125,10 @@ export interface Template {
    */
   boundary?: Array<[string, PinSel]>;
   trunks?: Trunk[];
+  /**
+   * Guides (columns) the region's envelope reaches out to. A run that turns on a column outside
+   * every member (the column where the output line turns up to a feedback part) needs it: the
+   * next part on that line then starts clear of the column instead of on it.
+   */
+  reserve?: string[];
 }
