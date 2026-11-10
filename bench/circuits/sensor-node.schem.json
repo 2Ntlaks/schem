@@ -1,0 +1,172 @@
+{
+  "schema": "schem/1.0",
+  "meta": {
+    "title": "Battery sensor node"
+  },
+  "circuit": {
+    "parts": [
+      {
+        "id": "B1",
+        "type": "battery",
+        "props": {
+          "value": "7.4V"
+        }
+      },
+      {
+        "id": "SW1",
+        "type": "spst"
+      },
+      {
+        "id": "U1",
+        "type": "module:pololu-d24v10f5"
+      },
+      {
+        "id": "U2",
+        "type": "module:esp32-devkitc-v4"
+      },
+      {
+        "id": "R1",
+        "type": "resistor",
+        "props": {
+          "value": "100k"
+        }
+      },
+      {
+        "id": "R2",
+        "type": "resistor",
+        "props": {
+          "value": "33k"
+        }
+      },
+      {
+        "id": "C1",
+        "type": "capacitor",
+        "props": {
+          "value": "100n"
+        }
+      },
+      {
+        "id": "SW2",
+        "type": "pushbutton"
+      },
+      {
+        "id": "R3",
+        "type": "resistor",
+        "props": {
+          "value": "10k"
+        }
+      },
+      {
+        "id": "R4",
+        "type": "resistor",
+        "props": {
+          "value": "330"
+        }
+      },
+      {
+        "id": "D1",
+        "type": "led"
+      },
+      {
+        "id": "U3",
+        "type": "module:waveshare-lcd1602-i2c"
+      }
+    ],
+    "nets": [
+      {
+        "id": "n1",
+        "endpoints": [
+          "B1[+]",
+          "SW1[1]"
+        ]
+      },
+      {
+        "id": "n2",
+        "name": "VBAT",
+        "endpoints": [
+          "SW1[2]",
+          "U1[3]",
+          "R1[1]"
+        ]
+      },
+      {
+        "id": "n3",
+        "name": "5V",
+        "endpoints": [
+          "U1[5]",
+          "U2[J2-19]",
+          "U3[1]"
+        ]
+      },
+      {
+        "id": "n4",
+        "endpoints": [
+          "R1[2]",
+          "R2[1]",
+          "C1[1]",
+          "U2[J2-5]"
+        ]
+      },
+      {
+        "id": "n5",
+        "name": "3V3",
+        "endpoints": [
+          "U2[J2-1]",
+          "R3[1]"
+        ]
+      },
+      {
+        "id": "n6",
+        "endpoints": [
+          "R3[2]",
+          "SW2[1]",
+          "U2[J2-7]"
+        ]
+      },
+      {
+        "id": "n7",
+        "endpoints": [
+          "U2[J3-15]",
+          "R4[1]"
+        ]
+      },
+      {
+        "id": "n8",
+        "endpoints": [
+          "R4[2]",
+          "D1[A]"
+        ]
+      },
+      {
+        "id": "n9",
+        "name": "SDA",
+        "endpoints": [
+          "U2[J3-6]",
+          "U3[4]"
+        ]
+      },
+      {
+        "id": "n10",
+        "name": "SCL",
+        "endpoints": [
+          "U2[J3-3]",
+          "U3[3]"
+        ]
+      },
+      {
+        "id": "n11",
+        "name": "GND",
+        "endpoints": [
+          "B1[-]",
+          "U1[4]",
+          "U2{GND}",
+          "R2[2]",
+          "C1[2]",
+          "SW2[2]",
+          "D1[K]",
+          "U3[2]"
+        ]
+      }
+    ]
+  }
+}

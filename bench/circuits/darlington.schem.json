@@ -1,0 +1,118 @@
+{
+  "schema": "schem/1.0",
+  "meta": {
+    "title": "Darlington motor driver"
+  },
+  "circuit": {
+    "parts": [
+      {
+        "id": "J1",
+        "type": "header",
+        "props": {
+          "label": "PWM"
+        },
+        "pins": [
+          {
+            "number": "1",
+            "name": "SIG",
+            "role": "passive"
+          },
+          {
+            "number": "2",
+            "name": "GND",
+            "role": "passive"
+          }
+        ]
+      },
+      {
+        "id": "R1",
+        "type": "resistor",
+        "props": {
+          "value": "2.2k"
+        }
+      },
+      {
+        "id": "Q1",
+        "type": "npn"
+      },
+      {
+        "id": "Q2",
+        "type": "npn"
+      },
+      {
+        "id": "M1",
+        "type": "motor"
+      },
+      {
+        "id": "D1",
+        "type": "diode"
+      },
+      {
+        "id": "R2",
+        "type": "resistor",
+        "props": {
+          "value": "10k"
+        }
+      },
+      {
+        "id": "B1",
+        "type": "battery",
+        "props": {
+          "value": "9V"
+        }
+      }
+    ],
+    "nets": [
+      {
+        "id": "n1",
+        "endpoints": [
+          "J1[1]",
+          "R1[1]"
+        ]
+      },
+      {
+        "id": "n2",
+        "endpoints": [
+          "R1[2]",
+          "Q1[B]"
+        ]
+      },
+      {
+        "id": "n3",
+        "endpoints": [
+          "Q1[E]",
+          "Q2[B]",
+          "R2[1]"
+        ]
+      },
+      {
+        "id": "n4",
+        "endpoints": [
+          "Q1[C]",
+          "Q2[C]",
+          "M1[2]",
+          "D1[A]"
+        ]
+      },
+      {
+        "id": "n5",
+        "name": "VCC",
+        "endpoints": [
+          "B1[+]",
+          "M1[1]",
+          "D1[K]"
+        ]
+      },
+      {
+        "id": "n6",
+        "name": "GND",
+        "endpoints": [
+          "B1[-]",
+          "J1[2]",
+          "Q2[E]",
+          "R2[2]"
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,183 @@
+{
+  "schema": "schem/1.0",
+  "meta": {
+    "title": "Instrumentation amplifier"
+  },
+  "circuit": {
+    "parts": [
+      {
+        "id": "U1",
+        "type": "opamp"
+      },
+      {
+        "id": "U2",
+        "type": "opamp"
+      },
+      {
+        "id": "U3",
+        "type": "opamp"
+      },
+      {
+        "id": "R1",
+        "type": "resistor",
+        "props": {
+          "value": "10k"
+        }
+      },
+      {
+        "id": "R2",
+        "type": "resistor",
+        "props": {
+          "value": "10k"
+        }
+      },
+      {
+        "id": "RG",
+        "type": "resistor",
+        "props": {
+          "value": "1k"
+        }
+      },
+      {
+        "id": "R3",
+        "type": "resistor",
+        "props": {
+          "value": "10k"
+        }
+      },
+      {
+        "id": "R4",
+        "type": "resistor",
+        "props": {
+          "value": "10k"
+        }
+      },
+      {
+        "id": "R5",
+        "type": "resistor",
+        "props": {
+          "value": "10k"
+        }
+      },
+      {
+        "id": "R6",
+        "type": "resistor",
+        "props": {
+          "value": "10k"
+        }
+      },
+      {
+        "id": "J1",
+        "type": "header",
+        "props": {
+          "label": "IN"
+        },
+        "pins": [
+          {
+            "number": "1",
+            "name": "V+",
+            "role": "passive"
+          },
+          {
+            "number": "2",
+            "name": "V-",
+            "role": "passive"
+          }
+        ]
+      },
+      {
+        "id": "J2",
+        "type": "header",
+        "props": {
+          "label": "OUT"
+        },
+        "pins": [
+          {
+            "number": "1",
+            "name": "OUT",
+            "role": "passive"
+          }
+        ]
+      }
+    ],
+    "nets": [
+      {
+        "id": "n1",
+        "endpoints": [
+          "J1[1]",
+          "U1[3]"
+        ]
+      },
+      {
+        "id": "n2",
+        "endpoints": [
+          "J1[2]",
+          "U2[3]"
+        ]
+      },
+      {
+        "id": "n3",
+        "endpoints": [
+          "U1[2]",
+          "R1[1]",
+          "RG[1]"
+        ]
+      },
+      {
+        "id": "n4",
+        "endpoints": [
+          "U2[2]",
+          "R2[1]",
+          "RG[2]"
+        ]
+      },
+      {
+        "id": "n5",
+        "endpoints": [
+          "U1[1]",
+          "R1[2]",
+          "R3[1]"
+        ]
+      },
+      {
+        "id": "n6",
+        "endpoints": [
+          "U2[1]",
+          "R2[2]",
+          "R4[1]"
+        ]
+      },
+      {
+        "id": "n7",
+        "endpoints": [
+          "R3[2]",
+          "U3[2]",
+          "R5[1]"
+        ]
+      },
+      {
+        "id": "n8",
+        "endpoints": [
+          "R4[2]",
+          "U3[3]",
+          "R6[1]"
+        ]
+      },
+      {
+        "id": "n9",
+        "endpoints": [
+          "U3[1]",
+          "R5[2]",
+          "J2[1]"
+        ]
+      },
+      {
+        "id": "n10",
+        "name": "GND",
+        "endpoints": [
+          "R6[2]"
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,138 @@
+{
+  "schema": "schem/1.0",
+  "meta": {
+    "title": "Common-emitter amplifier"
+  },
+  "circuit": {
+    "parts": [
+      {
+        "id": "V1",
+        "type": "ac-source"
+      },
+      {
+        "id": "C1",
+        "type": "capacitor",
+        "props": {
+          "value": "10u"
+        }
+      },
+      {
+        "id": "R1",
+        "type": "resistor",
+        "props": {
+          "value": "47k"
+        }
+      },
+      {
+        "id": "R2",
+        "type": "resistor",
+        "props": {
+          "value": "10k"
+        }
+      },
+      {
+        "id": "Q1",
+        "type": "npn",
+        "props": {
+          "partNumber": "2N3904"
+        }
+      },
+      {
+        "id": "R3",
+        "type": "resistor",
+        "props": {
+          "value": "4.7k"
+        }
+      },
+      {
+        "id": "R4",
+        "type": "resistor",
+        "props": {
+          "value": "1k"
+        }
+      },
+      {
+        "id": "C2",
+        "type": "capacitor",
+        "props": {
+          "value": "100u"
+        }
+      },
+      {
+        "id": "C3",
+        "type": "capacitor",
+        "props": {
+          "value": "10u"
+        }
+      },
+      {
+        "id": "R5",
+        "type": "resistor",
+        "props": {
+          "value": "10k"
+        }
+      }
+    ],
+    "nets": [
+      {
+        "id": "n1",
+        "endpoints": [
+          "V1[1]",
+          "C1[1]"
+        ]
+      },
+      {
+        "id": "n2",
+        "endpoints": [
+          "C1[2]",
+          "R1[2]",
+          "R2[1]",
+          "Q1[B]"
+        ]
+      },
+      {
+        "id": "n3",
+        "name": "VCC",
+        "endpoints": [
+          "R1[1]",
+          "R3[1]"
+        ]
+      },
+      {
+        "id": "n4",
+        "endpoints": [
+          "R3[2]",
+          "Q1[C]",
+          "C3[1]"
+        ]
+      },
+      {
+        "id": "n5",
+        "endpoints": [
+          "Q1[E]",
+          "R4[1]",
+          "C2[1]"
+        ]
+      },
+      {
+        "id": "n6",
+        "name": "OUT",
+        "endpoints": [
+          "C3[2]",
+          "R5[1]"
+        ]
+      },
+      {
+        "id": "n7",
+        "name": "GND",
+        "endpoints": [
+          "V1[2]",
+          "R2[2]",
+          "R4[2]",
+          "C2[2]",
+          "R5[2]"
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,172 @@
+{
+  "schema": "schem/1.0",
+  "meta": {
+    "title": "5 V linear regulator"
+  },
+  "circuit": {
+    "parts": [
+      {
+        "id": "J1",
+        "type": "header",
+        "props": {
+          "label": "DC IN"
+        },
+        "pins": [
+          {
+            "number": "1",
+            "name": "+",
+            "role": "passive"
+          },
+          {
+            "number": "2",
+            "name": "-",
+            "role": "passive"
+          }
+        ]
+      },
+      {
+        "id": "D1",
+        "type": "diode",
+        "props": {
+          "partNumber": "1N4007"
+        }
+      },
+      {
+        "id": "C1",
+        "type": "capacitor",
+        "props": {
+          "value": "100u"
+        }
+      },
+      {
+        "id": "C2",
+        "type": "capacitor",
+        "props": {
+          "value": "330n"
+        }
+      },
+      {
+        "id": "U1",
+        "type": "ic",
+        "props": {
+          "partNumber": "LM7805"
+        },
+        "pins": [
+          {
+            "number": "1",
+            "name": "IN",
+            "role": "power_in"
+          },
+          {
+            "number": "2",
+            "name": "GND",
+            "role": "ground"
+          },
+          {
+            "number": "3",
+            "name": "OUT",
+            "role": "power_out"
+          }
+        ]
+      },
+      {
+        "id": "C3",
+        "type": "capacitor",
+        "props": {
+          "value": "100n"
+        }
+      },
+      {
+        "id": "C4",
+        "type": "capacitor",
+        "props": {
+          "value": "10u"
+        }
+      },
+      {
+        "id": "R1",
+        "type": "resistor",
+        "props": {
+          "value": "1k"
+        }
+      },
+      {
+        "id": "D2",
+        "type": "led",
+        "props": {
+          "color": "green"
+        }
+      },
+      {
+        "id": "J2",
+        "type": "header",
+        "props": {
+          "label": "5V OUT"
+        },
+        "pins": [
+          {
+            "number": "1",
+            "name": "+",
+            "role": "passive"
+          },
+          {
+            "number": "2",
+            "name": "-",
+            "role": "passive"
+          }
+        ]
+      }
+    ],
+    "nets": [
+      {
+        "id": "n1",
+        "endpoints": [
+          "J1[1]",
+          "D1[A]"
+        ]
+      },
+      {
+        "id": "n2",
+        "name": "VIN",
+        "endpoints": [
+          "D1[K]",
+          "C1[1]",
+          "C2[1]",
+          "U1[1]"
+        ]
+      },
+      {
+        "id": "n3",
+        "name": "5V",
+        "endpoints": [
+          "U1[3]",
+          "C3[1]",
+          "C4[1]",
+          "R1[1]",
+          "J2[1]"
+        ]
+      },
+      {
+        "id": "n4",
+        "endpoints": [
+          "R1[2]",
+          "D2[A]"
+        ]
+      },
+      {
+        "id": "n5",
+        "name": "GND",
+        "endpoints": [
+          "J1[2]",
+          "C1[2]",
+          "C2[2]",
+          "U1[2]",
+          "C3[2]",
+          "C4[2]",
+          "D2[K]",
+          "J2[2]"
+        ]
+      }
+    ]
+  }
+}

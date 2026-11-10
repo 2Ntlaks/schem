@@ -1,0 +1,207 @@
+{
+  "schema": "schem/1.0",
+  "meta": {
+    "title": "Summing amplifier into a transistor stage"
+  },
+  "circuit": {
+    "parts": [
+      {
+        "id": "J1",
+        "type": "header",
+        "props": {
+          "label": "IN"
+        },
+        "pins": [
+          {
+            "number": "1",
+            "name": "A",
+            "role": "passive"
+          },
+          {
+            "number": "2",
+            "name": "B",
+            "role": "passive"
+          },
+          {
+            "number": "3",
+            "name": "GND",
+            "role": "passive"
+          }
+        ]
+      },
+      {
+        "id": "R1",
+        "type": "resistor",
+        "props": {
+          "value": "10k"
+        }
+      },
+      {
+        "id": "R2",
+        "type": "resistor",
+        "props": {
+          "value": "10k"
+        }
+      },
+      {
+        "id": "R3",
+        "type": "resistor",
+        "props": {
+          "value": "22k"
+        }
+      },
+      {
+        "id": "U1",
+        "type": "opamp"
+      },
+      {
+        "id": "C1",
+        "type": "capacitor",
+        "props": {
+          "value": "1u"
+        }
+      },
+      {
+        "id": "R4",
+        "type": "resistor",
+        "props": {
+          "value": "47k"
+        }
+      },
+      {
+        "id": "R5",
+        "type": "resistor",
+        "props": {
+          "value": "10k"
+        }
+      },
+      {
+        "id": "Q1",
+        "type": "npn"
+      },
+      {
+        "id": "R6",
+        "type": "resistor",
+        "props": {
+          "value": "2.2k"
+        }
+      },
+      {
+        "id": "R7",
+        "type": "resistor",
+        "props": {
+          "value": "470"
+        }
+      },
+      {
+        "id": "C2",
+        "type": "capacitor",
+        "props": {
+          "value": "10u"
+        }
+      },
+      {
+        "id": "J2",
+        "type": "header",
+        "props": {
+          "label": "OUT"
+        },
+        "pins": [
+          {
+            "number": "1",
+            "name": "SIG",
+            "role": "passive"
+          },
+          {
+            "number": "2",
+            "name": "GND",
+            "role": "passive"
+          }
+        ]
+      }
+    ],
+    "nets": [
+      {
+        "id": "n1",
+        "endpoints": [
+          "J1[1]",
+          "R1[1]"
+        ]
+      },
+      {
+        "id": "n2",
+        "endpoints": [
+          "J1[2]",
+          "R2[1]"
+        ]
+      },
+      {
+        "id": "n3",
+        "endpoints": [
+          "R1[2]",
+          "R2[2]",
+          "R3[1]",
+          "U1[2]"
+        ]
+      },
+      {
+        "id": "n4",
+        "endpoints": [
+          "U1[1]",
+          "R3[2]",
+          "C1[1]"
+        ]
+      },
+      {
+        "id": "n5",
+        "endpoints": [
+          "C1[2]",
+          "R4[2]",
+          "R5[1]",
+          "Q1[B]"
+        ]
+      },
+      {
+        "id": "n6",
+        "name": "VCC",
+        "endpoints": [
+          "R4[1]",
+          "R6[1]"
+        ]
+      },
+      {
+        "id": "n7",
+        "endpoints": [
+          "R6[2]",
+          "Q1[C]",
+          "C2[1]"
+        ]
+      },
+      {
+        "id": "n8",
+        "endpoints": [
+          "Q1[E]",
+          "R7[1]"
+        ]
+      },
+      {
+        "id": "n9",
+        "endpoints": [
+          "C2[2]",
+          "J2[1]"
+        ]
+      },
+      {
+        "id": "n10",
+        "name": "GND",
+        "endpoints": [
+          "J1[3]",
+          "U1[3]",
+          "R5[2]",
+          "R7[2]",
+          "J2[2]"
+        ]
+      }
+    ]
+  }
+}
