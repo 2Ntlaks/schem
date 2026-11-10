@@ -6,6 +6,7 @@ import { canonical as canonicalEp, CircuitError, netKind, type Circuit, type Net
 import { applyOps, type CircuitOp } from "../core/ops.js";
 import { resolveEndpoint } from "../core/validate.js";
 import { hintParts, type Hint, type HintPriority, type Intent, type LayoutState, type Side } from "../core/intent.js";
+import { drawnAsPorts } from "../layout/ports.js";
 import { layout, pinDefsOf, type LayoutResult, type Project, type Status } from "../layout/layout.js";
 import { checkDrawing, type DrawingCheck } from "../quality/index.js";
 import { BUILTIN, ORIENTS, type SymPin } from "../symbols/library.js";
@@ -252,14 +253,13 @@ function affectedBy(c1: Circuit, c2: Circuit, i1: Intent, i2: Intent, ops: EditO
   const partOf = (e: string) => e.slice(0, e.search(/[[{.]/));
   // Port-drawn nets (SPEC 9.5, rev C.3) do not spread "affected": only parts whose own endpoints
   // changed count. Which nets are port-drawn comes from the previous layout; a net it does not have
-  // uses the layout's rule (a named power or ground net with three or more endpoints).
+  // uses the layout's rule (src/layout/ports.ts).
   const d1 = pinDefsOf(c1), d2 = pinDefsOf(c2);
   const canon = (e: string, d: PinDefs) => { const r = resolveEndpoint(e, d); return r.ok ? canonicalEp(r.ep) : e; };
   const portDrawn = (n: Net) => {
     const prev = previous?.routes[n.id];
     if (prev) return prev.ports === true;
-    const k = netKind(n);
-    return (k === "power" || k === "ground") && n.name !== undefined && new Set(n.endpoints.map((e) => canon(e, d2))).size >= 3;
+    return drawnAsPorts(n, [...new Set(n.endpoints.map((e) => canon(e, d2)))], (p) => c2.parts.find((x) => x.id === p)?.type);
   };
   const net1 = new Map(c1.nets.map((n) => [n.id, [...n.endpoints].sort(cmpStr).join(" ")]));
   const net2 = new Map(c2.nets.map((n) => [n.id, [...n.endpoints].sort(cmpStr).join(" ")]));

@@ -141,21 +141,21 @@ describe("generated circuits under random edits (layer 5)", () => {
 });
 
 describe("strict edits", () => {
-  // Generated circuit 38 with its random edit: its best layout moves one untouched part 8 G.
-  const g = generate(38, 5);
+  // Generated circuit 50 with its random edit: its best layout reroutes two nets the edit did not involve.
+  const g = generate(50, 5);
   const previous = layout({ circuit: g.circuit }).state!;
-  const { ops } = randomEdit(g.circuit, 38 * 31);
+  const { ops } = randomEdit(g.circuit, 50 * 31);
 
   it("an edit past the stability gate is saved by default and refused when strict", () => {
     const loose = edit({ project: { circuit: g.circuit }, previous, ops });
     expect(loose.saved).toBe(true);
-    expect(stabilityBreaks(loose.report!)).toEqual(["an untouched part moved 8 G (at most 6)"]);
+    expect(stabilityBreaks(loose.report!)).toEqual(["routes changed on 2 nets the edit did not involve (at most 1): n5, n6"]);
 
     const strict = edit({ project: { circuit: g.circuit }, previous, ops, strict: true });
     expect(strict.saved).toBe(false);
     expect(strict.status).toBe("unstable");
     expect(strict.project.circuit).toBe(g.circuit);
-    expect(stabilityBreaks(strict.report!)).toEqual(["an untouched part moved 8 G (at most 6)"]);
+    expect(stabilityBreaks(strict.report!)).toEqual(["routes changed on 2 nets the edit did not involve (at most 1): n5, n6"]);
   });
 
   it("strict still saves an edit that asks for the whole sheet to be redrawn", () => {

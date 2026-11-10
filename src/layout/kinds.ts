@@ -38,7 +38,7 @@ const MIRROR_Y: Orient = { rot: 180, flip: true };   // top-bottom mirror
 const ROT180: Orient = { rot: 180, flip: false };    // both
 
 /** Control pin, the pin drawn at the top at rotation 0, the one at the bottom, and N or P type. */
-const TRANSISTOR: Record<string, { ctrl: string; main: string; ref: string; n: boolean }> = {
+export const TRANSISTOR: Record<string, { ctrl: string; main: string; ref: string; n: boolean }> = {
   npn: { ctrl: "B", main: "C", ref: "E", n: true },
   pnp: { ctrl: "B", main: "C", ref: "E", n: false },
   nmos: { ctrl: "G", main: "D", ref: "S", n: true },
