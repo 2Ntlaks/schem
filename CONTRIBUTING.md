@@ -10,7 +10,7 @@ Thank you for helping. schem is an early prototype, and the most useful help rig
 4. **An example circuit.** A small, real circuit in [`examples/`](examples/) that draws valid, with a line in [`examples/README.md`](examples/README.md).
 5. **Docs.** Anything in the README or [`docs/netlist-format.md`](docs/netlist-format.md) that confused you is worth fixing.
 
-Changes to the layout engine (`src/layout/`) are welcome, but please open an issue first and describe the drawing problem you want to fix. Placement and routing changes affect every circuit, and the checks below are strict.
+Changes to the layout engine (`src/layout/`) are welcome, but please open an issue first and describe the drawing problem you want to fix. Placement and routing changes affect every circuit, and the checks below are strict. [`docs/general-layout.md`](docs/general-layout.md) explains how the general layout works, lists the open jobs, and describes the benchmark (`npm run bench`) that tells you whether a change made drawings better or worse.
 
 ## Setup
 

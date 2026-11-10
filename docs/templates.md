@@ -84,13 +84,16 @@ as one filter and not as a non-inverting amplifier with loose parts around it.
 
 ## What is not here yet
 
-These are drawn by the general rules for now, and can come out untidy:
+These have no template. The general rules ([`general-layout.md`](general-layout.md)) draw them:
 
-- A differentiator (capacitors into IN-).
-- Sallen-Key band-pass filters and multiple-feedback filters.
-- Single-transistor amplifiers (common emitter, emitter follower).
-- 555 timer circuits and crystal oscillators.
-- Instrumentation amplifiers and other circuits with several op-amps wired across each other.
+- Single-transistor amplifiers (common emitter, emitter follower) and 555 timer circuits come out
+  close to their textbook shape: the general rules stack a transistor's load above it and its
+  emitter parts below, and stand a timing string in one column.
+- A differentiator, Sallen-Key band-pass filters and multiple-feedback filters are drawn in signal
+  order, but not in a fixed shape.
+- Symmetric circuits (an astable multivibrator, an instrumentation amplifier, a push-pull output
+  stage) are drawn left to right, valid but not in the shape an engineer expects. These are the
+  best candidates for new templates.
 
 If a circuit you draw often is missing, open an issue with the circuit file and a picture of the
 shape you expect. A template is data, not code: see the notes at the top of

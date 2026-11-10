@@ -270,3 +270,23 @@ A template run that crosses columns (the I2C trunks from the controller to the p
 - Test circuit `I2C_RESET_RC`: a controller with a reset RC beside its bus. The old layout blocked both trunks and detoured the bus under the capacitor (9 bends); now the trunks run straight (5 bends).
 
 Correction to the edit-stability section above: the sweep figures there were first reported as 124 and 136 of 140; the right figures are 121 and 133 of 137 (the 3 random edits that change nothing were counted as saved). The rate, 97%, and the 16 unstable edits before the change were right.
+
+### The general layout (2026-11-10)
+
+Work on circuits with no template, measured by a new benchmark. The page for contributors is `docs/general-layout.md`; this section records what changed against the spec.
+
+- **Benchmark.** `bench/circuits/` (18 everyday circuits, almost none with a template), `npm run bench`, a score per drawing (`scripts/lib/bench-score.ts`) and `bench/baseline.json`. Before: 8 of 18 valid (10 were `valid_low_confidence`), total 2118.1. After: 18 of 18 valid, total 1167.1.
+- **Flow inference replaces breadth-first ranks** (`src/layout/flow.ts`; SPEC 9.2 step 2 says breadth-first distance from the sources). Directed edges come from part kinds (op-amp, transistor, pin roles `input`, `output` and `power_out`, a diode, fuse or switch feeding a rail); the rest take their direction from the seeds. Seeds, in order: explicit sources, input connectors and potentiometers, blocks that only drive, then the block furthest from the outputs. Ranks are longest paths; a block that only feeds others moves next to what it feeds. A feedback part (output to input of one block) takes that block's column. Separate sub-circuits sit side by side, the largest first. "Low confidence" is now only a start with nothing to go on (no source, no input, no output, no hub).
+- **Taps** (SPEC 9.2 step 3a) keep their half column, with two changes: a tap that only feeds inputs, or sits on a plain pin of a block that drives something else, goes on the input side (the case 7 reset pull-up is now left of the controller); and a stack on one wire counts as a tap (in the feeder column when it is on the input side).
+- **Vertical stacks** (`src/layout/stacks.ts`), new: transistor loads and emitter parts, supply-to-ground strings, hanging chains. They use the same rigid-offset mechanism as the decoupling child slots. The `pull-up`, `pull-down`, `led-series` and `led-series-vertical` templates give way to a stack. Fallback: `stacks: false`, like `templates: false`.
+- **Supply symbols** (`src/layout/ports.ts`): a two-endpoint power or ground net with no source on it is now drawn with symbols (it was a wire), and a one-endpoint one gets its symbol as SPEC 9.2 step 3 says (it was drawn with nothing). The edit path uses the same function.
+- **Pin order**: a second layout with the side pins of generated IC boxes in the order of their connections, kept when it has fewer crossings, bends or wire. Not in incremental mode (an edit keeps the saved sides).
+- **Ordering fixes**: the barycentre's pin fraction ignored nothing, so shared supply and ground nets pulled blocks towards an IC's top and bottom pins; it now counts wired nets only, and looks to the nearest column with a neighbour, not only the adjacent one.
+
+Checks: 543 tests pass; validation cases 1 to 8 valid (cases 4 and 7 redrawn, the other six byte-identical); 12 of 12 validation edits pass gate 4; random-edit sweep 131 of 137 stable (was 133); gate 6 generated p95 about 2.9 s on the machine where the old engine measured 2.4 s (limit 3 s).
+
+Test changes, each because the layout changed on purpose: the strict-edit tests used generated circuit 38 as their example of an unstable edit, which is now stable, so they use circuit 50; the `I2C_RESET_RC` fixture's first pin was a reset input, whose RC now sits left of the controller and no longer tests the bus corridor, so the pin is an output with the same RC on it; the findings snapshot of the generated 30-part circuit was rewritten (the eight cases' findings are unchanged).
+
+Blind check (2026-11-11): two AI judges, given the 18 old and 18 new bench drawings as shuffled unlabelled pairs, preferred the new drawing in 17 and 16 pairs (one tie each; one marginal vote for the old emitter follower). Mean marks out of 5 went from 2.2 and 1.9 to 3.9 and 3.8. Both named the same leftover defect: the base wire looping under a bias divider (a four-way junction would be needed for a straight line; see the open jobs).
+
+Not done, listed as open jobs in `docs/general-layout.md`: negative supplies, fan-out of tall branches from one chip, regulator pin sides and the series supply path, long module titles, symmetric templates.

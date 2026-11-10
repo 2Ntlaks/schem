@@ -23,6 +23,7 @@ Your task is either a brief in `docs/agent-briefs/` or the issue you were asked 
    - `npm run typecheck`
    - `npm test`
    - `npm run phase0` (all 8 validation cases must stay `valid`)
+   - `npm run bench -- --check` when you touched `src/layout/` (no bench circuit may score worse; see `docs/general-layout.md`)
 3. Look at every image you produce or change (open the PNG). A drawing that the code calls valid can still look wrong.
 4. If something is unclear, or a step would need a rule above to be broken, stop and write the question in your report. Do not guess.
 

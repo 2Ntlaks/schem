@@ -13,6 +13,7 @@
 
 - [`../SPEC.md`](../SPEC.md): the full design (data model, symbols, layout engine, verifier, phases and gates).
 - [`verification-stack.html`](verification-stack.html): the layers that check a drawing, from "shows exactly the netlist" up to blind rating. Open it in a browser.
+- [`general-layout.md`](general-layout.md): how circuits with no template are drawn (supply symbols, vertical stacks, flow, pin order), the benchmark that measures it (`npm run bench`), and the open jobs. Start here if you want to improve drawings.
 - [`showcase/`](showcase/): the comparison with tscircuit, SKiDL, netlistsvg and schemdraw (`npm run showcase` rebuilds it). The baselines and their attempt log are in [`../baselines/`](../baselines/).
 
 ## Project history
