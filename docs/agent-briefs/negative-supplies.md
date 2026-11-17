@@ -17,3 +17,7 @@ documentation can also change.
 
 Run the repository checks and inspect the drawings. Leave the frozen
 cases, specification, fixtures, and benchmark baseline untouched.
+
+After the new test failed at setup, the user approved correcting its
+`xformPath` import and continuing the checks. Keep the test assertions
+and the existing tests as written.

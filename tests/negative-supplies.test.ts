@@ -1,9 +1,8 @@
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { isNegativeSupply, netKind, type Circuit, type Net } from "../src/core/model.js";
-import { xformPath } from "../src/geom/geom.js";
 import { readProject } from "../src/io/project.js";
-import { layout } from "../src/layout/layout.js";
+import { layout, xformPath } from "../src/layout/layout.js";
 import { drawnAsPorts } from "../src/layout/ports.js";
 import { checkDrawing } from "../src/quality/index.js";
 import { BUILTIN } from "../src/symbols/library.js";
