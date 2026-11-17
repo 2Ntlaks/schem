@@ -46,7 +46,7 @@ export function canonical(e: Endpoint): string {
   return e.kind === "terminal" ? `${e.part}[${e.number}]` : `${e.part}{${e.group}}`;
 }
 
-const POWER_NAME = /^(\+?\d+(\.\d+)?V\d*|\d+V\d+|VCC|VDD|VIN|VBAT|V\+|VPP|VBUS|PWR)$/i;
+const POWER_NAME = /^([+-]?\d+(\.\d+)?V\d*|VCC|VDD|VIN|VBAT|V\+|VPP|VBUS|PWR|VEE|V-)$/i;
 const GROUND_NAME = /^(GND|AGND|DGND|PGND|VSS|0V|GROUND)$/i;
 
 /** SPEC 6.3: explicit kind wins, else name-based default, else signal. */
@@ -55,4 +55,9 @@ export function netKind(n: Net): NetKind {
   if (n.name && GROUND_NAME.test(n.name)) return "ground";
   if (n.name && POWER_NAME.test(n.name)) return "power";
   return "signal";
+}
+
+/** SPEC 6.3: VSS is negative when explicitly declared as power. */
+export function isNegativeSupply(net: Net): boolean {
+  return netKind(net) === "power" && /^(-|VEE$|V-$|VSS$)/i.test(net.name ?? "");
 }

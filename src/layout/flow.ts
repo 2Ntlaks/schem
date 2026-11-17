@@ -16,7 +16,7 @@
 // - a floating string: two-pin parts connected only to each other and to supply or ground symbols
 //   (a rail capacitor, an indicator LED with its resistor). It sits beside what feeds its rail.
 
-import { netKind, type Net, type PinDefs } from "../core/model.js";
+import { isNegativeSupply, netKind, type Net, type PinDefs } from "../core/model.js";
 import { cmpStr } from "../geom/geom.js";
 import { BUILTIN, HEADER } from "../symbols/library.js";
 import { TRANSISTOR } from "./kinds.js";
@@ -105,7 +105,9 @@ export function inferFlow(g: FlowGraph, fixed: ReadonlyMap<string, number>): Flo
   const feedsRail = (b: string): string | undefined => {
     if (!single(b) || !isTapShape(b) || !PATH_TYPES.has(g.type(b))) return undefined;
     const rail = pinsOf(b).find((p) => g.portNet.has(p.net))!, wire = pinsOf(b).find((p) => flows(p.net))!;
-    if (kind(rail.net) !== "power" || (g.type(b) === "diode" && rail.pin !== "K")) return undefined;
+    if (kind(rail.net) !== "power") return undefined;
+    const diodeRailPin = isNegativeSupply(g.net(rail.net)) ? "A" : "K";
+    if (g.type(b) === "diode" && rail.pin !== diodeRailPin) return undefined;
     const others = (onNet.get(wire.net) ?? []).filter((p) => p.part !== b);
     const supplyLike = others.some((p) => g.type(p.part) === HEADER || BUILTIN[g.type(p.part)]?.kind === "source" || PATH_TYPES.has(g.type(p.part)));
     const active = others.some((p) => TRANSISTOR[g.type(p.part)] !== undefined || classOf(p.part, p.pin) === "drv" && BUILTIN[g.type(p.part)]?.kind !== "source");

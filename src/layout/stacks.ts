@@ -1,12 +1,12 @@
 // Vertical stacks (SPEC 9.1 rules 7 and 10, without a template): two-pin parts that an engineer
 // draws in one vertical line, found from the netlist alone.
 //
-// - On a transistor: the parts between its collector or drain and the supply stand above it, the
-//   parts between its emitter or source and ground hang below it. A second branch on the same pin
+// - On a transistor: parts between an upper pin and an upper rail stand above it, and parts
+//   between a lower pin and a lower rail hang below it. A second branch on the same pin
 //   (a bypass capacitor, a flyback diode) stands beside the first.
-// - A string: two-pin parts in series from a supply down to ground stand in one column, top to
+// - A string: two-pin parts in series from an upper rail to a lower one stand in one column, top to
 //   bottom, with the points between them free for wires to the side (a 555's timing string).
-// - A hanging chain: two-pin parts strictly in series that end at ground or start at a supply.
+// - A hanging chain: two-pin parts strictly in series that reach an upper or lower rail.
 //
 // This file only decides who stacks on whom. The geometry is worked out in layout.ts, which may
 // still drop a member (a locked part, no room); a dropped member is laid out by the general rules.
@@ -14,7 +14,8 @@
 import { netKind, type Net } from "../core/model.js";
 import { cmpStr } from "../geom/geom.js";
 import { BUILTIN } from "../symbols/library.js";
-import { TRANSISTOR } from "./kinds.js";
+import { TRANSISTOR, transistorFlipY } from "./kinds.js";
+import { railDirection } from "./ports.js";
 
 export interface StackChild {
   part: string;
@@ -67,7 +68,7 @@ export function findStacks(g: StackGraph): Stack[] {
   for (const l of onNet.values()) l.sort((a, b) => cmpStr(a.part, b.part) || cmpStr(a.pin, b.pin));
   const kind = (net: string) => netKind(g.net(net));
   const wire = (net: string) => !g.portNet.has(net) && kind(net) !== "ground";
-  const rail = (net: string, sense: "up" | "down") => g.portNet.has(net) && kind(net) === (sense === "up" ? "power" : "ground");
+  const rail = (net: string, sense: "up" | "down") => g.portNet.has(net) && railDirection(g.net(net)) === sense;
   const used = new Set<string>();
   const usable = (p: string) => BUILTIN[typeOf.get(p) ?? ""]?.kind === "two-pin" && pinsOf.get(p)?.length === 2 && !used.has(p) && g.free(p);
   const far = (p: string, pin: string) => pinsOf.get(p)!.find((x) => x.pin !== pin)!;
@@ -99,9 +100,8 @@ export function findStacks(g: StackGraph): Stack[] {
     const t = TRANSISTOR[typeOf.get(q) ?? ""];
     if (!t || !g.free(q)) continue;
     const net = (pin: string) => pinsOf.get(q)?.find((x) => x.pin === pin)?.net;
-    const k = (pin: string) => { const n = net(pin); return n === undefined ? undefined : kind(n); };
-    // The same test as the default orientation (kinds.ts): which of the two end pins is drawn at the top.
-    const turned = t.n ? k(t.ref) === "power" || k(t.main) === "ground" : k(t.ref) === "ground" || k(t.main) === "power";
+    const netOfPin = (pin: string) => { const n = net(pin); return n === undefined ? undefined : g.net(n); };
+    const turned = transistorFlipY(t.n, netOfPin(t.main), netOfPin(t.ref));
     const mainDir: "up" | "down" = t.n !== turned ? "up" : "down";
     const children: StackChild[] = [];
     for (const [pin, dir] of [[t.main, mainDir], [t.ref, mainDir === "up" ? "down" : "up"]] as const) {
@@ -118,8 +118,8 @@ export function findStacks(g: StackGraph): Stack[] {
     if (children.length) { stacks.push({ root: q, children }); used.add(q); }
   }
 
-  // Strings: from a supply down to ground, through any nets.
-  const toGround = (part: string, pin: string, seen: string[]): Array<{ part: string; near: string }> | undefined => {
+  // Strings: from an upper rail to a lower one, through any nets.
+  const toLowerRail = (part: string, pin: string, seen: string[]): Array<{ part: string; near: string }> | undefined => {
     const f = far(part, pin);
     const here = [...seen, part];
     if (rail(f.net, "down")) return [{ part, near: pin }];
@@ -127,7 +127,7 @@ export function findStacks(g: StackGraph): Stack[] {
     let best: Array<{ part: string; near: string }> | undefined;
     for (const t of onNet.get(f.net) ?? []) {
       if (here.includes(t.part) || !usable(t.part)) continue;
-      const rest = toGround(t.part, t.pin, here);
+      const rest = toLowerRail(t.part, t.pin, here);
       if (rest && (!best || rest.length < best.length)) best = rest;
     }
     return best ? [{ part, near: pin }, ...best] : undefined;
@@ -146,11 +146,11 @@ export function findStacks(g: StackGraph): Stack[] {
     if (!usable(p)) continue;
     const top = pinsOf.get(p)!.find((x) => rail(x.net, "up"));
     if (!top || !wire(far(p, top.pin).net)) continue;
-    const path = toGround(p, top.pin, []);
+    const path = toLowerRail(p, top.pin, []);
     if (path && path.length >= 2) stacks.push(stackOf(path));
   }
 
-  // Hanging chains: strictly in series, ending at ground or starting at a supply.
+  // Hanging chains: strictly in series, linked to an upper or lower rail.
   for (const p of ids) {
     if (!usable(p)) continue;
     for (const sense of ["down", "up"] as const) {
@@ -169,7 +169,7 @@ export function findStacks(g: StackGraph): Stack[] {
       // A capacitor at the free end is a coupling capacitor on its way to a load: it stays in the signal line.
       while (chain.length && /capacitor/.test(typeOf.get(chain[chain.length - 1]!.part) ?? "")) chain.pop();
       if (chain.length < 2) continue;
-      // Top to bottom: a ground-ended chain is listed bottom-up, a supply-ended one top-down.
+      // Top to bottom: reverse a chain walked from its lower rail.
       const path = sense === "down"
         ? [...chain].reverse().map((c) => ({ part: c.part, near: far(c.part, c.railSide).pin }))
         : chain.map((c) => ({ part: c.part, near: c.railSide }));

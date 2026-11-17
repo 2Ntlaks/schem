@@ -1,8 +1,15 @@
 // Which power and ground nets are drawn with supply symbols (SPEC 9.2 step 3). One rule, used by
 // the layout and by the edit path (which parts an edit affects depends on it).
 
-import { netKind, type Net } from "../core/model.js";
+import { isNegativeSupply, netKind, type Net } from "../core/model.js";
 import { BUILTIN } from "../symbols/library.js";
+
+/** The side of the signal path a rail belongs on (SPEC 9.1 rule 7). */
+export function railDirection(n: Net): "up" | "down" | undefined {
+  const kind = netKind(n);
+  if (kind === "ground" || isNegativeSupply(n)) return "down";
+  return kind === "power" ? "up" : undefined;
+}
 
 /**
  * A named power or ground net is drawn with supply or ground symbols, one at each pin, unless it

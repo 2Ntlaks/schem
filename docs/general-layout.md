@@ -49,16 +49,18 @@ Four files, in the order the layout uses them. Each has a long comment at its to
 
 1. **Supply symbols** (`src/layout/ports.ts`). A named power or ground net is drawn with supply or
    ground symbols, one at each pin. The one exception is a two-pin net with a battery or source on
-   it, which stays a wire so a simple loop still looks like a loop.
+   it, which stays a wire so a simple loop still looks like a loop. Negative rails such as `VEE`,
+   `V-` and `-12V` use downward supply symbols. `VSS` is ground by default and is a negative
+   supply when declared as power.
 
 2. **Vertical stacks** (`src/layout/stacks.ts`). Two-pin parts that an engineer draws in one
    vertical line are found from the netlist:
-   - the parts between a transistor's collector (or drain) and the supply stand above it, the
-     parts between its emitter (or source) and ground hang below it, and a second branch on the
+   - the parts between a transistor's upper pin and a positive supply stand above it, the
+     parts between its lower pin and ground or a negative supply hang below it, and a second branch on the
      same pin (a bypass capacitor, a flyback diode) stands beside the first;
-   - a string of two-pin parts from a supply down to ground stands in one column (a 555's timing
-     resistors and capacitor);
-   - a chain of two-pin parts strictly in series that ends at ground hangs in one line.
+   - a string of two-pin parts from a positive supply down to ground or a negative supply stands
+     in one column (the 555 timing string or the push-pull bias string);
+   - a chain of two-pin parts strictly in series that ends at a rail stands in one line.
 
    A stack is rigid: its parts move together. A locked or hinted part never joins one, and in an
    edit a part the edit did not touch joins one only where it already stood.
@@ -92,7 +94,6 @@ pass. Layout engine changes need an agreed issue first (see `AGENTS.md`).
 
 | Job | Seen in | What is wrong today | Where to work |
 |---|---|---|---|
-| Negative supplies | `pushpull` | `VEE` and names like `-12V` are not known as supplies, so the lower transistor's rail is a wire and the transistor ends up at the top. A negative supply needs a symbol that points down, and stacks must hang towards it. | `src/core/model.ts` (`netKind`), `src/layout/layout.ts` (port symbols), `src/layout/stacks.ts` (`rail`) |
 | Fan-out from a chip | `shift`, `mcu` | Several tall branches (resistor and LED) driven by neighbouring pins share one column, so their wires step around each other. Draw each branch along its pin's row, or stagger them. | `src/layout/flow.ts`, the column ordering in `src/layout/layout.ts` |
 | Regulators | `regulator`, `sensor-node` | A three-terminal regulator has IN and OUT side by side on top. IN belongs on the left and OUT on the right, with the rail drawn as a wire through it. Pull request 7 (series supply path) is the start; it needs rebasing on this engine. | `icFor` in `src/layout/layout.ts`, `grok/power-path` |
 | Long labels widen columns | `sensor-node` | A module's long title pushes its whole column apart. Wrap or shorten the title, or let it overhang. | `labelFor` in `src/layout/layout.ts` |
