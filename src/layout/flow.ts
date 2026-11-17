@@ -45,6 +45,8 @@ export interface Flow {
   rank: Map<string, number>;
   /** Column value of each block: its rank, or a part step for taps and floating strings. */
   col: Map<string, number>;
+  /** Multi-part taps on a wire shared with exactly one other pin. */
+  seriesTaps: Map<string, { entry: string; host: string }>;
   /** Blocks whose place was a guess with nothing to go on (low confidence). */
   guessed: string[];
 }
@@ -299,6 +301,7 @@ export function inferFlow(g: FlowGraph, fixed: ReadonlyMap<string, number>): Flo
   for (const [b, host] of sibling) { rank.set(b, rank.get(host)!); col.set(b, col.get(host)!); }
   // Taps: half a column after the first block on their wire, or before it when they only feed inputs.
   const graphRanked = new Set(rank.keys());
+  const seriesTaps: Flow["seriesTaps"] = new Map();
   for (const t of [...taps].sort(cmpStr)) {
     const others = (onNet.get(wireOf(t)) ?? []).filter((p) => graphRanked.has(g.blockOf(p.part)));
     if (!others.length) { rank.set(t, 0); col.set(t, 0); continue; }
@@ -309,6 +312,12 @@ export function inferFlow(g: FlowGraph, fixed: ReadonlyMap<string, number>): Flo
     const feeds = inputSide || others.every((p) => classOf(p.part, p.pin) === "rcv");
     // (a single part sits close to the pin; a stack is large and joins the column of the other feeders.)
     const back = single(t) ? 0.5 : 1;
+    const endpoints = onNet.get(wireOf(t))!;
+    if (!feeds && !single(t) && endpoints.length === 2 && others.length === 1) {
+      const entry = endpoints.find((p) => g.blockOf(p.part) === t)!;
+      const host = others[0]!;
+      seriesTaps.set(t, { entry: `${entry.part}[${entry.pin}]`, host: `${host.part}[${host.pin}]` });
+    }
     col.set(t, lowest + (feeds ? -back : 0.5));
     rank.set(t, feeds ? Math.ceil(lowest - back) : lowest + 1);
   }
@@ -329,5 +338,5 @@ export function inferFlow(g: FlowGraph, fixed: ReadonlyMap<string, number>): Flo
     rank.set(b, (hb !== undefined ? rank.get(hb) : undefined) ?? 0);
     col.set(b, (hb !== undefined ? col.get(hb) : undefined) ?? 0);
   }
-  return { rank, col, guessed };
+  return { rank, col, seriesTaps, guessed };
 }

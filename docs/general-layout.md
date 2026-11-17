@@ -74,6 +74,11 @@ Four files, in the order the layout uses them. Each has a long comment at its to
    amplifier's column. A pull-up, a shunt capacitor or a small stack on one wire sits half a column
    from that wire's blocks, on the input side when it only feeds inputs.
 
+   If tall branches on a chip's right would overlap in that column, they stagger sideways.
+   A branch fed by a higher pin sits farther out, so its wire can run over the nearer branches
+   and turn once into its own branch. Locks and placement or orientation hints take precedence.
+   Edits keep the columns from the previous drawing.
+
 4. **Pin order** (the end of `src/layout/layout.ts`). The pins on the left and right of a chip's
    box are put in the order of what they connect to. The layout runs a second time with that order
    and keeps the result only if it has fewer crossings, then fewer bends, then less wire.
@@ -83,8 +88,8 @@ rules lay out the rest around it. The three small templates (pull-up, pull-down,
 resistor) give way to a stack, because a stack draws them the same way and also knows where they
 belong.
 
-Each rule has a fallback. If a drawing with stacks cannot be solved, routed or verified, the
-layout runs again without them (`stacks: false`), and the notes say so.
+Each rule has a fallback. If a drawing with staggered branches or stacks cannot be solved,
+routed or verified, the layout retries with that rule off, and the notes say so.
 
 ## Open jobs
 
@@ -94,7 +99,6 @@ pass. Layout engine changes need an agreed issue first (see `AGENTS.md`).
 
 | Job | Seen in | What is wrong today | Where to work |
 |---|---|---|---|
-| Fan-out from a chip | `shift`, `mcu` | Several tall branches (resistor and LED) driven by neighbouring pins share one column, so their wires step around each other. Draw each branch along its pin's row, or stagger them. | `src/layout/flow.ts`, the column ordering in `src/layout/layout.ts` |
 | Regulators | `regulator`, `sensor-node` | A three-terminal regulator has IN and OUT side by side on top. IN belongs on the left and OUT on the right, with the rail drawn as a wire through it. Pull request 7 (series supply path) is the start; it needs rebasing on this engine. | `icFor` in `src/layout/layout.ts`, `grok/power-path` |
 | Long labels widen columns | `sensor-node` | A module's long title pushes its whole column apart. Wrap or shorten the title, or let it overhang. | `labelFor` in `src/layout/layout.ts` |
 | A wire looping under a divider | `ce-amp`, `follower`, `mixer-ce` | The wire from the bias divider's tap to the base goes down, under the lower resistor and back up. Both blind judges named this as the one real defect in otherwise good drawings. Cause: the input capacitor joins the tap from the left, and a second wire leaving the same point to the right would make a four-way junction, which SPEC 9.1 rule 9 forbids; the router also refuses to join 1 G from a junction. Two ways out, and the owner should choose: allow a dotted four-way junction at a divider tap (how most textbooks draw it), or shift the lower resistor 2 G sideways so the line gets two T junctions. | `DIVIDER` in `src/layout/templates/library.ts`, the join rules in `src/layout/router.ts` |
