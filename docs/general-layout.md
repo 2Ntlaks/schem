@@ -81,8 +81,8 @@ rules lay out the rest around it. The three small templates (pull-up, pull-down,
 resistor) give way to a stack, because a stack draws them the same way and also knows where they
 belong.
 
-When a voltage divider tap has at least two additional terminals, its template places the
-lower resistor two grid units to the right of the upper resistor. A wire can then pass
+When a voltage divider tap has a sideways connection from each side, its template places
+the lower resistor two grid units to the right of the upper resistor. A wire can then pass
 straight through two T junctions, as in `ce-amp`, `follower`, and `mixer-ce`.
 
 Each rule has a fallback. If a drawing with stacks cannot be solved, routed or verified, the

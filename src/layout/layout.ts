@@ -475,6 +475,24 @@ export function layout(project: Project, opts: LayoutOptions = {}): LayoutResult
     return r;
   };
 
+  // A split divider tap needs a horizontal approach from each side. A shunt part can
+  // increase the terminal count without providing a sideways connection.
+  const unusedSplitTaps = regions.filter((r) => {
+    if (r.template.id !== "voltage-divider-split-tap") return false;
+    // Keep the chosen divider geometry on a redraw of an existing layout.
+    if (r.members.every((id) => prevOf(id))) return !opts.previous?.templates?.includes(r.key);
+    const tap = r.nets.get("TAP")!, column = colOf.get(r.rep)!;
+    const outside = partsOfNet.get(tap)!.filter((id) => !r.members.includes(id));
+    const faces = (id: string, dir: Dir) => placed.get(id)!.pins.some((p) =>
+      p.dir === dir && drawnNet.get(`${id}[${p.number}]`) === tap);
+    const fromLeft = outside.some((id) => colOf.get(id)! < column && faces(id, "right"));
+    const fromRight = outside.some((id) => colOf.get(id)! > column && faces(id, "left"));
+    return !fromLeft || !fromRight;
+  });
+  if (unusedSplitTaps.length) {
+    return layout(project, { ...opts, templates: { skip: [...skip, ...unusedSplitTaps.map((r) => r.key)] } });
+  }
+
   // Step 5: region interiors, each solved on its own; a region then moves as one rigid block.
   // A host's envelope includes its decoupling child slots, so a template keeps room for them.
   const geo = (id: string): Geo => { const P = placed.get(id)!; return { pins: P.pins, ko: P.ko, env: envOf(id), own: ownEnv(id) }; };

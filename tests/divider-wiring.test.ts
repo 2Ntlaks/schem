@@ -3,6 +3,11 @@ import { describe, expect, it } from "vitest";
 import { readProject } from "../src/io/project.js";
 import { layout } from "../src/layout/layout.js";
 import { checkDrawing } from "../src/quality/index.js";
+import { toSvg } from "../src/render/svg.js";
+
+const benchProject = (name: string) => readProject(
+  join(import.meta.dirname, "..", "bench", "circuits", `${name}.schem.json`),
+).project!;
 
 describe("voltage divider with a split tap", () => {
   it.each([
@@ -10,8 +15,7 @@ describe("voltage divider with a split tap", () => {
     { circuit: "follower", upper: "R1", lower: "R2" },
     { circuit: "mixer-ce", upper: "R4", lower: "R5" },
   ])("$circuit routes the coupling capacitor straight to the base", ({ circuit, upper, lower }) => {
-    const path = join(import.meta.dirname, "..", "bench", "circuits", `${circuit}.schem.json`);
-    const project = readProject(path).project!;
+    const project = benchProject(circuit);
     const result = layout(project);
     expect(result.status).toBe("valid");
     expect(checkDrawing(project.circuit, result.pinDefs, result.render!).valid).toBe(true);
@@ -31,5 +35,13 @@ describe("voltage divider with a split tap", () => {
     ]));
     expect(dots.filter(([x, row]) => row === y && input[0] < x && x < base[0]))
       .toEqual([[upperTap[0], y], [lowerTap[0], y]]);
+  });
+
+  it("redraws a saved divider with its original geometry", () => {
+    const project = benchProject("ce-amp");
+    const saved = layout(project, { templates: { skip: ["voltage-divider-split-tap@1:R1,R2"] } });
+    const redrawn = layout(project, { previous: saved.state, affected: [] });
+    expect(redrawn.status).toBe("valid");
+    expect(toSvg(redrawn.render!)).toBe(toSvg(saved.render!));
   });
 });

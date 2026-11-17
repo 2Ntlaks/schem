@@ -67,7 +67,7 @@ output drives is drawn to its right. Examples:
 |---|---|---|---|
 | Bridge rectifier | Four diodes forming a full bridge | Two vertical diode legs side by side, AC in from the left at the midpoints, + on top. | `bridge-rectifier` |
 | I2C bus with pull-ups | Two nets whose pins carry the `i2c.sda` and `i2c.scl` roles, with a resistor from each to one supply | The controller on the left, SDA above SCL as two straight lines, the pull-ups just above them, the other chips in a row below. | `i2c-pullups` |
-| Voltage divider with a split tap | A voltage divider with at least two more terminals on its tap | The lower resistor sits two grid units to the right. A signal entering from the left and leaving to the right can use two T junctions along a straight wire. | `voltage-divider-split-tap` |
+| Voltage divider with a split tap | A voltage divider with a sideways connection from each side of its tap | The lower resistor sits two grid units to the right. A signal entering from the left and leaving to the right can use two T junctions along a straight wire. | `voltage-divider-split-tap` |
 | Voltage divider | Two resistors in series between a supply and ground, with something connected to the point between them | One vertical column, the tap between the resistors. | `voltage-divider` |
 | Pull-up, pull-down | A resistor from a signal to a supply or to ground | Vertical, from the supply or ground symbol to the signal wire. | `pull-up`, `pull-down` |
 | LED with its resistor | A resistor in series with an LED | In one line, the resistor first. Vertical when the LED goes to ground. | `led-series-vertical`, `led-series` |
