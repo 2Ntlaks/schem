@@ -24,7 +24,7 @@ import {
 } from "./templates/index.js";
 import { edgeForbidden } from "../geom/forbidden.js";
 import type { Art, DrawnPin, DrawnPort, Electrical, RenderModel } from "../render/model.js";
-import type { Intent, LayoutState, Side } from "../core/intent.js";
+import { hintParts, type Intent, type LayoutState, type Side } from "../core/intent.js";
 
 export interface Project { meta?: { title?: string }; circuit: Circuit; intent?: Intent }
 
@@ -73,6 +73,8 @@ export interface LayoutOptions {
   decoupling?: boolean;
   /** Vertical stacks found from the netlist (src/layout/stacks.ts): on by default, `false` is the fallback. */
   stacks?: boolean;
+  /** Stagger vertical branches driven by chip pins: on by default, `false` is the fallback. */
+  staggerBranches?: boolean;
   /** Pin order for generated IC boxes, from a first layout (set by the layout itself, see "Pin order"). */
   pinOrder?: Record<string, Partial<Record<Side, string[]>>>;
 }
@@ -188,13 +190,14 @@ export function layout(project: Project, opts: LayoutOptions = {}): LayoutResult
   let regions = opts.place || opts.templates === false ? [] : matchTemplates({ parts: circuit.parts, defs, drawnNet, netById, portNet }, TEMPLATES, skip);
   // Vertical stacks (src/layout/stacks.ts) take the parts no larger template holds. The one-part
   // templates and the LED pair give way to a stack: it draws them the same way and adds their place.
+  const spatialHints = new Set(hints.filter((h) => h.type === "relative" || h.type === "align" || h.type === "orient").flatMap(hintParts));
+  const heldByIntent = (id: string) => locks.has(id) || spatialHints.has(id);
   const GIVES_WAY = new Set(["pull-up", "pull-down", "led-series", "led-series-vertical"]);
   let stacks: Stack[] = [];
   if (!opts.place && opts.stacks !== false) {
     const inRegion = new Map<string, Region>(), isLink = new Set<string>();
     for (const r of regions) { for (const p of r.members) inRegion.set(p, r); for (const p of r.links) isLink.add(p); }
-    const held = (id: string) => locks.has(id) || orientHint.has(id) || decouplerOf.has(id) || isLink.has(id)
-      || hints.some((h) => (h.type === "relative" && (h.part === id || h.of === id)) || (h.type === "align" && h.parts.includes(id)));
+    const held = (id: string) => heldByIntent(id) || decouplerOf.has(id) || isLink.has(id);
     stacks = findStacks({ parts: circuit.parts, drawnNet, net: (id) => netById.get(id)!, portNet,
       free: (id) => !held(id) && (!inRegion.has(id) || GIVES_WAY.has(inRegion.get(id)!.template.id)), loose: (id) => !inRegion.has(id) });
     const taken = new Set(stacks.flatMap((st) => [st.root, ...st.children.map((c) => c.part)]));
@@ -253,7 +256,8 @@ export function layout(project: Project, opts: LayoutOptions = {}): LayoutResult
       colValue.set(id, peer ?? (near.length ? near.reduce((a, b) => a + b, 0) / near.length : fresh.get(id)!));
     }
   }
-  const colVals = [...new Set(colValue.values())].sort((a, b) => a - b);
+  const sortedColumns = () => [...new Set(colValue.values())].sort((a, b) => a - b);
+  let colVals = sortedColumns();
   const colOf = new Map(ids.map((id) => [id, colVals.indexOf(colValue.get(id)!)]));
 
   // Average column of the other parts on a net (for pin sides and left/right choice).
@@ -489,6 +493,47 @@ export function layout(project: Project, opts: LayoutOptions = {}): LayoutResult
   const blockNeighbours = blockGraph(neighbours);
 
   const groupOf = (b: string) => [...membersOf(b), ...[...rigid].filter(([, c]) => c.host === b).map(([id]) => id)];
+  // Side-by-side lanes give neighbouring outputs room to feed tall branches. The branch on
+  // the higher pin stands further out, so its wire can pass above every branch closer to the chip.
+  const fanStart = new Map<string, string>(); // branch net -> nearest branch in its group
+  if (!opts.previous && opts.staggerBranches !== false && flow.seriesTaps.size > 1) {
+    const fans = new Map<string, Array<{ block: string; row: number; net: string; top: number; bottom: number }>>();
+    for (const [block, { entry, host }] of flow.seriesTaps) {
+      const load = pinInfo(entry, placed), driver = pinInfo(host, placed);
+      const col = colOf.get(block)!;
+      const role = defs[driver.part]!.find((p) => p.number === driver.number)?.role;
+      if (placed.get(driver.part)!.sym.kind !== "ic" || (role !== "output" && role !== "bidir")) continue;
+      if (driver.dir !== "right" || load.dir !== "up" || col <= colOf.get(driver.part)!) continue;
+      const members = groupOf(block);
+      if (members.length !== flowGraph.members(block).length || members.some(heldByIntent)) continue;
+      const key = `${driver.part}|${col}`;
+      const fan = fans.get(key) ?? [];
+      const env = blockEnv(block);
+      const row = driver.at[1];
+      // Compare the space each branch would take if lined up with its driver in one column.
+      const top = row + 2 - load.at[1] - offsetOf(load.part)[1] + env.y;
+      fan.push({ block, row, net: drawnNet.get(entry)!, top, bottom: top + env.h });
+      fans.set(key, fan);
+    }
+    for (const branches of fans.values()) {
+      const fan = branches.filter((a) => branches.some((b) => a !== b && a.top < b.bottom + 2 && b.top < a.bottom + 2));
+      if (fan.length < 2) continue;
+      fan.sort((a, b) => b.row - a.row || cmpStr(a.block, b.block));
+      const base = colValue.get(fan[0]!.block)!;
+      const end = colVals[colOf.get(fan[0]!.block)! + 1] ?? base + 0.5;
+      for (const [i, { block, net }] of fan.entries()) {
+        const lane = base + (end - base) * i / fan.length;
+        for (const id of groupOf(block)) colValue.set(id, lane);
+        fanStart.set(net, fan[0]!.block);
+      }
+    }
+    if (fanStart.size) {
+      colVals = sortedColumns();
+      for (const id of ids) colOf.set(id, colVals.indexOf(colValue.get(id)!));
+      for (const [id, { host }] of childOffsets) colOf.set(id, colOf.get(host)!);
+    }
+  }
+  const withoutStagger = (reason: string) => retry(`chip branch staggering dropped: ${reason}`, { ...opts, staggerBranches: false });
   // Ordering candidate B: barycentre sweeps (fixed count) within each column.
   const columns: string[][] = colVals.map((_, c) => reps.filter((id) => colOf.get(id) === c && !childOffsets.has(id) && !rigid.has(id)));
   for (let sweep = 0; sweep < 4; sweep++) {
@@ -550,7 +595,12 @@ export function layout(project: Project, opts: LayoutOptions = {}): LayoutResult
   const spacing = (opts.spacing ?? 0) + Math.max(0, Math.round(((intent.spacing ?? 1) - 1) * 4));
   const spans = (i: number) => wired.filter((n) => {
     const cs = partsOfNet.get(n.id)!.map((p) => colOf.get(p)!);
-    return Math.min(...cs) <= i && Math.max(...cs) >= i + 1;
+    const last = Math.max(...cs);
+    const start = fanStart.get(n.id);
+    // A staggered branch wire runs straight over the nearer branches. Only its last channel
+    // needs a vertical track for the turn into the branch.
+    if (start !== undefined && i >= colOf.get(start)! - 1 && i < last - 1) return false;
+    return Math.min(...cs) <= i && last >= i + 1;
   }).length;
   // Nets inside one template region are routed in its reserved corridors, not in the channels.
   const inRegion = (netId: string) => { const ps = partsOfNet.get(netId)!; return ps.length >= 2 && regionOf.has(ps[0]!) && ps.every((p) => regionOf.get(p) === regionOf.get(ps[0]!)); };
@@ -697,6 +747,7 @@ export function layout(project: Project, opts: LayoutOptions = {}): LayoutResult
     for (const id of ids) cons.push(...eq(vx(id), X0, place[id]!.at[0], "lock", `lock ${id}`), ...eq(vy(id), X0, place[id]!.at[1], "lock", `lock ${id}`));
   }
   let sol = solveWithDrops(vars, cons, 50 + 2 * ids.length);
+  if (!sol.ok && fanStart.size) return withoutStagger("placement constraints");
   if (!sol.ok && regions.length) return retry(`templates dropped: placement constraints conflict (${sol.cycle.map((k) => k.why).join("; ")})`, { ...opts, templates: false });
   if (rigid.size && (!sol.ok || sol.dropped.some((k) => k.why.startsWith("stack ")))) return withoutStacks("placement constraints");
   if (childOffsets.size && (!sol.ok || sol.dropped.some((k) => k.why.startsWith("decoupling ")))) return withoutDecoupling("placement constraints");
@@ -822,6 +873,7 @@ export function layout(project: Project, opts: LayoutOptions = {}): LayoutResult
   // canonically so reusing identical wires does not change SVG bytes or layout tokens.
   routed.sort((a, b) => cmpStr(netKey(netById.get(a.net)!, vc), netKey(netById.get(b.net)!, vc)));
   const failed = routed.flatMap((r) => r.failed.map((f) => `${f} (net ${r.net})`));
+  if (failed.length && fanStart.size) return withoutStagger(`routing failed for ${failed.join(", ")}`);
   if (failed.length && spacing < 6 && !place) return retry(`routing failed for ${failed.join(", ")}; retrying with spacing +2 G`, { ...opts, spacing: (opts.spacing ?? 0) + 2 });
   // Without templates, as a last resort; in incremental mode the edit first retries with fresh routes.
   const fallback = regions.length > 0 && !(opts.previous && opts.reuseRoutes !== false);
@@ -889,6 +941,7 @@ export function layout(project: Project, opts: LayoutOptions = {}): LayoutResult
   // Step 8: a drawing is valid only if verification layers 1 and 2 pass on the render model.
   if (!failed.length) {
     const q = checkDrawing(circuit, defs, render);
+    if (!q.valid && fanStart.size) return withoutStagger("drawing checks");
     if (!q.valid && fallback) return retry(`templates dropped: the drawing failed its checks (${[...q.connections.errors.map((e) => e.message), ...q.overlaps.map((o) => o.message)].join("; ")})`, { ...opts, templates: false });
     if (!q.valid) {
       if (rigid.size) return withoutStacks("the drawing failed its checks");
@@ -981,7 +1034,7 @@ function netKey(n: Net, vc: ValidCircuit): string {
 function pinInfo(t: string, placed: Map<string, Placed>) {
   const part = partOfTerm(t), num = t.slice(part.length + 1, -1);
   const p = placed.get(part)!.pins.find((q) => q.number === num)!;
-  return { part, at: p.at, dir: p.dir };
+  return { part, number: num, at: p.at, dir: p.dir };
 }
 
 function shift(b: Box, o: Pt): Box { return { x: b.x + o[0], y: b.y + o[1], w: b.w, h: b.h }; }
