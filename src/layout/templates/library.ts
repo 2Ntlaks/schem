@@ -179,6 +179,17 @@ const DIVIDER: Template = {
   ],
 };
 
+/** Offset the lower resistor so opposing branches can join at separate T junctions. */
+const SPLIT_TAP_DIVIDER: Template = {
+  ...DIVIDER,
+  id: "voltage-divider-split-tap", priority: 7,
+  nets: { ...DIVIDER.nets, TAP: { kind: ["signal"], minEndpoints: 4 } },
+  interior: [
+    rel("x", pin("rb", net("TAP")), "=", pin("rt", net("TAP")), 2, "separate the tap branches by 2 G"),
+    rel("y", pin("rb", net("TAP")), "=", pin("rt", net("TAP")), 4, "the tap row between the two resistors"),
+  ],
+};
+
 /**
  * Pull-up / pull-down: vertical from the rail symbol to the signal wire. Only for a signal net
  * with a driver and a receiver (3+ endpoints); a two-endpoint net is a series path (LED template).
@@ -854,5 +865,5 @@ export const TEMPLATES: readonly Template[] = [
   RELAXATION_OSCILLATOR, wienBridge("resistor"), wienBridge("capacitor"),
   hBridge("pmos", "nmos"), hBridge("pnp", "npn"), diffPair("npn", "pnp"), diffPair("nmos", "pmos"), BRIDGE_RECTIFIER, I2C,
   lowSide("npn", "relay"), lowSide("nmos", "relay"), lowSide("npn", "two-pin"), lowSide("nmos", "two-pin"),
-  DIVIDER, PULL_UP, PULL_DOWN, LED_VERTICAL, LED_HORIZONTAL,
+  SPLIT_TAP_DIVIDER, DIVIDER, PULL_UP, PULL_DOWN, LED_VERTICAL, LED_HORIZONTAL,
 ];
