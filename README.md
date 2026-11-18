@@ -177,7 +177,7 @@ schem is an early prototype. It is useful today for small and medium circuits, a
     <td valign="top">
 
 - Dense boards with several chips spread out too far
-- Some symmetric circuits, such as a multivibrator, still need a template for their textbook layout ([open jobs](docs/general-layout.md#open-jobs))
+- Some symmetric circuits, such as an instrumentation amplifier, still need a template for their textbook layout ([open jobs](docs/general-layout.md#open-jobs))
 - The symbol and board library is small
 - Not on npm, so no `npx schem` yet
 - No blind rating by outside judges yet

@@ -673,7 +673,59 @@ function invertingStage(id: string, fb: "resistor" | "capacitor", parallel: bool
 }
 
 // ---------------------------------------------------------------------------
-// Oscillators around one op-amp.
+// Oscillators.
+
+/** Two grounded NPNs. Each timing capacitor must reach the OTHER transistor's base. */
+function ledAstable(): Template {
+  const slots: Template["slots"] = [];
+  const interior: Rel[] = [];
+  const trunks: NonNullable<Template["trunks"]> = [];
+  const nets: Template["nets"] = { SUP: { kind: ["power"], port: true }, GND: { kind: ["ground"], port: true } };
+  for (const [side, other] of [["L", "R"], ["R", "L"]] as const) {
+    const left = side === "L";
+    const q = "q" + side, load = "load" + side, led = "led" + side, bias = "bias" + side, cap = "cap" + side;
+    const collector = "C" + side, base = "B" + side, nextBase = "B" + other, series = "series" + side;
+    nets[collector] = nets[base] = { kind: ["signal"] };
+    nets[series] = { kind: ["signal"], endpoints: 2 };
+    slots.push(
+      { name: q, types: ["npn"], role: "member", orient: left ? MIRROR : UPRIGHT, label: left ? "left" : "right",
+        rank: { offset: 0 }, pins: [{ pin: "C", net: collector }, { pin: "B", net: base }, { pin: "E", net: "GND" }] },
+      { name: cap, types: ["capacitor"], role: "member", symmetric: true, orient: { net: collector, dir: left ? "left" : "right" },
+        label: left ? "above" : "below", pins: [{ pin: "1", net: collector }, { pin: "2", net: nextBase }] },
+      { name: bias, types: ["resistor"], role: "member", symmetric: true, orient: { net: "SUP", dir: "up" },
+        label: left ? "left" : "right", pins: [{ pin: "1", net: "SUP" }, { pin: "2", net: base }] },
+      { name: load, types: ["resistor"], role: "member", symmetric: true, orient: { net: collector, dir: "down" },
+        label: left ? "left" : "right", pins: [{ pin: "1", net: series }, { pin: "2", net: collector }] },
+      { name: led, types: ["led"], role: "member", orient: { net: "SUP", dir: "up" }, label: left ? "left" : "right",
+        pins: [{ pin: "A", net: "SUP" }, { pin: "K", net: series }] },
+    );
+    interior.push(
+      rel("x", pin(load, net(collector)), "=", pin(q, "C"), 0, "collector load above the transistor"),
+      rel("x", pin(led, "K"), "=", pin(q, "C"), 0, "LED in the collector column"),
+      rel("y", pin(led, "K"), "=", pin(load, net(series)), -2, "LED immediately above its resistor"),
+      rel("y", pin(load, net(collector)), "=", pin(q, "C"), -8, "room for the feedback taps"),
+      rel("x", pin(bias, net(base)), left ? ">=" : "<=", pin(q, "B"), left ? 3 : -3, "base bias inside its transistor"),
+      left ? rel("x", env(bias, "left"), ">=", env(load, "right"), 0, "clear the left load label")
+        : rel("x", env(bias, "right"), "<=", env(load, "left"), 0, "clear the right load label"),
+      rel("y", pin(bias, net(base)), "=", pin(load, net(collector)), -2, "bias resistors above the timing network"),
+      rel("x", pin(cap, net(nextBase)), "=", pin("bias" + other, net(nextBase)), left ? -2 : 2, "capacitor leads into the opposite base column"),
+      rel("y", pin(cap, net(collector)), "=", pin(q, "C"), left ? -6 : -2, "separate collector feedback rows"),
+    );
+    // The opposite capacitor joins this vertical bias wire at a T. Where it crosses
+    // the other feedback row there is no junction.
+    const biasPin = pin(bias, net(base)), basePin = pin(q, "B");
+    trunks.push({ net: base, why: "base bias column turning into the transistor",
+      points: [{ x: biasPin, y: biasPin, dy: 1 }, { x: biasPin, y: basePin }, { x: basePin, y: basePin, dx: left ? 1 : -1 }],
+      require: [{ pin: [bias, net(base)], dir: "down" }, { pin: [q, "B"], dir: left ? "right" : "left" }] });
+  }
+  interior.push(
+    rel("y", pin("qL", "B"), "=", pin("qR", "B"), 0, "transistors at the same height"),
+    rel("x", pin("biasR", net("BR")), ">=", pin("biasL", net("BL")), 8, "two timing paths between the bias columns"),
+    rel("x", env("capL", "left"), ">=", pin("biasL", net("BL")), 1, "left bias wire clears the upper capacitor label"),
+    rel("x", pin("biasR", net("BR")), ">=", env("capR", "right"), 1, "right bias wire clears the lower capacitor label"),
+  );
+  return { id: "npn-led-astable", version: 1, priority: 3, summary: "Two grounded NPNs with LED loads and cross-coupled timing capacitors", nets, slots, interior, trunks };
+}
 
 /**
  * Relaxation oscillator (astable multivibrator): the timing resistor above the op-amp from the
@@ -851,7 +903,7 @@ export const TEMPLATES: readonly Template[] = [
   invertingStage("opamp-inverting-lowpass", "resistor", true, "op-amp; resistor and capacitor side by side between OUT and IN-; at least one resistor into IN-"),
   invertingStage("opamp-integrator", "capacitor", false, "op-amp; capacitor between OUT and IN-; at least one resistor into IN-"),
   sallenKey("lowpass", false), sallenKey("lowpass", true), sallenKey("highpass", false), sallenKey("highpass", true),
-  RELAXATION_OSCILLATOR, wienBridge("resistor"), wienBridge("capacitor"),
+  ledAstable(), RELAXATION_OSCILLATOR, wienBridge("resistor"), wienBridge("capacitor"),
   hBridge("pmos", "nmos"), hBridge("pnp", "npn"), diffPair("npn", "pnp"), diffPair("nmos", "pmos"), BRIDGE_RECTIFIER, I2C,
   lowSide("npn", "relay"), lowSide("nmos", "relay"), lowSide("npn", "two-pin"), lowSide("nmos", "two-pin"),
   DIVIDER, PULL_UP, PULL_DOWN, LED_VERTICAL, LED_HORIZONTAL,

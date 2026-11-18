@@ -101,13 +101,15 @@ describe("flow inference", () => {
     expect(x("shift", "U1")).toBeLessThan(x("shift", "U2"));
   });
 
-  it("no op-amp or transistor in the bench faces backwards, except the PNP in the push-pull pair", () => {
+  it("the astable bases face inward and other active parts follow signal flow", () => {
+    const [left, right] = ["Q1", "Q2"].map((id) => pin("multivibrator", id, "B")).sort((a, b) => a.at[0] - b.at[0]);
+    expect([left!.dir, right!.dir]).toEqual(["right", "left"]);
     const backwards: string[] = [];
     for (const name of names) for (const p of run(name).r.render!.electrical.pins) {
       const type = readProject(join(DIR, `${name}.schem.json`)).project!.circuit.parts.find((q) => q.id === p.part)!.type;
       if (((type === "opamp" && p.number === "2") || (["npn", "pnp", "nmos", "pmos"].includes(type) && (p.number === "B" || p.number === "G"))) && p.dir === "right") backwards.push(`${name}:${p.part}`);
     }
-    expect(backwards.filter((b) => b !== "pushpull:Q2")).toEqual([]);
+    expect(backwards.filter((b) => b !== "pushpull:Q2")).toEqual([`multivibrator:${left!.part}`]);
   });
 });
 
