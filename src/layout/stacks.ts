@@ -11,10 +11,10 @@
 // This file only decides who stacks on whom. The geometry is worked out in layout.ts, which may
 // still drop a member (a locked part, no room); a dropped member is laid out by the general rules.
 
-import { netKind, type Net } from "../core/model.js";
+import { netKind, railLevel, type Net } from "../core/model.js";
 import { cmpStr } from "../geom/geom.js";
 import { BUILTIN } from "../symbols/library.js";
-import { TRANSISTOR } from "./kinds.js";
+import { mainPinUp, TRANSISTOR } from "./kinds.js";
 
 export interface StackChild {
   part: string;
@@ -67,7 +67,10 @@ export function findStacks(g: StackGraph): Stack[] {
   for (const l of onNet.values()) l.sort((a, b) => cmpStr(a.part, b.part) || cmpStr(a.pin, b.pin));
   const kind = (net: string) => netKind(g.net(net));
   const wire = (net: string) => !g.portNet.has(net) && kind(net) !== "ground";
-  const rail = (net: string, sense: "up" | "down") => g.portNet.has(net) && kind(net) === (sense === "up" ? "power" : "ground");
+  const rail = (net: string, sense: "up" | "down") => {
+    const level = railLevel(g.net(net));
+    return g.portNet.has(net) && level !== undefined && (sense === "up" ? level > 0 : level <= 0);
+  };
   const used = new Set<string>();
   const usable = (p: string) => BUILTIN[typeOf.get(p) ?? ""]?.kind === "two-pin" && pinsOf.get(p)?.length === 2 && !used.has(p) && g.free(p);
   const far = (p: string, pin: string) => pinsOf.get(p)!.find((x) => x.pin !== pin)!;
@@ -99,10 +102,10 @@ export function findStacks(g: StackGraph): Stack[] {
     const t = TRANSISTOR[typeOf.get(q) ?? ""];
     if (!t || !g.free(q)) continue;
     const net = (pin: string) => pinsOf.get(q)?.find((x) => x.pin === pin)?.net;
-    const k = (pin: string) => { const n = net(pin); return n === undefined ? undefined : kind(n); };
-    // The same test as the default orientation (kinds.ts): which of the two end pins is drawn at the top.
-    const turned = t.n ? k(t.ref) === "power" || k(t.main) === "ground" : k(t.ref) === "ground" || k(t.main) === "power";
-    const mainDir: "up" | "down" = t.n !== turned ? "up" : "down";
+    const mainDir = mainPinUp(t, (pin) => {
+      const n = net(pin);
+      return n === undefined ? undefined : g.net(n);
+    }) ? "up" : "down";
     const children: StackChild[] = [];
     for (const [pin, dir] of [[t.main, mainDir], [t.ref, mainDir === "up" ? "down" : "up"]] as const) {
       const n = net(pin);

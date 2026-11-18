@@ -50,6 +50,8 @@ Four files, in the order the layout uses them. Each has a long comment at its to
 1. **Supply symbols** (`src/layout/ports.ts`). A named power or ground net is drawn with supply or
    ground symbols, one at each pin. The one exception is a two-pin net with a battery or source on
    it, which stays a wire so a simple loop still looks like a loop.
+   Negative supplies such as `VEE` and `-12V` point down. In the `pushpull` benchmark the positive
+   and negative rails sit on opposite sides of the shared output.
 
 2. **Vertical stacks** (`src/layout/stacks.ts`). Two-pin parts that an engineer draws in one
    vertical line are found from the netlist:
@@ -92,7 +94,6 @@ pass. Layout engine changes need an agreed issue first (see `AGENTS.md`).
 
 | Job | Seen in | What is wrong today | Where to work |
 |---|---|---|---|
-| Negative supplies | `pushpull` | `VEE` and names like `-12V` are not known as supplies, so the lower transistor's rail is a wire and the transistor ends up at the top. A negative supply needs a symbol that points down, and stacks must hang towards it. | `src/core/model.ts` (`netKind`), `src/layout/layout.ts` (port symbols), `src/layout/stacks.ts` (`rail`) |
 | Fan-out from a chip | `shift`, `mcu` | Several tall branches (resistor and LED) driven by neighbouring pins share one column, so their wires step around each other. Draw each branch along its pin's row, or stagger them. | `src/layout/flow.ts`, the column ordering in `src/layout/layout.ts` |
 | Regulators | `regulator`, `sensor-node` | A three-terminal regulator has IN and OUT side by side on top. IN belongs on the left and OUT on the right, with the rail drawn as a wire through it. Pull request 7 (series supply path) is the start; it needs rebasing on this engine. | `icFor` in `src/layout/layout.ts`, `grok/power-path` |
 | Long labels widen columns | `sensor-node` | A module's long title pushes its whole column apart. Wrap or shorten the title, or let it overhang. | `labelFor` in `src/layout/layout.ts` |

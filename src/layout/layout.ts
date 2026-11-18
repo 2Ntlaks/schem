@@ -5,11 +5,11 @@ import {
   boxesOverlap, type Box, type Dir, type Orient, type Pt,
 } from "../geom/geom.js";
 import { obstacleFromLabel, type Obstacle } from "../geom/forbidden.js";
-import { canonical, netKind, type Circuit, type Net, type PinDef, type PinDefs } from "../core/model.js";
+import { canonical, netKind, railLevel, type Circuit, type Net, type PinDef, type PinDefs } from "../core/model.js";
 import { groupRepresentative, validate, type ValidCircuit } from "../core/validate.js";
 import { parseQuantity, quantityOf } from "../core/quantity.js";
 import { BUILTIN, checkSymbol, HEADER, icSymbol, keepOut, type SymbolDef } from "../symbols/library.js";
-import { defaultOrient, headerFor, headerPins } from "./kinds.js";
+import { defaultOrient, headerFor, headerPins, lowerRailEnd } from "./kinds.js";
 import { decouplingMatches } from "./decoupling.js";
 import { drawnAsPorts } from "./ports.js";
 import { inferFlow, type FlowGraph } from "./flow.js";
@@ -186,6 +186,12 @@ export function layout(project: Project, opts: LayoutOptions = {}): LayoutResult
   // Step 1: templates matched on the full graph (SPEC 9.4). Each region becomes one block.
   const skip = new Set(opts.templates ? opts.templates.skip : []);
   let regions = opts.place || opts.templates === false ? [] : matchTemplates({ parts: circuit.parts, defs, drawnNet, netById, portNet }, TEMPLATES, skip);
+  // Templates that require a power rail reserve space above it. Use general placement
+  // when that rail is negative so a pull resistor can hang below the signal.
+  regions = regions.filter((r) => ![...r.nets].some(([name, id]) => {
+    const kinds = r.template.nets[name]?.kind;
+    return kinds?.length === 1 && kinds[0] === "power" && railLevel(netById.get(id)!) === -1;
+  }));
   // Vertical stacks (src/layout/stacks.ts) take the parts no larger template holds. The one-part
   // templates and the LED pair give way to a stack: it draws them the same way and adds their place.
   const GIVES_WAY = new Set(["pull-up", "pull-down", "led-series", "led-series-vertical"]);
@@ -305,7 +311,7 @@ export function layout(project: Project, opts: LayoutOptions = {}): LayoutResult
       if (!netId || !portNet.has(netId)) continue;
       const net = netById.get(netId)!;
       const kind = netKind(net) === "ground" ? "ground" : "power";
-      const want: Dir = kind === "ground" ? "down" : "up";
+      const want: Dir = railLevel(net) === 1 ? "up" : "down";
       // A side pin's stub runs out far enough that the symbol and its text clear the part.
       const half = Math.max(1, (portText(kind, net) ? measure(portText(kind, net)!, LABEL_SIZE).width / 10 : 0) / 2);
       const out = isHorizontal(p.dir) ? Math.max(1, Math.ceil(half)) : 1;
@@ -868,10 +874,11 @@ export function layout(project: Project, opts: LayoutOptions = {}): LayoutResult
     for (const q of P.ports) {
       const a: Pt = [o[0] + q.anchor[0], o[1] + q.anchor[1]];
       const sym = BUILTIN[q.kind === "ground" ? "ground" : "supply"]!;
-      for (const g of sym.graphics) art.push({ t: "path", d: xformPath(g.d, a, { rot: 0, flip: false }), fill: "none" });
+      const negative = railLevel(q.net) === -1;
+      for (const g of sym.graphics) art.push({ t: "path", d: xformPath(g.d, a, { rot: negative ? 180 : 0, flip: false }), fill: "none" });
       const text = portText(q.kind, q.net);
       if (text) {
-        if (q.kind === "power") art.push({ t: "text", x: a[0], y: a[1] - 1.3, text, size: LABEL_SIZE, anchor: "middle", baseline: "bottom", owner: `port:${id}[${q.pin}]` });
+        if (q.kind === "power") art.push({ t: "text", x: a[0], y: a[1] + (negative ? 1.3 : -1.3), text, size: LABEL_SIZE, anchor: "middle", baseline: negative ? "top" : "bottom", owner: `port:${id}[${q.pin}]` });
         else art.push({ t: "text", x: a[0] + 1.4, y: a[1] + 1.4, text, size: LABEL_SIZE, anchor: "start", baseline: "middle", owner: `port:${id}[${q.pin}]` });
       }
     }
@@ -993,12 +1000,9 @@ function twoPinOrient(
 ): Orient {
   const [p1, p2] = sym.pins as [SymbolDef["pins"][0], SymbolDef["pins"][0]];
   const n1 = drawnNet.get(`${id}[${p1.number}]`), n2 = drawnNet.get(`${id}[${p2.number}]`);
-  const kind = (n?: string) => (n ? netKind(netById.get(n)!) : undefined);
   // Pin 1 is at the local left (dir left), pin 2 at the right. rot 90: pin1 up; rot 270: pin1 down.
-  if (kind(n2) === "ground") return { rot: 90, flip: false };
-  if (kind(n1) === "ground") return { rot: 270, flip: false };
-  if (n1 && portNet.has(n1) && kind(n1) === "power") return { rot: 90, flip: false };
-  if (n2 && portNet.has(n2) && kind(n2) === "power") return { rot: 270, flip: false };
+  const lower = lowerRailEnd(netById.get(n1 ?? ""), netById.get(n2 ?? ""), portNet);
+  if (lower) return { rot: lower === 2 ? 90 : 270, flip: false };
   const c1 = n1 ? netCol(n1, id) : undefined, c2 = n2 ? netCol(n2, id) : undefined;
   if (c1 !== undefined && c2 !== undefined && c2 < c1) return { rot: 180, flip: false };
   return { rot: 0, flip: false };
@@ -1016,10 +1020,10 @@ function icFor(
   const sides = { left: [] as PinDef[], right: [] as PinDef[], top: [] as PinDef[], bottom: [] as PinDef[] };
   for (const p of visible) {
     const netId = drawnNet.get(`${id}[${p.number}]`);
-    const kind = netId ? netKind(netById.get(netId)!) : undefined;
+    const level = netId ? railLevel(netById.get(netId)!) : undefined;
     if ([...Object.values(forced ?? {}), ...Object.values(after ?? {})].some((ns) => ns.includes(p.number))) continue;
-    if (p.role === "ground" || kind === "ground") sides.bottom.push(p);
-    else if (p.role === "power_in" || kind === "power") sides.top.push(p);
+    if (p.role === "ground" || level === 0 || level === -1) sides.bottom.push(p);
+    else if (p.role === "power_in" || level === 1) sides.top.push(p);
     else {
       const c = netId ? netCol(netId, id) : undefined;
       (c !== undefined && c < col ? sides.left : sides.right).push(p);
@@ -1052,7 +1056,8 @@ function portBox(kind: "ground" | "power", net: Net, a: Pt): Box {
     const b: Box = { x: a[0] - 1, y: a[1], w: 2, h: 2 };
     return text ? gridBox(unionBox(b, { x: a[0] + 1.4, y: a[1] + 0.6, w: tw, h: 1.6 })) : b;
   }
-  return gridBox(unionBox({ x: a[0] - 1, y: a[1] - 1, w: 2, h: 1 }, { x: a[0] - tw / 2, y: a[1] - 2.9, w: tw, h: 1.6 }));
+  const negative = railLevel(net) === -1;
+  return gridBox(unionBox({ x: a[0] - 1, y: a[1] + (negative ? 0 : -1), w: 2, h: 1 }, { x: a[0] - tw / 2, y: a[1] + (negative ? 1.3 : -2.9), w: tw, h: 1.6 }));
 }
 
 function displayValue(type: string, raw: string): string {

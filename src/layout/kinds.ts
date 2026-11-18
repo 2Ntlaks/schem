@@ -3,7 +3,7 @@
 // Kept out of layout.ts so the pipeline there stays one readable pass.
 
 import type { Orient } from "../geom/geom.js";
-import { netKind, type Net, type PinDef } from "../core/model.js";
+import { railLevel, type Net, type PinDef } from "../core/model.js";
 import { headerSymbol, type SymbolDef } from "../symbols/library.js";
 import { measure } from "../text/font.js";
 
@@ -45,6 +45,28 @@ export const TRANSISTOR: Record<string, { ctrl: string; main: string; ref: strin
   pmos: { ctrl: "G", main: "D", ref: "S", n: false },
 };
 
+/** Compare the two end pins. Signal pins normally sit between the positive rail and ground. */
+export function mainPinUp(t: (typeof TRANSISTOR)[string], net: (pin: string) => Net | undefined): boolean {
+  const band = (pin: string) => {
+    const n = net(pin);
+    return (n && railLevel(n)) ?? 0.5;
+  };
+  const main = band(t.main), ref = band(t.ref);
+  return main === ref ? t.n : main > ref;
+}
+
+/** Which end goes below the other. A positive rail drawn as a wire does not force a vertical part. */
+export function lowerRailEnd(a: Net | undefined, b: Net | undefined, ports: ReadonlySet<string>): 1 | 2 | undefined {
+  const first = a && railLevel(a), second = b && railLevel(b);
+  if (second === -1) return 2;
+  if (first === -1) return 1;
+  if (second === 0) return 2;
+  if (first === 0) return 1;
+  if (a && first === 1 && ports.has(a.id)) return 2;
+  if (b && second === 1 && ports.has(b.id)) return 1;
+  return undefined;
+}
+
 /**
  * Default orientation (SPEC 9.2 step 3b) for the kinds layout.ts does not orient itself.
  * Returns undefined for the kinds it leaves alone. Every rule is a fixed test on net kinds
@@ -52,8 +74,7 @@ export const TRANSISTOR: Record<string, { ctrl: string; main: string; ref: strin
  */
 export function defaultOrient(sym: SymbolDef, id: string, ctx: OrientContext): Orient | undefined {
   const net = (pin: string) => ctx.drawnNet.get(`${id}[${pin}]`);
-  const kind = (pin: string) => { const n = net(pin); return n ? netKind(ctx.netById.get(n)!) : undefined; };
-  const isPort = (pin: string, k: "power" | "ground") => { const n = net(pin); return n !== undefined && ctx.portNet.has(n) && kind(pin) === k; };
+  const pinNet = (pin: string) => ctx.netById.get(net(pin) ?? "");
   /** The nets of these pins sit, on average, left of the part (port nets do not count). */
   const fromLeft = (pins: string[]) => {
     const cs = pins.flatMap((p) => { const n = net(p); const c = n && !ctx.portNet.has(n) ? ctx.netCol(n, id) : undefined; return c === undefined ? [] : [c]; });
@@ -69,9 +90,7 @@ export function defaultOrient(sym: SymbolDef, id: string, ctx: OrientContext): O
     if (!t) return ROT0;
     // N type: emitter or source down, towards ground. P type: emitter or source up, towards the supply.
     // At rotation 0 the N types have it at the bottom and the P types at the top.
-    const flipY = t.n
-      ? kind(t.ref) === "power" || kind(t.main) === "ground"
-      : kind(t.ref) === "ground" || kind(t.main) === "power";
+    const flipY = t.n !== mainPinUp(t, pinNet);
     // The base or gate faces its driver: mirror left-right when the driver sits to the right.
     const flipX = toRight([t.ctrl]);
     return flipX && flipY ? ROT180 : flipY ? MIRROR_Y : flipX ? MIRROR_X : ROT0;
@@ -81,10 +100,9 @@ export function defaultOrient(sym: SymbolDef, id: string, ctx: OrientContext): O
     // Like a two-pin part on its track ends 1 and 3; the wiper (local top) ends up on the right
     // when vertical and on top when horizontal.
     const down3: Orient = { rot: 90, flip: false }, down1: Orient = { rot: 90, flip: true };
-    if (kind("3") === "ground") return down3;
-    if (kind("1") === "ground") return down1;
-    if (isPort("1", "power")) return down3;
-    if (isPort("3", "power")) return down1;
+    const lower = lowerRailEnd(pinNet("1"), pinNet("3"), ctx.portNet);
+    if (lower === 2) return down3;
+    if (lower === 1) return down1;
     const n1 = net("1"), n3 = net("3");
     const c1 = n1 ? ctx.netCol(n1, id) : undefined, c3 = n3 ? ctx.netCol(n3, id) : undefined;
     return c1 !== undefined && c3 !== undefined && c3 < c1 ? MIRROR_X : ROT0;

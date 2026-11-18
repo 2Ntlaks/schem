@@ -7,6 +7,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { layout, type LayoutResult } from "../src/layout/layout.js";
 import { drawnAsPorts } from "../src/layout/ports.js";
+import { netKind, railLevel } from "../src/core/model.js";
 import { checkDrawing } from "../src/quality/index.js";
 import { readProject } from "../src/io/project.js";
 import type { DrawnPin } from "../src/render/model.js";
@@ -111,6 +112,34 @@ describe("flow inference", () => {
 });
 
 describe("supply symbols (src/layout/ports.ts)", () => {
+  it("recognizes negative rails and respects explicit net kinds", () => {
+    for (const name of ["VEE", "vee", "V-", "-12V", "-2.5V", "-3V3"]) {
+      expect(netKind({ name })).toBe("power");
+      expect(railLevel({ name })).toBe(-1);
+      expect(railLevel({ name, kind: "signal" })).toBeUndefined();
+      expect(railLevel({ name, kind: "ground" })).toBe(0);
+    }
+    expect(netKind({ name: "-CLK" })).toBe("signal");
+    expect(railLevel({ name: "-BIAS", kind: "power" })).toBe(-1);
+    expect(railLevel({ name: "VSS" })).toBe(0);
+    expect(railLevel({ name: "VSS", kind: "power" })).toBe(-1);
+  });
+
+  it("puts the push-pull output between the emitters and draws the negative supply below its pins", () => {
+    const m = run("pushpull").r.render!;
+    const q1 = pin("pushpull", "Q1", "E"), q2 = pin("pushpull", "Q2", "E");
+    expect([q1.at[0], q1.dir, q2.dir]).toEqual([q2.at[0], "down", "up"]);
+    expect(q1.at[1]).toBeLessThan(q2.at[1]);
+    for (const [part, number] of [["Q2", "C"], ["R5", "2"]] as const) {
+      const p = pin("pushpull", part, number);
+      expect(p.dir).toBe("down");
+      expect(m.electrical.ports).toContainEqual({ at: p.at, text: "VEE", kind: "power", domain: null });
+      const label = m.art.find((a) => a.t === "text" && a.owner === `port:${part}[${number}]`);
+      expect(label).toMatchObject({ t: "text", text: "VEE", baseline: "top" });
+      expect(label?.t === "text" && label.y > p.at[1]).toBe(true);
+    }
+  });
+
   const type = (t: Record<string, string>) => (p: string) => t[p];
   it("a two-pin supply net between a battery and one part is a wire", () => {
     expect(drawnAsPorts({ id: "n", name: "VCC", endpoints: [] }, ["B1[+]", "R1[1]"], type({ B1: "battery", R1: "resistor" }))).toBe(false);
