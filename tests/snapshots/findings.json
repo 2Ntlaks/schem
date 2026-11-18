@@ -29,28 +29,7 @@
   },
   "case08-diffpair": {
     "status": "valid",
-    "findings": [
-      {
-        "id": "C10-V3",
-        "severity": "warn",
-        "message": "V3 sits between a supply and ground but is not drawn vertical with the supply side up.",
-        "fix": {
-          "ops": [
-            {
-              "op": "setOrientation",
-              "part": "V3",
-              "rot": 270
-            }
-          ],
-          "expectedLayout": "08db84f3fcfd3bdb1e01011baea5503fab191d68ac8aef1d3025d83d53f56429",
-          "changesCircuit": false,
-          "expect": {
-            "wireLength": -9
-          },
-          "tradeoff": null
-        }
-      }
-    ]
+    "findings": []
   },
   "generated-30-16": {
     "status": "valid",
