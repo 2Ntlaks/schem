@@ -52,7 +52,9 @@ export interface StackGraph {
 }
 
 /** In-line first: the load itself, then the parts usually drawn beside it. */
-const LANE_ORDER: Record<string, number> = { capacitor: 1, "polarised-capacitor": 1, diode: 2 };
+const LANE_ORDER: Record<string, number> = { capacitor: 1, "polarised-capacitor": 1, diode: 2, schottky: 2, zener: 2 };
+/** Series diodes that pass current on (a Zener is a shunt, so it is not one). */
+const RECTIFIERS = new Set(["diode", "schottky"]);
 const MAX_CHAIN = 3, MAX_STRING = 5, MAX_LANES = 3;
 
 export function findStacks(g: StackGraph): Stack[] {
@@ -171,6 +173,8 @@ export function findStacks(g: StackGraph): Stack[] {
       }
       // A capacitor at the free end is a coupling capacitor on its way to a load: it stays in the signal line.
       while (chain.length && /capacitor/.test(typeOf.get(chain[chain.length - 1]!.part) ?? "")) chain.pop();
+      // So does a rectifier at the free end: it passes current along the line to its load.
+      while (chain.length && RECTIFIERS.has(typeOf.get(chain[chain.length - 1]!.part) ?? "")) chain.pop();
       if (chain.length < 2) continue;
       // Top to bottom: a ground-ended chain is listed bottom-up, a supply-ended one top-down.
       const path = sense === "down"
