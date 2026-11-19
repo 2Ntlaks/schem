@@ -1,7 +1,7 @@
 // Layout pipeline (SPEC 9.2): generic placement, routing and decoupling child slots.
 
 import {
-  cmpNatural, cmpStr, edgeKey, gridBox, isHorizontal, key, step, unionBox, unitEdges, xformBox, xformDir, xformPt,
+  cmpNatural, cmpStr, edgeKey, gridBox, isHorizontal, key, opposite, step, unionBox, unitEdges, xformBox, xformDir, xformPt,
   boxesOverlap, type Box, type Dir, type Orient, type Pt,
 } from "../geom/geom.js";
 import { obstacleFromLabel, type Obstacle } from "../geom/forbidden.js";
@@ -238,6 +238,7 @@ export function layout(project: Project, opts: LayoutOptions = {}): LayoutResult
   // They ride on the stacks option, so the stack fallback drops them too.
   let bridges: Bridge[] = [];
   let pathLoads: PathAnchor[] = [];
+  const pathInLine: PathAnchor[] = [];
   if (!opts.place && opts.stacks !== false) {
     const inStack = new Set(stacks.flatMap((st) => [st.root, ...st.children.map((c) => c.part)]));
     const placeHint = new Set(hints.filter((h) => h.type === "relative" || h.type === "align").flatMap(hintParts));
@@ -254,12 +255,27 @@ export function layout(project: Project, opts: LayoutOptions = {}): LayoutResult
       .filter((p) => pathSides.get(p.part)?.has(p.pin) && free(p.part)).sort((a, b) => cmpStr(a.part, b.part) || cmpNatural(a.pin, b.pin));
     pathLoads = pathAnchors(pins, circuit, drawnNet, (n) => portNet.has(n) && netKind(netById.get(n)!) === "ground", free);
     for (const a of pathLoads) stackRoot.set(a.load, a.part);
+    // A two-pin part alone with a regulator pin on a wired net (a fuse or switch feeding its input)
+    // lies in line with that pin, so the supply runs through it in one straight wire.
+    for (const [part, sides] of [...pathSides].sort(([a], [b]) => cmpStr(a, b))) {
+      for (const pin of [...sides.keys()].sort(cmpNatural)) {
+        const net = drawnNet.get(`${part}[${pin}]`);
+        if (net === undefined || portNet.has(net)) continue;
+        const on = [...drawnNet].filter(([, n]) => n === net).map(([t]) => t).filter((t) => t !== `${part}[${pin}]`);
+        if (on.length !== 1) continue;
+        const load = partOfTerm(on[0]!), sym = BUILTIN[typeOfPart.get(load)!];
+        if (sym?.kind !== "two-pin" || sym.pins.length !== 2 || !free(load)) continue;
+        pathInLine.push({ part, pin, load, loadPin: on[0]!.slice(load.length + 1, -1), symbol: false });
+        stackRoot.set(load, part);
+      }
+    }
   }
   // A regulator pin with no load beside it keeps its supply symbol: a wire to a load drawn
   // somewhere else would cross the sheet. A regulator with neither keeps its pins where they were.
   const continuePins = new Set(path.continuePins);
   const anchored = new Set(pathLoads.map((a) => `${a.part}[${a.pin}]`));
-  const wiredPin = (t: string) => anchored.has(t) || path.wireNets.has(drawnNet.get(t) ?? "");
+  const inLinePin = new Set(pathInLine.map((a) => `${a.part}[${a.pin}]`));
+  const wiredPin = (t: string) => anchored.has(t) || inLinePin.has(t) || path.wireNets.has(drawnNet.get(t) ?? "");
   for (const l of path.links) {
     const sides = pathSides.get(l.part);
     if (!sides && !boxRegulator.has(l.part)) continue;
@@ -373,7 +389,7 @@ export function layout(project: Project, opts: LayoutOptions = {}): LayoutResult
     }
   }
   // A regulator with a load beside its input keeps its own label off the left too.
-  for (const a of pathLoads) if (pathSides.get(a.part)?.get(a.pin) === "left") icHasLeftBypass.add(a.part);
+  for (const a of [...pathLoads, ...pathInLine]) if (pathSides.get(a.part)?.get(a.pin) === "left") icHasLeftBypass.add(a.part);
   const measurePart = (id: string, force?: Orient): void => {
     const part = partOf.get(id)!;
     const col = colOf.get(id)!;
@@ -582,10 +598,12 @@ export function layout(project: Project, opts: LayoutOptions = {}): LayoutResult
    * meets the supply stub above it. It keeps clear of the chip, its other children, and the wires
    * of the chip's other pins on that side. Returns false if it does not fit or an edit forbids it.
    */
-  const standBeside = (id: string, topPin: string, host: string, hp: { at: Pt; dir: Dir }, keep: ReadonlyArray<{ at: Pt; dir: Dir }>, minDx: number): boolean => {
+  const standBeside = (id: string, topPin: string, host: string, hp: { at: Pt; dir: Dir }, keep: ReadonlyArray<{ at: Pt; dir: Dir }>, minDx: number, inLine = false): boolean => {
     const H = placed.get(host)!, P = placed.get(id)!;
     const top = P.pins.find((p) => p.number === topPin);
-    if (!top || top.dir !== "up") return false;
+    // Standing, the part's pin points up, 1 G below the pin's row; in line, it faces the pin on its row.
+    const row = inLine ? 0 : 1;
+    if (!top || top.dir !== (inLine ? opposite(hp.dir) : "up")) return false;
     const s = hp.dir === "right" ? 1 : -1;
     const lanes = H.pins.filter((p) => p.dir === hp.dir && !keep.includes(p))
       .map((p): Box => ({ x: s > 0 ? p.at[0] : p.at[0] - 12, y: p.at[1] - 0.5, w: 12, h: 1 }));
@@ -598,12 +616,12 @@ export function layout(project: Project, opts: LayoutOptions = {}): LayoutResult
     const was = opts.previous?.parts[id], hostWas = opts.previous?.parts[host];
     if (was && !affected.has(id)) {
       const dx = hostWas ? s * (was.at[0] - hostWas.at[0] + top.at[0] - hp.at[0]) : NaN;
-      if (!hostWas || was.at[1] - hostWas.at[1] !== hp.at[1] + 1 - top.at[1] || !(dx >= minDx)) return false;
+      if (!hostWas || was.at[1] - hostWas.at[1] !== hp.at[1] + row - top.at[1] || !(dx >= minDx)) return false;
       from = dx;
     }
     let at: Pt | undefined;
     for (let dx = from; dx <= from + 16 && !at; dx++) {
-      const tryAt: Pt = [hp.at[0] + s * dx - top.at[0], hp.at[1] + 1 - top.at[1]];
+      const tryAt: Pt = [hp.at[0] + s * dx - top.at[0], hp.at[1] + row - top.at[1]];
       if (!boxes.some((x) => occupied.some((q) => boxesOverlap(shifted(x, tryAt), q)))) at = tryAt;
     }
     if (!at) return false;
@@ -637,6 +655,17 @@ export function layout(project: Project, opts: LayoutOptions = {}): LayoutResult
     const stub = placed.get(a.load)!.ports.find((q) => q.pin === a.loadPin)?.stub;
     if ((a.symbol && stub?.length !== 3) || !standBeside(a.load, a.loadPin, a.part, hp, [hp], 2)) { bridgeLabelLeft.delete(a.load); measurePart(a.load); continue; }
     notes.push(`power path: ${a.load} beside ${a.part}[${a.pin}]`);
+  }
+  // A fuse or switch in line with a regulator pin, its near pin facing the pin on the same row.
+  for (const a of pathInLine) {
+    const hp = placed.get(a.part)!.pins.find((p) => p.number === a.pin);
+    if (!hp || !isHorizontal(hp.dir) || !pathSides.get(a.part)?.has(a.pin)) continue;
+    const pinDef = placed.get(a.load)!.sym.pins.find((p) => p.number === a.loadPin)!;
+    const o = ([0, 180] as const).map((rot): Orient => ({ rot, flip: false })).find((x) => xformDir(pinDef.dir, x) === opposite(hp.dir));
+    if (!o || !canTurn(a.load, o)) continue;
+    measurePart(a.load, o);
+    if (!standBeside(a.load, a.loadPin, a.part, hp, [hp], 2, true)) { measurePart(a.load); continue; }
+    notes.push(`power path: ${a.load} in line with ${a.part}[${a.pin}]`);
   }
   for (const id of ids) {
     const p = placed.get(id)!;

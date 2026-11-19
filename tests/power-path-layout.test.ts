@@ -95,6 +95,22 @@ describe("regulator on the power path", () => {
     expect(r.notes.some((n) => n.startsWith("power path: C1 ") || n.startsWith("power path: C2 "))).toBe(false);
     expect(pin("U1", "3").dir).toBe("right");
   });
+
+  it("lays a fuse alone on the input's net in line with the input pin", () => {
+    const c = regulator(0);
+    c.parts.push({ id: "F1", type: "fuse" });
+    c.nets.push({ id: "n9", name: "VIN", endpoints: ["F1[2]", "U1[1]"] });
+    c.nets[0] = { id: "n1", name: "VBAT", endpoints: ["J1[1]", "F1[1]"] };
+    const { r, pin } = draw(c);
+    expect(r.notes).toContain("power path: F1 in line with U1[1]");
+    const vin = pin("U1", "1");
+    expect(vin.dir).toBe("left");
+    // The fuse lies on the input's row, left of it, its near pin facing the input.
+    expect(pin("F1", "2").at[1]).toBe(vin.at[1]);
+    expect(pin("F1", "2").dir).toBe("right");
+    expect(pin("F1", "2").at[0]).toBeLessThan(vin.at[0]);
+    expect(pin("F1", "1").at[1]).toBe(vin.at[1]);
+  });
 });
 
 describe("pathAnchors", () => {
