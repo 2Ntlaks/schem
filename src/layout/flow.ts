@@ -258,10 +258,11 @@ export function inferFlow(g: FlowGraph, fixed: ReadonlyMap<string, number>): Flo
   }
   // Break cycles (feedback loops through several blocks): depth-first from the seeds, back edges dropped.
   const state = new Map<string, 1 | 2>();
+  const backTarget = new Map<string, string[]>();
   const visit = (u: string) => {
     state.set(u, 1);
     for (const w of [...succ.get(u)!].sort(cmpStr)) {
-      if (state.get(w) === 1) succ.get(u)!.delete(w);
+      if (state.get(w) === 1) { succ.get(u)!.delete(w); backTarget.set(u, [...(backTarget.get(u) ?? []), w]); }
       else if (!state.has(w)) visit(w);
     }
     state.set(u, 2);
@@ -269,6 +270,14 @@ export function inferFlow(g: FlowGraph, fixed: ReadonlyMap<string, number>): Flo
   for (const s of [...[...seeds].sort(cmpStr), ...ranked]) if (!state.has(s)) visit(s);
   const pred = new Map(ranked.map((b) => [b, [] as string[]]));
   for (const [a, ws] of succ) for (const w of ws) pred.get(w)!.push(a);
+  // Multi-stage feedback: a two-pin part whose only outgoing edge was a cycle back-edge returns
+  // from a downstream stage to an upstream block, so it belongs in that upstream block's column.
+  for (const [u, targets] of backTarget) {
+    if (targets.length === 1 && twoPin(u) && !fixed.has(u) && !explicit(u) && !isSink(u)
+      && succ.get(u)!.size === 0 && pred.get(u)!.length > 0) {
+      sibling.set(u, targets[0]!);
+    }
+  }
 
   // Longest paths, in topological order.
   const order: string[] = [];
@@ -300,10 +309,13 @@ export function inferFlow(g: FlowGraph, fixed: ReadonlyMap<string, number>): Flo
   const col = new Map(rank);
   for (const [b, host] of sibling) { rank.set(b, rank.get(host)!); col.set(b, col.get(host)!); }
   // Taps: half a column after the first block on their wire, or before it when they only feed inputs.
-  const graphRanked = new Set(rank.keys());
+  // Feedback siblings return to an upstream column, so they do not pull a load tap upstream with them.
+  const graphRanked = new Set([...rank.keys()].filter((b) => !sibling.has(b)));
   const seriesTaps: Flow["seriesTaps"] = new Map();
   for (const t of [...taps].sort(cmpStr)) {
-    const others = (onNet.get(wireOf(t)) ?? []).filter((p) => graphRanked.has(g.blockOf(p.part)));
+    const onWire = onNet.get(wireOf(t)) ?? [];
+    const primary = onWire.filter((p) => graphRanked.has(g.blockOf(p.part)));
+    const others = primary.length ? primary : onWire.filter((p) => rank.has(g.blockOf(p.part)));
     if (!others.length) { rank.set(t, 0); col.set(t, 0); continue; }
     const lowest = Math.min(...others.map((p) => rank.get(g.blockOf(p.part))!));
     // On one block's plain pin, when that block drives something else: the input side (see above).

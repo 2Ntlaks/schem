@@ -104,14 +104,29 @@ export function findStacks(g: StackGraph): Stack[] {
     const t = TRANSISTOR[typeOf.get(q) ?? ""];
     if (!t || !g.free(q)) continue;
     const net = (pin: string) => pinsOf.get(q)?.find((x) => x.pin === pin)?.net;
-    const mainDir = mainPinUp(t, (pin) => {
-      const n = net(pin);
-      return n === undefined ? undefined : g.net(n);
-    }) ? "up" : "down";
+    const mainDirOf = (part: string) => {
+      const tt = TRANSISTOR[typeOf.get(part) ?? ""];
+      if (!tt) return undefined;
+      return mainPinUp(tt, (pin) => {
+        const n = pinsOf.get(part)?.find((x) => x.pin === pin)?.net;
+        return n === undefined ? undefined : g.net(n);
+      }) ? "up" : "down";
+    };
+    const mainDir = mainDirOf(q)!;
     const children: StackChild[] = [];
     for (const [pin, dir] of [[t.main, mainDir], [t.ref, mainDir === "up" ? "down" : "up"]] as const) {
       const n = net(pin);
       if (n === undefined || !wire(n)) continue;
+      // Complementary pair (push-pull output): another transistor meets this pin from the opposite
+      // vertical side, so leave loads off the vertical line between the two transistors.
+      if ((onNet.get(n) ?? []).some((x) => {
+        if (x.part === q) return false;
+        const ot = TRANSISTOR[typeOf.get(x.part) ?? ""];
+        if (!ot || (x.pin !== ot.main && x.pin !== ot.ref)) return false;
+        const om = mainDirOf(x.part)!;
+        const otherDir = x.pin === ot.main ? om : (om === "up" ? "down" : "up");
+        return otherDir !== dir;
+      })) continue;
       const chains = hangers(n, dir, q).slice(0, MAX_LANES);
       const alone = (onNet.get(n) ?? []).length === 2;
       chains.forEach((chain, lane) => chain.forEach((c, i) => {
