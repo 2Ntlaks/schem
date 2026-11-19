@@ -1,23 +1,23 @@
 {
   "note": "Scores from npm run bench -- --update. Lower is better; see scripts/lib/bench-score.ts.",
   "scores": {
-    "ce-amp": 47,
-    "current-sink": 36.3,
-    "darlington": 41.6,
+    "ce-amp": 39.9,
+    "current-sink": 28.7,
+    "darlington": 36.3,
     "debounce": 25.9,
     "differentiator": 63,
-    "follower": 38.1,
+    "follower": 31,
     "highside": 28.4,
-    "inamp": 89.4,
-    "levelshift": 77.5,
-    "mcu": 86.8,
-    "mixer-ce": 63.5,
-    "multivibrator": 68.7,
+    "inamp": 75.3,
+    "levelshift": 67.9,
+    "mcu": 72,
+    "mixer-ce": 56.4,
+    "multivibrator": 63.3,
     "ne555": 41.3,
-    "pushpull": 134.2,
-    "regulator": 40.3,
-    "schmitt": 41.7,
-    "sensor-node": 142.8,
-    "shift": 100.6
+    "pushpull": 61.3,
+    "regulator": 38.9,
+    "schmitt": 32.6,
+    "sensor-node": 92.1,
+    "shift": 53.8
   }
 }
