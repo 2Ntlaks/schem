@@ -338,8 +338,13 @@ export function layout(project: Project, opts: LayoutOptions = {}): LayoutResult
     }
     // Labels must keep clear of port symbols and of every pin's approach point.
     const approachBoxes = pins.map((p): Box => { const a = step(p.at, p.dir); return { x: a[0] - 0.5, y: a[1] - 0.5, w: 1, h: 1 }; });
+    const hostDec = decouplers.filter((m) => m.host === id);
+    const decRight = hostDec.length > 0 && hostDec.every((m) => {
+      const tp = pins.find((p) => p.number === m.pin);
+      return tp !== undefined && tp.at[0] > ko.x + ko.w / 2;
+    });
     const labels = labelFor(part, sym, orient, ko, [...ports.map((q) => q.box), ...approachBoxes], intent.overrides?.labelSide?.[id]
-      ?? (tr ? templateLabel(tr, id) : undefined) ?? (decouplers.some((m) => m.host === id) ? "below-left-out" : undefined), !tr);
+      ?? (tr ? templateLabel(tr, id) : undefined), !tr, hostDec.length > 0 ? (decRight ? "below-right" : "below-left") : undefined);
     let env = ko;
     for (const l of labels) env = unionBox(env, gridBox(l.box));
     for (const q of ports) env = unionBox(env, q.box);
@@ -873,6 +878,10 @@ export function layout(project: Project, opts: LayoutOptions = {}): LayoutResult
         const [h, vv] = isHorizontal(pa.dir) ? [pa, pb] : [pb, pa];
         const off = vv.dir === "up" ? -2 : 2;
         candidates.push({ k: eq(vy(h.part), vy(vv.part), vv.at[1] + off - h.at[1], "align", `corner ${ps[i]}-${ps[j]}`), order: [Math.abs(ca - cb) + 0.5, tag] });
+      } else if (pa.dir === pb.dir && (placed.get(pa.part)!.sym.kind === "transistor" || placed.get(pb.part)!.sym.kind === "transistor")) {
+        // Two pins facing the same vertical direction in different columns (e.g. a pull-up and a
+        // transistor source on one bus): level their tips so one horizontal wire connects them.
+        candidates.push({ k: eq(vy(pb.part), vy(pa.part), pa.at[1] - pb.at[1], "align", `level ${ps[i]}-${ps[j]}`), order: [Math.abs(ca - cb) + 1, tag] });
       }
     }
   }
@@ -1279,7 +1288,7 @@ function labelLines(part: Circuit["parts"][0], sym: SymbolDef): string[] {
   return lines;
 }
 
-function labelFor(part: Circuit["parts"][0], sym: SymbolDef, o: Orient, ko: Box, avoid: Box[], side?: string, freeSide = false): Placed["labels"] {
+function labelFor(part: Circuit["parts"][0], sym: SymbolDef, o: Orient, ko: Box, avoid: Box[], side?: string, freeSide = false, belowPrefer?: "below-left" | "below-right"): Placed["labels"] {
   if (sym.kind === "port") return [];
   const lines = labelLines(part, sym);
   const w = Math.max(...lines.map((l) => measure(l, LABEL_SIZE).width / 10));
@@ -1288,9 +1297,13 @@ function labelFor(part: Circuit["parts"][0], sym: SymbolDef, o: Orient, ko: Box,
   const wrappedIc = sym.kind === "ic" && lines.length > 2;
   const hasRightPin = sym.pins.some((p) => xformDir(p.dir, o) === "right");
   const prefer = sym.kind === "ic"
-    ? (freeSide && wrappedIc && !hasRightPin
-      ? ["right", "above-right", "above-left", "below-right", "below-left", "above-right-out", "below-right-out", "above-left-out", "below-left-out", "left"]
-      : ["above-left", "above-right", "below-left", "below-right", "above-left-out", "above-right-out", "below-left-out", "below-right-out", "left", "right"])
+    ? (belowPrefer === "below-right"
+      ? ["below-left", "below-right", "below-right-out", "below-left-out", "right", "left", "above-left", "above-right", "above-left-out", "above-right-out"]
+      : belowPrefer === "below-left"
+        ? ["below-left", "below-right", "below-left-out", "below-right-out", "left", "right", "above-left", "above-right", "above-left-out", "above-right-out"]
+        : freeSide && wrappedIc && !hasRightPin
+          ? ["right", "above-right", "above-left", "below-right", "below-left", "above-right-out", "below-right-out", "above-left-out", "below-left-out", "left"]
+          : ["above-left", "above-right", "below-left", "below-right", "above-left-out", "above-right-out", "below-left-out", "below-right-out", "left", "right"])
     : vertical ? (sym.kind === "source" ? ["left", "right"] : ["right", "left"]) : sym.labelPrefer;
   const order = side ? [side, ...prefer.filter((x) => x !== side)] : prefer; // label-side override first (SPEC 6.4)
   const gap = 0.4;
