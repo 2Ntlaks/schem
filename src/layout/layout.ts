@@ -14,6 +14,7 @@ import { decouplingMatches } from "./decoupling.js";
 import { drawnAsPorts } from "./ports.js";
 import { inferFlow, type FlowGraph } from "./flow.js";
 import { findStacks, type Stack } from "./stacks.js";
+import { findBridges, type Bridge } from "./bridges.js";
 import { measure } from "../text/font.js";
 import { eq, solveWithDrops, X0, type Constraint } from "./solver.js";
 import { route, type NetRequest } from "./router.js";
@@ -212,6 +213,21 @@ export function layout(project: Project, opts: LayoutOptions = {}): LayoutResult
     regions = regions.filter((r) => !r.members.some((m) => taken.has(m)));
   }
   const stackRoot = new Map(stacks.flatMap((st) => st.children.map((c) => [c.part, st.root] as const)));
+  // Bridges (src/layout/bridges.ts): a two-pin part across two pins of one chip goes with the chip.
+  // They ride on the stacks option, so the stack fallback drops them too.
+  let bridges: Bridge[] = [];
+  if (!opts.place && opts.stacks !== false) {
+    const inStack = new Set(stacks.flatMap((st) => [st.root, ...st.children.map((c) => c.part)]));
+    const placeHint = new Set(hints.filter((h) => h.type === "relative" || h.type === "align").flatMap(hintParts));
+    const inTemplate = new Set(regions.flatMap((r) => [...r.members, ...r.links]));
+    bridges = findBridges({ parts: circuit.parts, defs, drawnNet, portNet,
+      free: (id) => !locks.has(id) && !placeHint.has(id) && !decouplerOf.has(id) && !inStack.has(id) && !inTemplate.has(id),
+      box: (id) => !BUILTIN[partOf.get(id)!.type] && partOf.get(id)!.type !== HEADER && !inTemplate.has(id) && !stackRoot.has(id),
+      fixedOrient: (id) => { const h = orientHint.get(id); return h ? { rot: h.rot, flip: h.flip } : prevOf(id)?.orient; } });
+    for (const b of bridges) stackRoot.set(b.part, b.host);
+  }
+  const bridgePairs = new Map<string, Array<[string, string]>>();
+  for (const b of bridges) bridgePairs.set(b.host, [...(bridgePairs.get(b.host) ?? []), b.hostPins]);
   const bridgeTopOpamp = new Set(stacks.flatMap((st) => (st.bridgeOpamps ? [st.bridgeOpamps[0]] : [])));
   const regionOf = new Map<string, Region>(), linkOf = new Map<string, Region>();
   for (const r of regions) { for (const p of r.members) regionOf.set(p, r); for (const p of r.links) linkOf.set(p, r); }
@@ -282,6 +298,8 @@ export function layout(project: Project, opts: LayoutOptions = {}): LayoutResult
   // their label on the outward (left) side, and the IC keeps its label off the left edge so the
   // capacitor sits directly beside the supply pin it serves.
   const leftBypassCaps = new Set<string>();
+  /** Bridges standing left of their chip keep their label on the outward (left) side. */
+  const bridgeLabelLeft = new Set<string>();
   const icHasLeftBypass = new Set<string>();
   if (!opts.place) {
     const decSet = new Set(decouplers.map((m) => m.part));
@@ -320,7 +338,7 @@ export function layout(project: Project, opts: LayoutOptions = {}): LayoutResult
       const named = new Set(Object.values(given ?? {}).flat());
       const tpl = Object.fromEntries(Object.entries((tr ? templateSides(tr, id) : undefined) ?? {})
         .map(([side, ns]) => [side, (ns ?? []).filter((n) => !named.has(n))] as const).filter(([, ns]) => ns.length));
-      sym = icFor(id, defs[id]!, drawnNet, netById, ncSet, col, netCol, given, tpl, slotRoom.get(id));
+      sym = icFor(id, defs[id]!, drawnNet, netById, ncSet, col, netCol, given, tpl, slotRoom.get(id), bridgePairs.get(id));
     }
     // Orientation precedence: fixed placement, lock, orient hint, previous layout, template, default.
     const lockOf = locks.get(id), oh = orientHint.get(id), prev = prevOf(id), to = tr ? templateOrient(tr, id, sym) : undefined;
@@ -366,7 +384,7 @@ export function layout(project: Project, opts: LayoutOptions = {}): LayoutResult
       return tp !== undefined && tp.at[0] > ko.x + ko.w / 2;
     });
     const labels = labelFor(part, sym, orient, ko, [...ports.map((q) => q.box), ...approachBoxes], intent.overrides?.labelSide?.[id]
-      ?? (tr ? templateLabel(tr, id) : leftBypassCaps.has(id) ? "left" : undefined), !tr,
+      ?? (tr ? templateLabel(tr, id) : leftBypassCaps.has(id) || bridgeLabelLeft.has(id) ? "left" : undefined), !tr,
       hostDec.length > 0 ? (decRight ? "below-right" : "below-left") : icHasLeftBypass.has(id) ? "above-right" : undefined);
     let env = ko;
     for (const l of labels) env = unionBox(env, gridBox(l.box));
@@ -496,6 +514,37 @@ export function layout(project: Project, opts: LayoutOptions = {}): LayoutResult
       rigid.set(c.part, { host: st.root, at });
       notes.push(`stack: ${c.part} ${c.dir === "up" ? "above" : "below"} ${c.parent}[${c.parentPin}]`);
     }
+  }
+  // Bridges: the part stands beside its chip's two pins, its upper pin reached from the upper pin's
+  // wire and its lower pin from below, clear of the wires of the chip's other pins on that side.
+  for (const b of bridges) {
+    const H = placed.get(b.host)!;
+    const hu = H.pins.find((p) => p.number === b.hostPins[0]), hl = H.pins.find((p) => p.number === b.hostPins[1]);
+    if (!hu || !hl || hu.dir !== hl.dir || !isHorizontal(hu.dir) || hl.at[0] !== hu.at[0] || hl.at[1] !== hu.at[1] + 2) continue;
+    const h = orientHint.get(b.part);
+    const o: Orient = h ? { rot: h.rot, flip: h.flip } : standing(b.part, b.partPins[0], "top");
+    if (!canTurn(b.part, o)) continue;
+    const s = hu.dir === "right" ? 1 : -1;
+    if (s < 0) bridgeLabelLeft.add(b.part);
+    measurePart(b.part, o);
+    const P = placed.get(b.part)!;
+    const top = P.pins.find((p) => p.number === b.partPins[0])!, bot = P.pins.find((p) => p.number === b.partPins[1])!;
+    const lanes = H.pins.filter((p) => p.dir === hu.dir && p !== hu && p !== hl)
+      .map((p): Box => ({ x: s > 0 ? p.at[0] : p.at[0] - 12, y: p.at[1] - 0.5, w: 12, h: 1 }));
+    const occupied = [...footprint(H), ...lanes, ...[...childOffsets, ...rigid].filter(([, c]) => c.host === b.host)
+      .flatMap(([id, c]) => footprint(placed.get(id)!).map((x) => shifted(x, c.at)))];
+    const boxes = footprint(P);
+    let at: Pt | undefined;
+    for (let dx = 3; dx <= 6 && !at && top.dir === "up" && bot.dir === "down"; dx++) {
+      const tryAt: Pt = [hu.at[0] + s * dx - top.at[0], hu.at[1] + 1 - top.at[1]];
+      if (!boxes.some((x) => occupied.some((q) => boxesOverlap(shifted(x, tryAt), q)))) at = tryAt;
+    }
+    // An edit: a part it did not touch keeps its place beside the chip only where it already stood.
+    const was = opts.previous?.parts[b.part], hostWas = opts.previous?.parts[b.host];
+    if (at && was && !affected.has(b.part) && !(hostWas && was.at[0] - hostWas.at[0] === at[0] && was.at[1] - hostWas.at[1] === at[1])) at = undefined;
+    if (!at) { bridgeLabelLeft.delete(b.part); measurePart(b.part); continue; }
+    rigid.set(b.part, { host: b.host, at });
+    notes.push(`bridge: ${b.part} beside ${b.host}[${b.hostPins[0]}] and ${b.host}[${b.hostPins[1]}]`);
   }
   for (const id of ids) {
     const p = placed.get(id)!;
@@ -1218,6 +1267,7 @@ function icFor(
   forced?: Partial<Record<Side, string[]>>,
   after?: Partial<Record<Side, string[]>>,
   slotRoom?: ReadonlyMap<string, number>,
+  bridged?: ReadonlyArray<[string, string]>,
 ): SymbolDef {
   const visible = pins.filter((p) => drawnNet.has(`${id}[${p.number}]`) || ncSet.has(`${id}[${p.number}]`));
   const sides = { left: [] as PinDef[], right: [] as PinDef[], top: [] as PinDef[], bottom: [] as PinDef[] };
@@ -1234,6 +1284,24 @@ function icFor(
   }
   const sortKey = (p: PinDef) => { const n = drawnNet.get(`${id}[${p.number}]`); const net = n ? netById.get(n) : undefined; return net?.name ?? `~${p.number}`; };
   for (const s of Object.values(sides)) s.sort((a, b) => cmpStr(sortKey(a), sortKey(b)) || cmpNatural(a.number, b.number));
+  // Two pins a part bridges (src/layout/bridges.ts) sit next to each other, upper first, on the
+  // side their wires go to, at the place of the upper pin. Pins on the top or bottom stay there.
+  for (const [u, l] of bridged ?? []) {
+    const sideOf = (n: string) => (["left", "right"] as const).find((s) => sides[s].some((p) => p.number === n));
+    const su = sideOf(u), sl = sideOf(l);
+    if (!su || !sl) continue;
+    const cs = [u, l].flatMap((n) => { const net = drawnNet.get(`${id}[${n}]`); const c = net ? netCol(net, id) : undefined; return c === undefined ? [] : [c]; });
+    const side = su === sl ? su : cs.length && cs.reduce((a, b) => a + b, 0) / cs.length < col ? "left" : "right";
+    const pu = sides[su].find((p) => p.number === u)!, pl = sides[sl].find((p) => p.number === l)!;
+    sides[su].splice(sides[su].indexOf(pu), 1);
+    sides[sl].splice(sides[sl].indexOf(pl), 1);
+    const list = sides[side];
+    let at = list.findIndex((p) => cmpStr(sortKey(p), sortKey(pu)) > 0 || (sortKey(p) === sortKey(pu) && cmpNatural(p.number, pu.number) > 0));
+    if (at < 0) at = list.length;
+    // Never between the two pins of a pair placed before.
+    while (at > 0 && at < list.length && (bridged ?? []).some(([a, b]) => list[at - 1]!.number === a && list[at]!.number === b)) at++;
+    list.splice(at, 0, pu, pl);
+  }
   // Forced sides (SPEC 11.3 setPinSides): listed pins first, in the given order; a template's, last.
   const listed = (ns: string[]) => ns.map((n) => visible.find((p) => p.number === n)).filter((p): p is PinDef => p !== undefined);
   for (const [side, ns] of Object.entries(forced ?? {}) as Array<[Side, string[]]>) sides[side].unshift(...listed(ns));
