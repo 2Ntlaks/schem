@@ -11,7 +11,7 @@ import { loadProject, projectPinDefs, saveProject, type LoadedProject } from "..
 import { layout, type LayoutResult } from "../layout/layout.js";
 import { checkDrawing, type DrawingCheck } from "../quality/index.js";
 import { textBlocks } from "../quality/drawing.js";
-import type { Box } from "../geom/geom.js";
+import type { Box, Pt } from "../geom/geom.js";
 import type { RenderModel } from "../render/model.js";
 import { toPng } from "../render/png.js";
 import { toSvg } from "../render/svg.js";
@@ -301,6 +301,11 @@ export function focusBox(render: RenderModel, ids: readonly string[]): Box | und
   return clampBox({ x: u.x - 2, y: u.y - 2, w: u.w + 4, h: u.h + 4 }, render.bounds);
 }
 
+export function focusPoints(render: RenderModel, points: readonly Pt[]): Box | undefined {
+  const region = union(points.map(([x, y]) => ({ x: x - 2, y: y - 2, w: 4, h: 4 })));
+  return region ? clampBox(region, render.bounds) : undefined;
+}
+
 /** Same SVG, with the viewBox and the physical size reduced to `crop`. overflow hides the rest. */
 export function cropSvg(svg: string, crop: Box): string {
   const fmt = (n: number) => {
@@ -351,7 +356,7 @@ export function queryBody(project: LoadedProject, drawn: Drawn, args: QueryArgs)
     return { ok: true, body: { ...tokens, part: partView(project, state, render, part.id) } };
   }
   if (args.net !== undefined) {
-    const net = project.circuit.nets.find((n) => n.id === args.net);
+    const net = project.circuit.nets.find((n) => n.id === args.net) ?? project.circuit.nets.find((n) => n.name === args.net);
     if (net === undefined) return { ok: false, message: `no net ${args.net}.` };
     return { ok: true, body: { ...tokens, net: netView(project, state, render, net.id) } };
   }

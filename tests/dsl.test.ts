@@ -77,6 +77,11 @@ describe("text DSL", () => {
     ]);
   });
 
+  it.each(["pins-right IN OUT", "pins-left OUT IN"])("locates conflicting strict pin hints (%s)", (other) => {
+    const result = compileDsl(`part U1 ic pins: IN OUT\nhint strict U1 pins-left IN OUT\nhint strict U1 ${other}`);
+    expect(result.errors[0]).toMatchObject({ code: "E263", span: { start: { line: 3, column: 1 } } });
+  });
+
   it("preserves near hints through JSON save and load", () => {
     const result = compileDsl(`${led}\nhint near D1 R1 priority=high`);
     expect(result.errors).toEqual([]);

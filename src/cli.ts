@@ -1,4 +1,4 @@
-// The command line (SPEC 11.4): draw a circuit file, and edit it without reshuffling the drawing.
+// The command line (SPEC 11.4): work with JSON netlists and text schematics.
 //
 //   npm run schem -- draw examples/led.schem.json
 //   npm run schem -- edit examples/led.schem.json --ops ops.json
@@ -9,34 +9,50 @@
 // src/io/edit-script.ts and saves the project with its layout (src/io/layout-cache.ts), so the
 // next draw or edit starts from the drawing the user has seen.
 
-import { copyFileSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, realpathSync } from "node:fs";
 import { basename, dirname, extname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { LayoutState } from "./core/intent.js";
-import { layoutToken, revision } from "./edit/edit.js";
+import { revision } from "./edit/edit.js";
 import { stabilityBreaks } from "./edit/report.js";
 import { applyEditScript, parseEditScript } from "./io/edit-script.js";
 import { jsonProblem, lineColumn } from "./io/json-problem.js";
-import { fromLayoutCache, toLayoutCache } from "./io/layout-cache.js";
-import { loadProject, saveProject, type LoadedProject, type LoadResult } from "./io/project.js";
+import { fromLayoutCache } from "./io/layout-cache.js";
+import type { LoadedProject, LoadResult } from "./io/project.js";
 import { layout, type LayoutResult } from "./layout/layout.js";
 import { checkDrawing } from "./quality/index.js";
 import { toSvg } from "./render/svg.js";
 import { toPng } from "./render/png.js";
+import { executeCommand, type CommandResult } from "./mcp/commands.js";
+import { commitProject, formatOf, issueText, loadWithin, projectText, readWithin } from "./mcp/project-files.js";
+import { insideRoot, openRoots, resolvePath, showPath, type Roots } from "./mcp/roots.js";
+import { replaceWithHistory, withLock, writeOutput, WriteConflict } from "./mcp/store.js";
+import { MAX_FILE, guardProject } from "./mcp/sheet.js";
 
 export interface Io {
   out: (s: string) => void;
   err: (s: string) => void;
 }
 
-const USAGE = `schem - draw a circuit from a JSON netlist
+const USAGE = `schem - draw a circuit from JSON or text
 
 Usage:
+  npm run schem -- init [name]
+  npm run schem -- render <file> -o <output.svg|png> [--scale N | --dpi N] [--draft] [--overwrite]
+  npm run schem -- check <file> [--detail brief|normal|full] [--cursor N]
+  npm run schem -- preview <file> -o <output.png> [--max N] [--focus R1,U2 | --finding ID]
+  npm run schem -- query <file> part|net ID
+  npm run schem -- describe <file> [--table]
+  npm run schem -- components [query] [--limit 20]
+  npm run schem -- fmt <file> [--to dsl|json]
+  npm run schem -- undo <file>
   npm run schem -- draw <file> [-o <dir>]
   npm run schem -- edit <file> --ops <ops.json> [-o <dir>] [--strict] [--dry-run]
                    [--expect-revision <R>] [--expect-layout <L>] [--json]
   npm run schem -- --help
   npm run schem -- --version
+
+File commands accept .schem text or .json. Use --json for machine output.
 
 Example:
   npm run schem -- draw examples/led.schem.json
@@ -47,10 +63,11 @@ edit applies the operations in <ops.json> as one change, keeps the rest of the
 drawing where it was, saves the file (the old one goes to .schem-history/) and
 writes the drawing like draw. An edit that would move untouched parts more than
 the limit is saved with a warning; --strict refuses it instead. --dry-run writes
-nothing. Exit codes: 0 saved, 1 refused (nothing written), 2 cannot read the
-input, 4 the file changed since the expected revision or layout.
+nothing. Exit codes: 0 valid, 1 invalid or input error, 2 usage, 3 internal
+error, 4 conflict. The legacy plain-text JSON draw and edit forms report
+unreadable input as 2.
 
-The circuit file format is described in docs/netlist-format.md, and edit
+The circuit file formats are described in docs/dsl.md and docs/netlist-format.md, and edit
 operations in docs/editing.md.`;
 
 /** A file's base name without `.schem.json` or `.json`. */
@@ -60,14 +77,29 @@ function drawingName(file: string): string {
   return base.slice(0, base.length - suffix.length) || "drawing";
 }
 
-/** Path for messages: forward slashes, so the output looks the same on Windows and Unix. */
-function showPath(p: string): string {
-  return p.replace(/\\/g, "/");
-}
-
 function packageVersion(): string {
   const pkg = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")) as { version?: unknown };
   return typeof pkg.version === "string" ? pkg.version : "unknown";
+}
+
+function rootsFor(file?: string): Roots {
+  const cwd = process.cwd(), root = openRoots([cwd]);
+  if (!file || insideRoot(cwd, resolve(file))) return root;
+  const parent = existingParent(dirname(resolve(file)));
+  return existsSync(parent) ? openRoots([cwd, parent]) : root;
+}
+
+function existingParent(dir: string): string {
+  while (!existsSync(dir) && dirname(dir) !== dir) dir = dirname(dir);
+  return dir;
+}
+
+// The legacy -o directory option explicitly configures an additional export root.
+function withLegacyOutput(roots: Roots, dir: string): Roots {
+  const absolute = resolve(dir);
+  if (roots.real.some((root) => insideRoot(root, absolute))) return roots;
+  const output = openRoots([existingParent(absolute)]);
+  return { real: [...roots.real, ...output.real] };
 }
 
 // ---------------------------------------------------------------------------
@@ -77,49 +109,66 @@ function issueLine(prefix: string, message: string): string {
 }
 
 function printLoadErrors(result: LoadResult, io: Io): void {
-  for (const e of result.errors) io.err(issueLine("error", e.message));
-  for (const w of result.warnings) io.err(issueLine("warning", w.message));
+  for (const e of result.errors) io.err(issueLine("error", "span" in e ? issueText(e) : e.message));
+  for (const w of result.warnings) io.err(issueLine("warning", "span" in w ? issueText(w) : w.message));
   if (result.missingTypes.length > 0) {
     io.err(`  Known part types and their pins are listed in docs/parts.md.`);
   }
 }
 
 /** Read and load a project file, printing why it cannot be used. */
-function readProjectFile(file: string, verb: string, io: Io): LoadedProject | undefined {
-  let text: string;
-  try {
-    text = readFileSync(file, "utf8");
-  } catch (e) {
-    const code = (e as NodeJS.ErrnoException).code;
-    if (code === "ENOENT") io.err(`Cannot read ${showPath(file)}: no such file`);
-    else if (code === "EISDIR") io.err(`Cannot read ${showPath(file)}: it is a directory, not a file.`);
-    else if (code === "EACCES" || code === "EPERM") io.err(`Cannot read ${showPath(file)}: permission denied.`);
-    else io.err(`Cannot read ${showPath(file)}: ${(e as Error).message}`);
+function readProjectFile(file: string, verb: string, roots: Roots, io: Io): LoadedProject | undefined {
+  const opened = readWithin(roots, file);
+  if (!opened.ok) {
+    io.err(`Cannot read ${showPath(file)}. ${opened.message}`);
     return undefined;
   }
 
   // JSON.parse is the authority; the scanner only supplies a friendlier position when it fails.
-  try {
-    JSON.parse(text);
-  } catch {
-    const problem = jsonProblem(text);
-    if (problem) {
-      const { line, column } = lineColumn(text, problem.index);
-      io.err(`Cannot read ${showPath(file)}: bad JSON at line ${line}, column ${column}: ${problem.message}`);
-    } else {
-      io.err(`Cannot read ${showPath(file)}: the file is not valid JSON.`);
+  const format = formatOf(file), text = opened.text.replace(/^\uFEFF/, "");
+  if (format === "json") {
+    try { JSON.parse(text); }
+    catch {
+      const problem = jsonProblem(text);
+      if (problem) {
+        const { line, column } = lineColumn(text, problem.index);
+        io.err(`Cannot read ${showPath(file)}: bad JSON at line ${line}, column ${column}: ${problem.message}`);
+      } else {
+        io.err(`Cannot read ${showPath(file)}: the file is not valid JSON.`);
+      }
+      return undefined;
     }
-    return undefined;
   }
 
-  const loaded = loadProject(text);
+  const loaded = projectText(text, format);
   if (!loaded.ok || loaded.project === undefined) {
     io.err(`Cannot ${verb} ${showPath(file)}:`);
     printLoadErrors(loaded, io);
     return undefined;
   }
-  for (const w of loaded.warnings) io.err(issueLine("warning", w.message));
+  const guards = guardProject(loaded.project);
+  if (guards.length) { for (const guard of guards) io.err(guard); return undefined; }
+  for (const w of loaded.warnings) io.err(issueLine("warning", "span" in w ? issueText(w) : w.message));
   return loaded.project;
+}
+
+function openProjectForCli(file: string, verb: string, json: boolean, io: Io):
+  { ok: true; project: LoadedProject; real: string; roots: Roots } | { ok: false; code: number } {
+  const roots = rootsFor(file);
+  if (json) {
+    const input = loadWithin(roots, file);
+    if (!input.ok) return { ok: false, code: emit({ isError: true, body: { error: input.message, issues: input.issues } }, true, io) };
+    return { ...input, roots };
+  }
+  const project = readProjectFile(file, verb, roots, io);
+  if (!project) return { ok: false, code: formatOf(file) === "dsl" ? 1 : 2 };
+  return { ok: true, project, real: realpathSync(file), roots };
+}
+
+function legacyFailure(json: boolean, file: string, message: string, io: Io): number {
+  if (json) return emit({ isError: true, body: { error: message } }, true, io);
+  io.err(message);
+  return formatOf(file) === "dsl" ? 1 : 2;
 }
 
 /** The layout a file was saved with (written by edit), if it still matches the file. */
@@ -130,15 +179,17 @@ function savedLayout(project: LoadedProject, io: Io): LayoutState | undefined {
 }
 
 /** Write the SVG and PNG of a laid-out drawing; returns their paths, or undefined after saying why not. */
-function writeDrawing(result: LayoutResult, dir: string, name: string, io: Io): { svgPath: string; pngPath: string } | undefined {
+function writeDrawing(result: LayoutResult, dir: string, name: string, file: string, roots: Roots, io: Io): { svgPath: string; pngPath: string } | undefined {
   const svg = toSvg(result.render!);
   const png = toPng(svg);
   const svgPath = join(dir, `${name}.svg`);
   const pngPath = join(dir, `${name}.png`);
   try {
+    const parent = realpathSync(existingParent(resolve(dir)));
+    if (!roots.real.some((root) => insideRoot(root, parent))) throw new Error("The output folder is outside the configured roots.");
     mkdirSync(dir, { recursive: true });
-    writeFileSync(svgPath, svg);
-    writeFileSync(pngPath, png);
+    writeOutput(roots, svgPath, file, svg, true);
+    writeOutput(roots, pngPath, file, png, true);
   } catch (e) {
     io.err(`Cannot write to ${showPath(dir)}: ${(e as Error).message}`);
     return undefined;
@@ -146,14 +197,13 @@ function writeDrawing(result: LayoutResult, dir: string, name: string, io: Io): 
   return { svgPath, pngPath };
 }
 
-function draw(file: string | undefined, dir: string, io: Io): number {
+function draw(file: string | undefined, dir: string, json: boolean, io: Io): number {
   if (file === undefined) {
-    io.err("draw: no file given.");
-    io.err(USAGE);
-    return 2;
+    return usageError("draw: no file given.", json, io);
   }
-  const project = readProjectFile(file, "draw", io);
-  if (project === undefined) return 2;
+  const input = openProjectForCli(file, "draw", json, io);
+  if (!input.ok) return input.code;
+  const { project, roots, real } = input;
 
   const name = drawingName(file);
   const started = performance.now();
@@ -166,18 +216,20 @@ function draw(file: string | undefined, dir: string, io: Io): number {
     result = layout(project);
   }
   if (result.render === undefined) {
+    if (json) return emit({ isError: true, body: { error: "The circuit could not be drawn.", status: result.status, issues: result.issues } }, true, io);
     io.err(`${name}: could not draw it (${result.status}).`);
     for (const issue of result.issues) io.err(issueLine("issue", issue));
     for (const note of result.notes) io.err(issueLine("note", note));
-    return 2;
+    return formatOf(file) === "dsl" ? 1 : 2;
   }
 
   const quality = checkDrawing(project.circuit, result.pinDefs, result.render);
-  const written = writeDrawing(result, dir, name, io);
-  if (written === undefined) return 2;
+  const written = writeDrawing(result, dir, name, real, withLegacyOutput(roots, dir), io);
+  if (written === undefined) return json ? emit({ isError: true, body: { error: "Could not write the drawings." } }, true, io) : 2;
   const ms = performance.now() - started;
 
   const valid = quality.valid && result.status === "valid";
+  if (json) return emit({ isError: !valid, body: { status: result.status, verified: quality.valid, svg: showPath(written.svgPath), png: showPath(written.pngPath), metrics: quality.metrics } }, true, io);
   io.out(
     `${name}: ${valid ? "valid" : "NOT valid"}. Wrote ${showPath(written.svgPath)} and ${showPath(written.pngPath)} (${Math.round(ms)} ms)`,
   );
@@ -204,71 +256,38 @@ interface Args {
   expectLayout?: string;
 }
 
-/** Older copies kept per file in .schem-history/ next to it (SPEC 11.3). */
-const HISTORY = 20;
-
-/** Copy the file to .schem-history/<file name>/<n>.schem.json, keeping the newest HISTORY copies. */
-function snapshot(file: string): void {
-  const dir = join(dirname(file), ".schem-history", basename(file));
-  mkdirSync(dir, { recursive: true });
-  const numbers = readdirSync(dir)
-    .map((f) => /^(\d+)\.schem\.json$/.exec(f)?.[1])
-    .filter((n): n is string => n !== undefined)
-    .map(Number)
-    .sort((a, b) => a - b);
-  copyFileSync(file, join(dir, `${(numbers.at(-1) ?? 0) + 1}.schem.json`));
-  for (const n of numbers.slice(0, Math.max(0, numbers.length + 1 - HISTORY))) rmSync(join(dir, `${n}.schem.json`));
-}
-
-/**
- * Replace a file through a temporary file and a rename, so it is never left half-written (SPEC
- * 11.2). A rename blocked for a moment by another program (OneDrive, an editor, antivirus) is
- * retried a few times.
- */
-function replaceFile(file: string, text: string): void {
-  const tmp = `${file}.${process.pid}.tmp`;
-  writeFileSync(tmp, text);
-  for (let attempt = 1; ; attempt++) {
-    try {
-      renameSync(tmp, file);
-      return;
-    } catch (e) {
-      const code = (e as NodeJS.ErrnoException).code;
-      if (attempt >= 10 || (code !== "EPERM" && code !== "EBUSY" && code !== "EACCES")) {
-        rmSync(tmp, { force: true });
-        throw e;
-      }
-      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 50 * attempt);
-    }
-  }
-}
-
 function edit(a: Args, io: Io): number {
   if (a.file === undefined) {
-    io.err("edit: no file given.");
-    io.err(USAGE);
-    return 2;
+    return usageError("edit: no file given.", a.json, io);
   }
   if (a.ops === undefined) {
-    io.err("edit: no operations given. Add --ops <ops.json>; docs/editing.md describes the operations.");
-    return 2;
+    return usageError("edit: no operations given. Add --ops <ops.json>.", a.json, io);
   }
-  const project = readProjectFile(a.file, "edit", io);
-  if (project === undefined) return 2;
-
-  let opsText: string;
+  const roots = rootsFor(a.file), target = resolvePath(roots, a.file, "overwrite");
+  if (!target.ok) return legacyFailure(a.json, a.file, target.message, io);
   try {
-    opsText = readFileSync(a.ops, "utf8");
-  } catch (e) {
-    const code = (e as NodeJS.ErrnoException).code;
-    io.err(`Cannot read ${showPath(a.ops)}: ${code === "ENOENT" ? "no such file" : (e as Error).message}`);
-    return 2;
+    return withLock(target.real, () => editLocked({ ...a, file: a.file!, ops: a.ops! }, target.real, roots, io));
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (error instanceof WriteConflict)
+      return emit({ isError: true, body: { status: "conflict", error: message } }, a.json, io);
+    return legacyFailure(a.json, a.file, message, io);
   }
+}
+
+function editLocked(a: Args & { file: string; ops: string }, real: string, roots: Roots, io: Io): number {
+  const input = openProjectForCli(a.file, "edit", a.json, io);
+  if (!input.ok) return input.code;
+  const { project } = input;
+  const ops = readWithin(roots, a.ops);
+  if (!ops.ok) return legacyFailure(a.json, a.file, ops.message, io);
+  const opsText = ops.text;
   const parsed = parseEditScript(opsText);
   if (!parsed.ok) {
+    if (a.json) return emit({ isError: true, body: { error: "Invalid edit operations.", issues: parsed.issues } }, true, io);
     io.err(`Cannot use ${showPath(a.ops)}:`);
     for (const i of parsed.issues) io.err(issueLine("error", `${i.code} ${i.message}`));
-    return 2;
+    return formatOf(a.file) === "dsl" ? 1 : 2;
   }
   const script = { ...parsed.script };
   if (a.expectRevision !== undefined) script.expectedRevision = a.expectRevision;
@@ -304,25 +323,18 @@ function edit(a: Args, io: Io): number {
     return code;
   }
 
-  // The saved layout's basis is the revision of the file as it will be read back.
-  const { layoutCache: _old, ...edited } = run.project;
-  const reloaded = loadProject(saveProject(edited)).project!;
-  const basis = revision(reloaded);
-  const cache = toLayoutCache(r.layout.state, basis, r.mode ?? "canonical");
-  const text = saveProject({ ...edited, layoutCache: cache });
-  const token = layoutToken(reloaded, fromLayoutCache(cache, basis).state!);
-
+  const { text, revision: basis, layoutToken: token } = commitProject(run.project, r.layout.state, r.mode ?? "canonical", formatOf(a.file));
+  if (Buffer.byteLength(text) > MAX_FILE) return legacyFailure(a.json, a.file, "The saved project would be over 2 MB.", io);
   let written: { svgPath: string; pngPath: string } | undefined;
   if (!a.dryRun) {
-    try {
-      snapshot(a.file);
-      replaceFile(a.file, text);
-    } catch (e) {
-      io.err(`Cannot save ${showPath(a.file)}: ${(e as Error).message}`);
-      return 2;
+    replaceWithHistory(real, text);
+    written = writeDrawing(r.layout, a.dir, name, real, withLegacyOutput(roots, a.dir), io);
+    if (written === undefined) {
+      const error = "The edit was saved, but the drawing export failed.";
+      if (a.json) return emit({ isError: true, body: { error, saved: true, revision: basis, layoutToken: token } }, true, io);
+      io.err(error);
+      return 1;
     }
-    written = writeDrawing(r.layout, a.dir, name, io);
-    if (written === undefined) return 2;
   }
   const ms = performance.now() - started;
 
@@ -357,6 +369,130 @@ function edit(a: Args, io: Io): number {
   return 0;
 }
 
+
+const SHARED = {
+  init: { values: [], flags: [] },
+  check: { values: ["detail", "cursor"], flags: [] },
+  render: { values: ["out", "scale", "dpi"], flags: ["draft", "overwrite"] },
+  preview: { values: ["out", "max", "focus", "finding"], flags: [] },
+  query: { values: [], flags: [] },
+  undo: { values: [], flags: [] },
+  fmt: { values: ["to"], flags: [] },
+  describe: { values: [], flags: ["table"] },
+  components: { values: ["limit", "cursor"], flags: [] },
+} satisfies Record<string, { values: string[]; flags: string[] }>;
+
+const STARTER = [
+  'circuit "LED indicator"',
+  "part B1 battery 9V",
+  "part R1 resistor 470",
+  "part D1 led color=red",
+  "net PWR = B1[+] R1[1]",
+  "connect R1[2] D1[A]",
+  "net GND = D1[K] B1[-]",
+  "",
+].join("\n");
+
+type SharedVerb = keyof typeof SHARED;
+
+function usageError(message: string, json: boolean, io: Io): number {
+  if (json) io.out(JSON.stringify({ error: message, status: "usage" }, null, 2));
+  else { io.err(message); io.err(USAGE); }
+  return 2;
+}
+
+function shared(verb: SharedVerb, argv: string[], io: Io): number {
+  const json = argv.includes("--json");
+  const spec: { values: readonly string[]; flags: readonly string[] } = SHARED[verb];
+  const positional: string[] = [], options = new Map<string, string | true>();
+  const usage = (message: string) => usageError(message, json, io);
+  for (let i = 0; i < argv.length; i++) {
+    const arg = argv[i]!;
+    if (arg === "--json") continue;
+    if (!arg.startsWith("-")) { positional.push(arg); continue; }
+    const opt = arg === "-o" ? "out" : arg.startsWith("--") ? arg.slice(2) : "";
+    if (options.has(opt)) return usage(`Option "${arg}" is already set.`);
+    if (spec.flags.includes(opt)) options.set(opt, true);
+    else if (spec.values.includes(opt)) {
+      const value = argv[i + 1];
+      if (!value || value.startsWith("--") || value === "-o") return usage(`${arg} needs a value.`);
+      options.set(opt, value);
+      i++;
+    } else return usage(`Unknown option "${arg}".`);
+  }
+
+  const [file, subject, id] = positional;
+  const noFile = verb === "components" || verb === "init";
+  const count = verb === "query" ? 3 : 1;
+  if (positional.length > count || (!noFile && positional.length !== count))
+    return usage(verb === "query" ? "query needs a file, part or net, and an id." : `Check the arguments for ${verb}.`);
+  const args: Record<string, unknown> = Object.fromEntries(options);
+  if (verb === "components") args.query = file;
+  else if (verb === "init") {
+    const name = file ?? "circuit";
+    args.path = /\.(?:schem|json)$/i.test(name) ? name : `${name}.schem`;
+    args.source = STARTER;
+  } else args.path = file;
+
+  if (verb === "query") {
+    if (subject !== "part" && subject !== "net") return usage("query needs part or net.");
+    args[subject] = id;
+  }
+  if (verb === "preview" || verb === "render") {
+    const out = options.get("out");
+    if (typeof out !== "string") return usage(`${verb} needs -o and an output file.`);
+    const format = extname(out).slice(1).toLowerCase();
+    if (verb === "preview" && format !== "png") return usage("preview needs a .png output.");
+    if (verb === "render" && format !== "svg" && format !== "png") return usage("render needs a .svg or .png output.");
+    args.format = format;
+  }
+  if (verb === "render") {
+    if (options.has("scale") && options.has("dpi")) return usage("Give --scale or --dpi.");
+    if (args.format === "svg" && (options.has("scale") || options.has("dpi"))) return usage("--scale and --dpi are for PNG.");
+    args.requireValid = !options.has("draft");
+  }
+  if (verb === "preview" && options.has("finding") && options.has("focus")) return usage("Give --focus or --finding.");
+  if (verb === "fmt" && args.to !== undefined && args.to !== "dsl" && args.to !== "json") return usage("--to is dsl or json.");
+  if (verb === "check" && args.detail !== undefined && !["brief", "normal", "full"].includes(String(args.detail)))
+    return usage("--detail is brief, normal or full.");
+  if (verb === "check" && args.detail === undefined) args.detail = "full";
+  for (const [flag, key] of [["scale", "scale"], ["dpi", "dpi"], ["max", "maxSize"], ["limit", "limit"]] as const) {
+    const value = options.get(flag);
+    if (value === undefined) continue;
+    const number = Number(value);
+    if (!Number.isFinite(number) || number <= 0 || (flag === "limit" && !Number.isSafeInteger(number)))
+      return usage(`--${flag} needs a positive ${flag === "limit" ? "integer" : "number"}.`);
+    args[key] = number;
+  }
+  const roots = rootsFor(typeof args.path === "string" ? args.path : undefined);
+  const name = verb === "init" ? "schem_create" : `schem_${verb}`;
+  return emit(executeCommand(roots, name, args), json, io);
+}
+
+function emit(result: CommandResult, json: boolean, io: Io): number {
+  const { body } = result;
+  if (json) io.out(JSON.stringify(body, null, 2));
+  else if (result.isError) io.err(String(body.error ?? body.status ?? "The command failed."));
+  else if (typeof body.description === "string") {
+    io.out(body.description);
+    if (Array.isArray(body.table)) {
+      io.out("\nNet | Presentation | Pins\n--- | --- | ---");
+      for (const row of body.table) io.out(`${row.name} | ${row.presentation} | ${row.pins.join(", ")}`);
+    }
+  } else if (typeof body.out === "string") io.out(`Wrote ${body.out}.`);
+  else if (Array.isArray(body.components)) {
+    for (const entry of body.components) io.out(`${entry.id}  ${entry.pins.map((pin: { name: string }) => pin.name).join(", ")}`.trimEnd());
+  } else if (body.part || body.net) io.out(JSON.stringify(body.part ?? body.net, null, 2));
+  else {
+    io.out([body.path, body.status].filter(Boolean).join("  "));
+    if (body.metrics) io.out(JSON.stringify(body.metrics));
+    if (Array.isArray(body.findings)) for (const finding of body.findings) io.out(`${finding.id}  ${finding.message}`);
+    if (Array.isArray(body.warnings)) for (const warning of body.warnings) io.out(`Warning: ${warning}`);
+  }
+  if (body.status === "conflict") return 4;
+  return result.isError || (typeof body.status === "string" && body.status !== "valid") || body.verified === false ? 1 : 0;
+}
+
 function dispatch(argv: string[], io: Io): number {
   const [command, ...rest] = argv;
   if (command === undefined || command === "--help" || command === "-h" || command === "help") {
@@ -367,48 +503,41 @@ function dispatch(argv: string[], io: Io): number {
     io.out(packageVersion());
     return 0;
   }
+  if (Object.hasOwn(SHARED, command)) return shared(command as SharedVerb, rest, io);
   if (command !== "draw" && command !== "edit") {
-    io.err(`Unknown command "${command}".`);
-    io.err(USAGE);
-    return 2;
+    return usageError(`Unknown command "${command}".`, rest.includes("--json"), io);
   }
 
-  const a: Args = { dir: "out", strict: false, dryRun: false, json: false };
+  const a: Args = { dir: "out", strict: false, dryRun: false, json: rest.includes("--json") };
   // Options that take a value, and flags, per command.
   const valued: Record<string, (v: string) => void> = { "-o": (v) => (a.dir = v), "--out": (v) => (a.dir = v) };
-  const flags: Record<string, () => void> = {};
+  const flags: Record<string, () => void> = { "--json": () => (a.json = true) };
   if (command === "edit") {
     valued["--ops"] = (v) => (a.ops = v);
     valued["--expect-revision"] = (v) => (a.expectRevision = v);
     valued["--expect-layout"] = (v) => (a.expectLayout = v);
     flags["--strict"] = () => (a.strict = true);
     flags["--dry-run"] = () => (a.dryRun = true);
-    flags["--json"] = () => (a.json = true);
   }
   for (let i = 0; i < rest.length; i++) {
     const arg = rest[i]!;
     if (valued[arg]) {
       const next = rest[i + 1];
-      if (next === undefined) {
-        io.err(`${arg}: no ${arg === "-o" || arg === "--out" ? "folder" : "value"} given.`);
-        return 2;
-      }
+      if (next === undefined || next.startsWith("--"))
+        return usageError(`${arg}: no ${arg === "-o" || arg === "--out" ? "folder" : "value"} given.`, a.json, io);
       valued[arg]!(next);
       i++;
     } else if (flags[arg]) {
       flags[arg]!();
     } else if (arg.startsWith("-") && arg !== "-") {
-      io.err(`Unknown option "${arg}".`);
-      io.err(USAGE);
-      return 2;
+      return usageError(`Unknown option "${arg}".`, a.json, io);
     } else if (a.file === undefined) {
       a.file = arg;
     } else {
-      io.err(`${command}: more than one file given ("${a.file}" and "${arg}").`);
-      return 2;
+      return usageError(`${command}: more than one file given ("${a.file}" and "${arg}").`, a.json, io);
     }
   }
-  return command === "draw" ? draw(a.file, a.dir, io) : edit(a, io);
+  return command === "draw" ? draw(a.file, a.dir, a.json, io) : edit(a, io);
 }
 
 /** Run the CLI with arguments and output sinks; returns the process exit code. */
@@ -416,9 +545,9 @@ export function run(argv: string[], io: Io): number {
   try {
     return dispatch(argv, io);
   } catch (e) {
-    io.err("Internal error, please report it:");
-    io.err(e instanceof Error ? (e.stack ?? e.message) : String(e));
-    return 2;
+    if (argv.includes("--json")) io.out(JSON.stringify({ status: "internal_error", error: e instanceof Error ? e.message : String(e) }));
+    else io.err(e instanceof Error ? (e.stack ?? e.message) : String(e));
+    return 3;
   }
 }
 

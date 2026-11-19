@@ -248,9 +248,10 @@ function intentOf(
   return { intent, sources };
 }
 
-/** A strict relation must separate the alignment points. A row or column makes them equal. */
+/** Check constraints that follow from the source, even when routing cannot produce a drawing. */
 function checkStrictPlacement(hints: readonly Hint[], sources: ReadonlyMap<string, Token>): void {
   const constraints: Constraint[] = [], variables = new Set<string>();
+  const pinSides = new Map<string, { side: string; hintId: string }>();
   for (const hint of hints) {
     if (hint.priority !== "strict") continue;
     const add = (axis: string, after: string, before: string, gap: number) => {
@@ -269,6 +270,18 @@ function checkStrictPlacement(hints: readonly Hint[], sources: ReadonlyMap<strin
       for (const part of hint.parts.slice(1)) {
         add(axis, hint.parts[0]!, part, 0);
         add(axis, part, hint.parts[0]!, 0);
+      }
+    } else if (hint.type === "pinSides") {
+      for (const [side, pins] of Object.entries(hint.sides)) {
+        for (const [index, pin] of pins.entries()) {
+          const key = `${hint.part}[${pin}]`, earlier = pinSides.get(key);
+          if (earlier && earlier.side !== side) {
+            const first = sources.get(earlier.hintId)!.span.start.line;
+            fail(sources.get(hint.id)!, `${key} is fixed to the ${earlier.side} side by the strict hint on line ${first}.`, "E263");
+          }
+          if (!earlier) pinSides.set(key, { side, hintId: hint.id });
+          if (index) add(`pins:${hint.part}:${side}`, pin, pins[index - 1]!, 1);
+        }
       }
     }
   }
