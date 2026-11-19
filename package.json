@@ -44,6 +44,7 @@
   },
   "scripts": {
     "build": "tsx scripts/build.ts",
+    "pack:smoke": "tsx scripts/pack-smoke.ts",
     "test": "vitest run",
     "typecheck": "tsc --noEmit && tsc --noEmit -p web",
     "draw": "tsx scripts/draw.ts",
