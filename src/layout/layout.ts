@@ -723,7 +723,14 @@ export function layout(project: Project, opts: LayoutOptions = {}): LayoutResult
     for (let i = 0; i + 1 < col.length; i++) {
       if (apart.has(`${col[i]}|${col[i + 1]}`)) continue;
       const ea = blockEnv(col[i]!), eb = blockEnv(col[i + 1]!);
-      cons.push({ a: vy(col[i + 1]!), b: vy(col[i]!), c: keptGap(col[i]!, col[i + 1]!, 1, gapY + ea.y + ea.h - eb.y), priority: "structural", why: `order in column ${c}` });
+      // If the upper block has a wired down-facing pin on its bottom edge, leave 3 G to the next
+      // block so a corner wire at pin.y + 2 clears the lower block's top edge (avoiding a 1 G jog).
+      const hasBottomWire = groupOf(col[i]!).some((m) => placed.get(m)!.pins.some((p) => {
+        const net = drawnNet.get(`${m}[${p.number}]`);
+        return net !== undefined && !portNet.has(net) && p.dir === "down" && p.at[1] + offsetOf(m)[1] >= ea.y + ea.h;
+      }));
+      const needY = Math.max(gapY, hasBottomWire ? 3 : 0);
+      cons.push({ a: vy(col[i + 1]!), b: vy(col[i]!), c: keptGap(col[i]!, col[i + 1]!, 1, needY + ea.y + ea.h - eb.y), priority: "structural", why: `order in column ${c}` });
     }
   }
   // Bus corridors: a template run that crosses columns (an I2C trunk from the controller to its
@@ -930,7 +937,11 @@ export function layout(project: Project, opts: LayoutOptions = {}): LayoutResult
       const p = el.pins.find((q) => `${q.part}[${q.number}]` === t)!;
       return { id: t, at: p.at, dir: p.dir };
     });
-    terms.sort((a, b) => colOf.get(partOfTerm(a.id))! - colOf.get(partOfTerm(b.id))! || cmpStr(a.id, b.id));
+    // Start from a horizontal terminal when present so multi-pin nets establish their straight
+    // horizontal trunk row before vertical taps join it (avoids U-loops around tap corners).
+    const horizFirst = terms.length >= 3 && terms.some((t) => isHorizontal(t.dir)) && terms.some((t) => !isHorizontal(t.dir));
+    terms.sort((a, b) => (horizFirst ? Number(!isHorizontal(a.dir)) - Number(!isHorizontal(b.dir)) : 0)
+      || colOf.get(partOfTerm(a.id))! - colOf.get(partOfTerm(b.id))! || cmpStr(a.id, b.id));
     if (portNet.has(n.id)) {
       const prewired: Array<[Pt, Pt]> = [];
       for (const id of ids) for (const q of placed.get(id)!.ports) if (q.net.id === n.id && q.stub.length) {
