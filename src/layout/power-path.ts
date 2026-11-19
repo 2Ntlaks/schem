@@ -162,8 +162,13 @@ export function pathAnchors(
   const cap = (id: string) => {
     const p = partOf.get(id)!;
     if (!CAPACITOR_TYPES.has(p.type)) return undefined;
-    const v = parseQuantity(p.props?.value ?? "", "farad");
-    return v.ok ? v.value : Infinity;
+    // The leading quantity counts: "100 nF X7R 50 V" is 100 nF.
+    const value = p.props?.value ?? "";
+    const v = parseQuantity(value, "farad");
+    if (v.ok) return v.value;
+    const lead = /^\s*[\d.]+\s*[a-zA-Zµμ]*/.exec(value)?.[0];
+    const w = lead ? parseQuantity(lead, "farad") : undefined;
+    return w?.ok ? w.value : Infinity;
   };
   const used = new Set<string>();
   const out: PathAnchor[] = [];

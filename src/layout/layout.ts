@@ -592,14 +592,20 @@ export function layout(project: Project, opts: LayoutOptions = {}): LayoutResult
     const occupied = [...footprint(H), ...lanes, ...[...childOffsets, ...rigid].filter(([, c]) => c.host === host)
       .flatMap(([cid, c]) => footprint(placed.get(cid)!).map((x) => shifted(x, c.at)))];
     const boxes = footprint(P);
+    // An edit: a part it did not touch stands beside the chip only if it stood there before, and
+    // starts from where it stood, moving out only as far as it must.
+    let from = minDx;
+    const was = opts.previous?.parts[id], hostWas = opts.previous?.parts[host];
+    if (was && !affected.has(id)) {
+      const dx = hostWas ? s * (was.at[0] - hostWas.at[0] + top.at[0] - hp.at[0]) : NaN;
+      if (!hostWas || was.at[1] - hostWas.at[1] !== hp.at[1] + 1 - top.at[1] || !(dx >= minDx)) return false;
+      from = dx;
+    }
     let at: Pt | undefined;
-    for (let dx = minDx; dx <= minDx + 16 && !at; dx++) {
+    for (let dx = from; dx <= from + 16 && !at; dx++) {
       const tryAt: Pt = [hp.at[0] + s * dx - top.at[0], hp.at[1] + 1 - top.at[1]];
       if (!boxes.some((x) => occupied.some((q) => boxesOverlap(shifted(x, tryAt), q)))) at = tryAt;
     }
-    // An edit: a part it did not touch keeps its place beside the chip only where it already stood.
-    const was = opts.previous?.parts[id], hostWas = opts.previous?.parts[host];
-    if (at && was && !affected.has(id) && !(hostWas && was.at[0] - hostWas.at[0] === at[0] && was.at[1] - hostWas.at[1] === at[1])) at = undefined;
     if (!at) return false;
     rigid.set(id, { host, at });
     return true;

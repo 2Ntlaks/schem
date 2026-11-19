@@ -109,6 +109,14 @@ describe("pathAnchors", () => {
     ]);
   });
 
+  it("reads a capacitor's leading value, so a longer value keeps the row's order", () => {
+    const c = regulator(0);
+    c.parts.find((p) => p.id === "C9")!.props!.value = "100 nF X7R 50 V";
+    const drawnNet = new Map<string, string>();
+    for (const n of c.nets) for (const e of n.endpoints) drawnNet.set(e, n.id);
+    expect(pathAnchors([{ part: "U1", pin: "3" }], c, drawnNet, (n) => n === "n4", () => true).map((a) => a.load)).toEqual(["C9", "C8"]);
+  });
+
   it("takes one other two-pin load when there is no capacitor", () => {
     const c: Circuit = {
       parts: [reg, { id: "R2", type: "resistor", props: { value: "1k" } }, { id: "R1", type: "resistor", props: { value: "1k" } }],
