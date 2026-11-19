@@ -9,7 +9,8 @@
 //    - `schem mcp` answers initialize and tools/list over stdio with the same tool list and
 //      instructions as the repo's server, and schem_create then schem_render make the same SVG
 //      as the repo's server does in-process.
-// 4. Run the tarball through npx in an empty folder, as `npx schem` will once it is published.
+// 4. Run the tarball through npx in an empty folder, as `npx schem-cli` will once it is
+//    published: once naming the `schem` command, and once naming only the package.
 // 5. Install from the clone as docs/install.md describes (npm install -g, into a temporary
 //    prefix so the real global folder is untouched) and draw one example with it.
 //
@@ -29,7 +30,7 @@ const ROOT = path.resolve(fileURLToPath(new URL("..", import.meta.url)));
 const WIN = process.platform === "win32";
 const EXAMPLES = ["led", "esp32-relay", "summing-amp"];
 const keep = process.argv.includes("--keep");
-const version = (JSON.parse(readFileSync(path.join(ROOT, "package.json"), "utf8")) as { version: string }).version;
+const { name: pkgName, version } = JSON.parse(readFileSync(path.join(ROOT, "package.json"), "utf8")) as { name: string; version: string };
 
 let step = 0;
 function ok(message: string): void {
@@ -233,7 +234,7 @@ async function main(): Promise<void> {
     writeFileSync(path.join(app, "package.json"), `${JSON.stringify({ name: "smoke-app", private: true }, null, 2)}\n`);
     mustRun(npm, ["install", tarball, "--no-audit", "--no-fund", "--loglevel=error"], app);
     const installedPkg = JSON.parse(readFileSync(path.join(app, "package.json"), "utf8")) as { dependencies?: Record<string, string> };
-    if (Object.keys(installedPkg.dependencies ?? {}).join() !== "schem") fail(`the app has other dependencies: ${Object.keys(installedPkg.dependencies ?? {}).join(", ")}`);
+    if (Object.keys(installedPkg.dependencies ?? {}).join() !== pkgName) fail(`the app has other dependencies: ${Object.keys(installedPkg.dependencies ?? {}).join(", ")}`);
     const bin = path.join(app, "node_modules", ".bin", WIN ? "schem.cmd" : "schem");
     if (!existsSync(bin)) fail(`npm install made no ${bin}`);
     ok("npm install <tarball> into an empty project: node_modules/.bin/schem exists");
@@ -254,6 +255,10 @@ async function main(): Promise<void> {
     const nv = mustRun(npx, [...npxArgs, "--version"], empty).trim();
     if (nv !== version) fail(`npx schem --version printed "${nv}"`);
     ok(`npx --package <tarball> schem --version in an empty folder: ${nv}`);
+    // Naming only the package, as in `npx schem-cli draw x.json`: npx runs its one command.
+    const inferred = mustRun(npx, ["--yes", `file:../pack/${info.filename}`, "--version"], empty).trim();
+    if (inferred !== version) fail(`npx <package> --version (no command named) printed "${inferred}"`);
+    ok(`npx <package> --version, without naming the command: ${inferred} (npx runs the one bin, schem)`);
     checkDraws(npx, npxArgs, empty, refDir, "npx");
     const repoRoot2 = path.join(work, "repo-mcp-2");
     mkdirSync(repoRoot2);
@@ -273,7 +278,7 @@ async function main(): Promise<void> {
     checkDraws(globalBin, [], clone, refDir, "clone install (npm install -g .)");
     // The global package is a link to this repo: remove the link with npm before the temporary
     // folder is deleted, so the delete cannot reach the repo through it.
-    mustRun(npm, ["uninstall", "--global", "--prefix", prefix, "--loglevel=error", "schem"], work);
+    mustRun(npm, ["uninstall", "--global", "--prefix", prefix, "--loglevel=error", pkgName], work);
     if (existsSync(globalBin)) fail(`npm uninstall -g left ${globalBin}`);
 
     console.log(`pack:smoke passed: ${info.filename}, ${(info.size / 1024).toFixed(1)} kB, ${info.entryCount} files`);

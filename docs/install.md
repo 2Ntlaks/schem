@@ -8,9 +8,9 @@ schem is one command, `schem`, with two jobs:
 You need [Node.js](https://nodejs.org/) 22 or newer on Windows, macOS or Linux.
 
 > **schem is not on npm yet.** Until it is published, install it from a clone of this repo
-> (next section). The name `schem` on the npm registry currently belongs to an unrelated,
-> empty package, so `npx schem` does **not** run this project today. The npm commands further
-> down are for after the package is published; its final npm name may differ.
+> (next section). It will be published as **`schem-cli`**, and the command it installs is
+> `schem`. Do not type `npx schem`: the name `schem` on npm belongs to an unrelated, empty
+> package. The npm commands further down are for after the package is published.
 
 ## Install from a clone (works today)
 
@@ -29,7 +29,7 @@ schem --version
 schem draw examples/led.schem.json
 ```
 
-After a `git pull`, run `npm ci` and `npm run build` again; the linked command picks up the new build. To remove the command: `npm uninstall -g schem`.
+After a `git pull`, run `npm ci` and `npm run build` again; the linked command picks up the new build. To remove the command: `npm uninstall -g schem-cli`.
 
 ### MCP setup from a clone
 
@@ -38,7 +38,7 @@ For agents, point the client at Node and the built file directly. This works the
 - command: `node`
 - arguments: `/path/to/schem/dist/schem.js mcp --root /path/to/your/circuits`
 
-On Windows write the path with forward slashes, for example `C:/Users/you/schem/dist/schem.js`. The client snippets below use the npx form; to use your clone instead, replace `"command": "npx"` and `"-y", "schem"` with `"command": "node"` and `"/path/to/schem/dist/schem.js"`. For Claude Code:
+On Windows write the path with forward slashes, for example `C:/Users/you/schem/dist/schem.js`. The client snippets below use the npx form; to use your clone instead, replace `"command": "npx"` and `"-y", "schem-cli"` with `"command": "node"` and `"/path/to/schem/dist/schem.js"`. For Claude Code:
 
 ```sh
 claude mcp add schem -- node /path/to/schem/dist/schem.js mcp --root /path/to/your/circuits
@@ -49,17 +49,17 @@ claude mcp add schem -- node /path/to/schem/dist/schem.js mcp --root /path/to/yo
 Draw a circuit without installing anything:
 
 ```sh
-npx schem draw circuit.json
+npx schem-cli draw circuit.json
 ```
 
-This writes `out/circuit.svg` and `out/circuit.png`. Or install the command once:
+npx runs the package's one command, `schem`. This writes `out/circuit.svg` and `out/circuit.png`. Or install the command once:
 
 ```sh
-npm install -g schem
+npm install -g schem-cli
 schem draw circuit.json -o drawings
 ```
 
-`schem --help` lists the commands and options. The circuit file format is in [netlist-format.md](netlist-format.md), the part types in [parts.md](parts.md) and edit operations in [editing.md](editing.md). These three files and the examples also ship inside the package, in `node_modules/schem/docs/` and `node_modules/schem/examples/`.
+`schem --help` lists the commands and options. The circuit file format is in [netlist-format.md](netlist-format.md), the part types in [parts.md](parts.md) and edit operations in [editing.md](editing.md). These three files and the examples also ship inside the package, in `node_modules/schem-cli/docs/` and `node_modules/schem-cli/examples/`.
 
 ## The MCP server's options
 
@@ -81,13 +81,13 @@ In the snippets below, replace `/path/to/your/circuits` with your folder. `npx -
 ### Claude Code
 
 ```sh
-claude mcp add schem -- npx -y schem mcp --root /path/to/your/circuits
+claude mcp add schem -- npx -y schem-cli mcp --root /path/to/your/circuits
 ```
 
 Add `--scope user` to make it available in every project, or `--scope project` to write it to `.mcp.json` for your team. On native Windows (not WSL), wrap npx in `cmd /c`:
 
 ```sh
-claude mcp add schem -- cmd /c npx -y schem mcp --root C:/Users/you/circuits
+claude mcp add schem -- cmd /c npx -y schem-cli mcp --root C:/Users/you/circuits
 ```
 
 Check it with `claude mcp list`.
@@ -101,7 +101,7 @@ Edit `claude_desktop_config.json` (Settings, Developer, Edit Config). It is in `
   "mcpServers": {
     "schem": {
       "command": "npx",
-      "args": ["-y", "schem", "mcp", "--root", "/path/to/your/circuits"]
+      "args": ["-y", "schem-cli", "mcp", "--root", "/path/to/your/circuits"]
     }
   }
 }
@@ -118,7 +118,7 @@ Add to `.cursor/mcp.json` in your project, or to `~/.cursor/mcp.json` for every 
   "mcpServers": {
     "schem": {
       "command": "npx",
-      "args": ["-y", "schem", "mcp", "--root", "/path/to/your/circuits"]
+      "args": ["-y", "schem-cli", "mcp", "--root", "/path/to/your/circuits"]
     }
   }
 }
@@ -134,7 +134,7 @@ Add to `.vscode/mcp.json` in your workspace (note the key is `servers`, not `mcp
     "schem": {
       "type": "stdio",
       "command": "npx",
-      "args": ["-y", "schem", "mcp", "--root", "${workspaceFolder}"]
+      "args": ["-y", "schem-cli", "mcp", "--root", "${workspaceFolder}"]
     }
   }
 }
@@ -149,10 +149,10 @@ Add to `~/.codex/config.toml`:
 ```toml
 [mcp_servers.schem]
 command = "npx"
-args = ["-y", "schem", "mcp", "--root", "/path/to/your/circuits"]
+args = ["-y", "schem-cli", "mcp", "--root", "/path/to/your/circuits"]
 ```
 
-Or run `codex mcp add schem -- npx -y schem mcp --root /path/to/your/circuits`.
+Or run `codex mcp add schem -- npx -y schem-cli mcp --root /path/to/your/circuits`.
 
 ## What the package contains
 

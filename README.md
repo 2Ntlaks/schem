@@ -54,7 +54,7 @@ To change a circuit without reshuffling its drawing, list the changes in a small
 
 ## Install
 
-schem is **not on npm yet**. To get a `schem` command on your PATH today, build it from a clone and link it:
+schem is **not on npm yet**; it will be published as `schem-cli`. To get a `schem` command on your PATH today, build it from a clone and link it:
 
 ```sh
 npm ci
@@ -192,7 +192,7 @@ schem is an early prototype. It is useful today for small and medium circuits, a
 - Dense boards with several chips spread out too far
 - Some symmetric circuits, such as an instrumentation amplifier, still need a template for their textbook layout ([open jobs](docs/general-layout.md#open-jobs))
 - The symbol and board library is small
-- Not on npm, so no `npx schem` yet
+- Not on npm yet (it will be published as `schem-cli`)
 - No blind rating by outside judges yet
 
 </td>

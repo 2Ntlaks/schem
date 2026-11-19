@@ -2,8 +2,8 @@
 #
 # It never runs on its own: the only trigger is a manual "Run workflow" in the Actions tab
 # (workflow_dispatch). To release:
-#   1. Settle the npm name (the name "schem" on npm belongs to someone else today; see
-#      docs/agent-reports/claude-npm-package.md) and set "version" in package.json.
+#   1. Set "version" in package.json. The package publishes as "schem-cli" (the name
+#      "schem" on npm belongs to someone else); its command is still "schem".
 #   2. Add the repository secret NPM_TOKEN (an npm automation token with publish rights).
 #   3. Push a tag v<version>, for example v0.1.0, that points at the release commit.
 #   4. Actions, release, Run workflow, choose that tag under "Use workflow from". Leave
