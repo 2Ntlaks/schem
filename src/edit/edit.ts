@@ -4,9 +4,10 @@
 import { cmpStr, xformDir, xformPt, type Orient, type Pt, type Rot } from "../geom/geom.js";
 import { canonical as canonicalEp, CircuitError, netKind, type Circuit, type Net, type PinDefs } from "../core/model.js";
 import { applyOps, type CircuitOp } from "../core/ops.js";
-import { resolveEndpoint } from "../core/validate.js";
+import { resolveEndpoint, validate } from "../core/validate.js";
 import { hintParts, type Hint, type HintPriority, type Intent, type LayoutState, type Side } from "../core/intent.js";
 import { drawnAsPorts } from "../layout/ports.js";
+import { powerPath } from "../layout/power-path.js";
 import { layout, pinDefsOf, type LayoutResult, type Project, type Status } from "../layout/layout.js";
 import { checkDrawing, type DrawingCheck } from "../quality/index.js";
 import { BUILTIN, ORIENTS, type SymPin } from "../symbols/library.js";
@@ -258,12 +259,16 @@ function affectedBy(c1: Circuit, c2: Circuit, i1: Intent, i2: Intent, ops: EditO
   const partOf = (e: string) => e.slice(0, e.search(/[[{.]/));
   // Port-drawn nets (SPEC 9.5, rev C.3) do not spread "affected": only parts whose own endpoints
   // changed count. Which nets are port-drawn comes from the previous layout; a net it does not have
-  // uses the layout's rule (src/layout/ports.ts).
+  // uses the layout's rule (src/layout/ports.ts). A series power-path net with no load is drawn as a
+  // wire (src/layout/power-path.ts), so a change on it spreads to every part on it.
   const d1 = pinDefsOf(c1), d2 = pinDefsOf(c2);
   const canon = (e: string, d: PinDefs) => { const r = resolveEndpoint(e, d); return r.ok ? canonicalEp(r.ep) : e; };
+  const checked = validate(c2, d2);
+  const pathWires = checked.valid ? powerPath(c2, d2, checked.valid).wireNets : new Set<string>();
   const portDrawn = (n: Net) => {
     const prev = previous?.routes[n.id];
     if (prev) return prev.ports === true;
+    if (pathWires.has(n.id)) return false;
     return drawnAsPorts(n, [...new Set(n.endpoints.map((e) => canon(e, d2)))], (p) => c2.parts.find((x) => x.id === p)?.type);
   };
   const net1 = new Map(c1.nets.map((n) => [n.id, [...n.endpoints].sort(cmpStr).join(" ")]));

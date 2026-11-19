@@ -1,7 +1,7 @@
 // Layout pipeline (SPEC 9.2): generic placement, routing and decoupling child slots.
 
 import {
-  cmpNatural, cmpStr, edgeKey, gridBox, isHorizontal, key, step, unionBox, unitEdges, xformBox, xformDir, xformPt,
+  cmpNatural, cmpStr, edgeKey, gridBox, isHorizontal, key, opposite, step, unionBox, unitEdges, xformBox, xformDir, xformPt,
   boxesOverlap, type Box, type Dir, type Orient, type Pt,
 } from "../geom/geom.js";
 import { obstacleFromLabel, type Obstacle } from "../geom/forbidden.js";
@@ -14,6 +14,8 @@ import { decouplingMatches } from "./decoupling.js";
 import { drawnAsPorts } from "./ports.js";
 import { inferFlow, type FlowGraph } from "./flow.js";
 import { findStacks, type Stack } from "./stacks.js";
+import { findBridges, type Bridge } from "./bridges.js";
+import { pathAnchors, powerPath, type PathAnchor } from "./power-path.js";
 import { measure } from "../text/font.js";
 import { eq, solveWithDrops, X0, type Constraint } from "./solver.js";
 import { route, type NetRequest } from "./router.js";
@@ -158,12 +160,32 @@ export function layout(project: Project, opts: LayoutOptions = {}): LayoutResult
   const typeOfPart = new Map(circuit.parts.map((p) => [p.id, p.type]));
   const portNet = new Set<string>();
   for (const n of circuit.nets) if (drawnAsPorts(n, [...new Set(vc.endpoints.get(n.id)!.map(canonical))], (p) => typeOfPart.get(p))) portNet.add(n.id);
+  // Series power path (src/layout/power-path.ts): a supply net with only path pins is a wire; on a
+  // supply net with loads, the path pins are wired to the loads' symbols and get none of their own.
+  // A regulator box takes its input on the left and its output on the right (icFor), with its
+  // loads in a row beside each pin, unless the pin has decoupling capacitors for its top slots.
+  const path = powerPath(circuit, defs, vc);
+  notes.push(...path.notes);
+  for (const id of path.wireNets) portNet.delete(id);
+  const pathSides = new Map<string, Map<string, Side>>();
+  const boxRegulator = new Set<string>();
+  for (const l of path.links) {
+    const roles = l.pins.map((n) => defs[l.part]?.find((d) => d.number === n)?.role);
+    if (roles[0] !== "power_in" || roles[1] !== "power_out") continue;
+    boxRegulator.add(l.part);
+    pathSides.set(l.part, new Map([[l.pins[0], "left"], [l.pins[1], "right"]]));
+  }
   const wired = circuit.nets.filter((n) => !portNet.has(n.id));
   const keepsPreviousLock = (id: string) => {
     const lock = locks.get(id), prev = opts.previous?.parts[id];
     return !lock || (prev && lock.x === prev.at[0] && lock.y === prev.at[1] && lock.rot === prev.orient.rot && lock.flip === prev.orient.flip);
   };
-  const decouplers = opts.place || opts.decoupling === false ? [] : decouplingMatches(circuit, defs, vc, drawnNet, portNet, hints)
+  // A regulator pin that has decoupling capacitors keeps them in its top slots, next to its supply
+  // symbol, as on any chip; only a pin with none goes on the side with its loads beside it.
+  const matches = opts.place || opts.decoupling === false ? [] : decouplingMatches(circuit, defs, vc, drawnNet, portNet, hints);
+  for (const m of matches) pathSides.get(m.host)?.delete(m.pin);
+  for (const [part, sides] of pathSides) if (!sides.size) pathSides.delete(part);
+  const decouplers = matches
     .filter((m) => keepsPreviousLock(m.part) && !orientHint.has(m.part) && !orientHint.has(m.host)
       && !hints.some((h) => (h.type === "relative" && (h.part === m.part || h.of === m.part)) || (h.type === "align" && h.parts.includes(m.part))));
   const decouplerOf = new Map(decouplers.map((m) => [m.part, m]));
@@ -212,6 +234,71 @@ export function layout(project: Project, opts: LayoutOptions = {}): LayoutResult
     regions = regions.filter((r) => !r.members.some((m) => taken.has(m)));
   }
   const stackRoot = new Map(stacks.flatMap((st) => st.children.map((c) => [c.part, st.root] as const)));
+  // Bridges (src/layout/bridges.ts): a two-pin part across two pins of one chip goes with the chip.
+  // They ride on the stacks option, so the stack fallback drops them too.
+  let bridges: Bridge[] = [];
+  let pathLoads: PathAnchor[] = [];
+  const pathInLine: PathAnchor[] = [];
+  if (!opts.place && opts.stacks !== false) {
+    const inStack = new Set(stacks.flatMap((st) => [st.root, ...st.children.map((c) => c.part)]));
+    const placeHint = new Set(hints.filter((h) => h.type === "relative" || h.type === "align").flatMap(hintParts));
+    const inTemplate = new Set(regions.flatMap((r) => [...r.members, ...r.links]));
+    bridges = findBridges({ parts: circuit.parts, defs, drawnNet, portNet,
+      free: (id) => !locks.has(id) && !placeHint.has(id) && !decouplerOf.has(id) && !inStack.has(id) && !inTemplate.has(id),
+      box: (id) => !BUILTIN[partOf.get(id)!.type] && partOf.get(id)!.type !== HEADER && !inTemplate.has(id) && !stackRoot.has(id),
+      fixedOrient: (id) => { const h = orientHint.get(id); return h ? { rot: h.rot, flip: h.flip } : prevOf(id)?.orient; } });
+    for (const b of bridges) stackRoot.set(b.part, b.host);
+    // The loads beside a regulator's input or output (power-path.ts) go with the regulator like
+    // stack children.
+    const free = (id: string) => !locks.has(id) && !placeHint.has(id) && !orientHint.has(id) && !decouplerOf.has(id) && !inStack.has(id) && !inTemplate.has(id) && !stackRoot.has(id);
+    const pins = [...path.continuePins].map((t) => ({ part: partOfTerm(t), pin: t.slice(t.indexOf("[") + 1, -1) }))
+      .filter((p) => pathSides.get(p.part)?.has(p.pin) && free(p.part)).sort((a, b) => cmpStr(a.part, b.part) || cmpNatural(a.pin, b.pin));
+    pathLoads = pathAnchors(pins, circuit, drawnNet, (n) => portNet.has(n) && netKind(netById.get(n)!) === "ground", free);
+    for (const a of pathLoads) stackRoot.set(a.load, a.part);
+    // A two-pin part alone with a regulator pin on a wired net (a fuse or switch feeding its input)
+    // lies in line with that pin, so the supply runs through it in one straight wire.
+    for (const [part, sides] of [...pathSides].sort(([a], [b]) => cmpStr(a, b))) {
+      for (const pin of [...sides.keys()].sort(cmpNatural)) {
+        const net = drawnNet.get(`${part}[${pin}]`);
+        if (net === undefined || portNet.has(net)) continue;
+        const on = [...drawnNet].filter(([, n]) => n === net).map(([t]) => t).filter((t) => t !== `${part}[${pin}]`);
+        if (on.length !== 1) continue;
+        const load = partOfTerm(on[0]!), sym = BUILTIN[typeOfPart.get(load)!];
+        if (sym?.kind !== "two-pin" || sym.pins.length !== 2 || !free(load)) continue;
+        pathInLine.push({ part, pin, load, loadPin: on[0]!.slice(load.length + 1, -1), symbol: false });
+        stackRoot.set(load, part);
+      }
+    }
+  }
+  // A regulator pin with no load beside it keeps its supply symbol: a wire to a load drawn
+  // somewhere else would cross the sheet. A regulator with neither keeps its pins where they were.
+  const continuePins = new Set(path.continuePins);
+  const anchored = new Set(pathLoads.map((a) => `${a.part}[${a.pin}]`));
+  const inLinePin = new Set(pathInLine.map((a) => `${a.part}[${a.pin}]`));
+  const wiredPin = (t: string) => anchored.has(t) || inLinePin.has(t) || path.wireNets.has(drawnNet.get(t) ?? "");
+  for (const l of path.links) {
+    const sides = pathSides.get(l.part);
+    if (!sides && !boxRegulator.has(l.part)) continue;
+    for (const pin of l.pins) if (!sides?.has(pin) || !wiredPin(`${l.part}[${pin}]`)) { continuePins.delete(`${l.part}[${pin}]`); sides?.delete(pin); }
+    if (sides && !sides.size) pathSides.delete(l.part);
+  }
+  // The loads in a row beside a regulator pin are wired into its line; only the outermost keeps a symbol.
+  for (const a of pathLoads) if (!a.symbol) continuePins.add(`${a.load}[${a.loadPin}]`);
+  // A net keeps its path only while a series pin on it (not just the source) is still wired.
+  const continueByNet = new Map<string, Set<string>>();
+  for (const [net, pins] of path.continueByNet) {
+    const keep = [...pins, ...pathLoads.filter((a) => !a.symbol).map((a) => `${a.load}[${a.loadPin}]`)]
+      .filter((t) => continuePins.has(t) && drawnNet.get(t) === net);
+    if (keep.some((t) => BUILTIN[typeOfPart.get(partOfTerm(t))!]?.kind !== "source")) continueByNet.set(net, new Set(keep));
+    else for (const t of keep) continuePins.delete(t);
+  }
+  // The loads whose supply stub a path wire joins: the loads beside a regulator, or every load on
+  // a net whose path pins the router joins wherever it is nearest.
+  const loadPinOf = new Set(pathLoads.filter((a) => a.symbol).map((a) => `${a.load}[${a.loadPin}]`));
+  const joinedStub = (net: string, pin: string) => continueByNet.has(net)
+    && (loadPinOf.has(pin) || [...continueByNet.get(net)!].some((t) => !anchored.has(t) && !pathLoads.some((a) => `${a.load}[${a.loadPin}]` === t)));
+  const bridgePairs = new Map<string, Array<[string, string]>>();
+  for (const b of bridges) bridgePairs.set(b.host, [...(bridgePairs.get(b.host) ?? []), b.hostPins]);
   const bridgeTopOpamp = new Set(stacks.flatMap((st) => (st.bridgeOpamps ? [st.bridgeOpamps[0]] : [])));
   const regionOf = new Map<string, Region>(), linkOf = new Map<string, Region>();
   for (const r of regions) { for (const p of r.members) regionOf.set(p, r); for (const p of r.links) linkOf.set(p, r); }
@@ -282,6 +369,8 @@ export function layout(project: Project, opts: LayoutOptions = {}): LayoutResult
   // their label on the outward (left) side, and the IC keeps its label off the left edge so the
   // capacitor sits directly beside the supply pin it serves.
   const leftBypassCaps = new Set<string>();
+  /** Bridges standing left of their chip keep their label on the outward (left) side. */
+  const bridgeLabelLeft = new Set<string>();
   const icHasLeftBypass = new Set<string>();
   if (!opts.place) {
     const decSet = new Set(decouplers.map((m) => m.part));
@@ -299,6 +388,8 @@ export function layout(project: Project, opts: LayoutOptions = {}): LayoutResult
       if (host) { leftBypassCaps.add(id); icHasLeftBypass.add(host); }
     }
   }
+  // A regulator with a load beside its input keeps its own label off the left too.
+  for (const a of [...pathLoads, ...pathInLine]) if (pathSides.get(a.part)?.get(a.pin) === "left") icHasLeftBypass.add(a.part);
   const measurePart = (id: string, force?: Orient): void => {
     const part = partOf.get(id)!;
     const col = colOf.get(id)!;
@@ -320,7 +411,7 @@ export function layout(project: Project, opts: LayoutOptions = {}): LayoutResult
       const named = new Set(Object.values(given ?? {}).flat());
       const tpl = Object.fromEntries(Object.entries((tr ? templateSides(tr, id) : undefined) ?? {})
         .map(([side, ns]) => [side, (ns ?? []).filter((n) => !named.has(n))] as const).filter(([, ns]) => ns.length));
-      sym = icFor(id, defs[id]!, drawnNet, netById, ncSet, col, netCol, given, tpl, slotRoom.get(id));
+      sym = icFor(id, defs[id]!, drawnNet, netById, ncSet, col, netCol, given, tpl, slotRoom.get(id), bridgePairs.get(id), pathSides.get(id));
     }
     // Orientation precedence: fixed placement, lock, orient hint, previous layout, template, default.
     const lockOf = locks.get(id), oh = orientHint.get(id), prev = prevOf(id), to = tr ? templateOrient(tr, id, sym) : undefined;
@@ -340,6 +431,8 @@ export function layout(project: Project, opts: LayoutOptions = {}): LayoutResult
     for (const p of pins) {
       const netId = drawnNet.get(`${id}[${p.number}]`);
       if (!netId || !portNet.has(netId)) continue;
+      // A pin on the series power path is wired to the loads' symbols; it gets none of its own.
+      if (continuePins.has(`${id}[${p.number}]`)) continue;
       const net = netById.get(netId)!;
       const kind = netKind(net) === "ground" ? "ground" : "power";
       const want: Dir = railLevel(net) === 1 ? "up" : "down";
@@ -347,7 +440,9 @@ export function layout(project: Project, opts: LayoutOptions = {}): LayoutResult
       const half = Math.max(1, (portText(kind, net) ? measure(portText(kind, net)!, LABEL_SIZE).width / 10 : 0) / 2);
       const out = isHorizontal(p.dir) ? Math.max(1, Math.ceil(half)) : 1;
       let stub: Pt[];
-      if (p.dir === want) stub = [];
+      // On a net the path shares, the symbol stands 2 G off its pin, so the path's wire can join
+      // the stub between them instead of the symbol itself.
+      if (p.dir === want) stub = joinedStub(netId, `${id}[${p.number}]`) ? [p.at, step(p.at, want), step(p.at, want, 2)] : [];
       else if (isHorizontal(p.dir)) stub = [p.at, step(p.at, p.dir, out), step(step(p.at, p.dir, out), want)];
       else {
         // The pin faces away from where the symbol must point (a flipped pull-up): leave the pin,
@@ -366,7 +461,7 @@ export function layout(project: Project, opts: LayoutOptions = {}): LayoutResult
       return tp !== undefined && tp.at[0] > ko.x + ko.w / 2;
     });
     const labels = labelFor(part, sym, orient, ko, [...ports.map((q) => q.box), ...approachBoxes], intent.overrides?.labelSide?.[id]
-      ?? (tr ? templateLabel(tr, id) : leftBypassCaps.has(id) ? "left" : undefined), !tr,
+      ?? (tr ? templateLabel(tr, id) : leftBypassCaps.has(id) || bridgeLabelLeft.has(id) ? "left" : undefined), !tr,
       hostDec.length > 0 ? (decRight ? "below-right" : "below-left") : icHasLeftBypass.has(id) ? "above-right" : undefined);
     let env = ko;
     for (const l of labels) env = unionBox(env, gridBox(l.box));
@@ -496,6 +591,81 @@ export function layout(project: Project, opts: LayoutOptions = {}): LayoutResult
       rigid.set(c.part, { host: st.root, at });
       notes.push(`stack: ${c.part} ${c.dir === "up" ? "above" : "below"} ${c.parent}[${c.parentPin}]`);
     }
+  }
+  /**
+   * Stand a part (already turned and measured) beside a chip's side pin, as a rigid child: its top
+   * pin 1 G below the pin's row, so the pin's wire runs straight out and turns down into it, or
+   * meets the supply stub above it. It keeps clear of the chip, its other children, and the wires
+   * of the chip's other pins on that side. Returns false if it does not fit or an edit forbids it.
+   */
+  const standBeside = (id: string, topPin: string, host: string, hp: { at: Pt; dir: Dir }, keep: ReadonlyArray<{ at: Pt; dir: Dir }>, minDx: number, inLine = false): boolean => {
+    const H = placed.get(host)!, P = placed.get(id)!;
+    const top = P.pins.find((p) => p.number === topPin);
+    // Standing, the part's pin points up, 1 G below the pin's row; in line, it faces the pin on its row.
+    const row = inLine ? 0 : 1;
+    if (!top || top.dir !== (inLine ? opposite(hp.dir) : "up")) return false;
+    const s = hp.dir === "right" ? 1 : -1;
+    const lanes = H.pins.filter((p) => p.dir === hp.dir && !keep.includes(p))
+      .map((p): Box => ({ x: s > 0 ? p.at[0] : p.at[0] - 12, y: p.at[1] - 0.5, w: 12, h: 1 }));
+    const occupied = [...footprint(H), ...lanes, ...[...childOffsets, ...rigid].filter(([, c]) => c.host === host)
+      .flatMap(([cid, c]) => footprint(placed.get(cid)!).map((x) => shifted(x, c.at)))];
+    const boxes = footprint(P);
+    // An edit: a part it did not touch stands beside the chip only if it stood there before, and
+    // starts from where it stood, moving out only as far as it must.
+    let from = minDx;
+    const was = opts.previous?.parts[id], hostWas = opts.previous?.parts[host];
+    if (was && !affected.has(id)) {
+      const dx = hostWas ? s * (was.at[0] - hostWas.at[0] + top.at[0] - hp.at[0]) : NaN;
+      if (!hostWas || was.at[1] - hostWas.at[1] !== hp.at[1] + row - top.at[1] || !(dx >= minDx)) return false;
+      from = dx;
+    }
+    let at: Pt | undefined;
+    for (let dx = from; dx <= from + 16 && !at; dx++) {
+      const tryAt: Pt = [hp.at[0] + s * dx - top.at[0], hp.at[1] + row - top.at[1]];
+      if (!boxes.some((x) => occupied.some((q) => boxesOverlap(shifted(x, tryAt), q)))) at = tryAt;
+    }
+    if (!at) return false;
+    rigid.set(id, { host, at });
+    return true;
+  };
+  // Bridges: the part stands beside its chip's two pins, its upper pin on the upper pin's wire and
+  // its lower pin wired from below.
+  for (const b of bridges) {
+    const H = placed.get(b.host)!;
+    const hu = H.pins.find((p) => p.number === b.hostPins[0]), hl = H.pins.find((p) => p.number === b.hostPins[1]);
+    if (!hu || !hl || hu.dir !== hl.dir || !isHorizontal(hu.dir) || hl.at[0] !== hu.at[0] || hl.at[1] !== hu.at[1] + 2) continue;
+    const h = orientHint.get(b.part);
+    const o: Orient = h ? { rot: h.rot, flip: h.flip } : standing(b.part, b.partPins[0], "top");
+    if (!canTurn(b.part, o)) continue;
+    if (hu.dir === "left") bridgeLabelLeft.add(b.part);
+    measurePart(b.part, o);
+    const bottom = placed.get(b.part)!.pins.find((p) => p.number === b.partPins[1]);
+    if (bottom?.dir !== "down" || !standBeside(b.part, b.partPins[0], b.host, hu, [hu, hl], 3)) { bridgeLabelLeft.delete(b.part); measurePart(b.part); continue; }
+    notes.push(`bridge: ${b.part} beside ${b.host}[${b.hostPins[0]}] and ${b.host}[${b.hostPins[1]}]`);
+  }
+  // Power path: a regulator's input or output load hangs beside the pin, its supply symbol on a
+  // short stub that the pin's straight wire joins (power-path.ts).
+  for (const a of pathLoads) {
+    const hp = placed.get(a.part)!.pins.find((p) => p.number === a.pin);
+    if (!hp || !isHorizontal(hp.dir)) continue;
+    const o = standing(a.load, a.loadPin, "top");
+    if (!canTurn(a.load, o)) continue;
+    if (hp.dir === "left") bridgeLabelLeft.add(a.load);
+    measurePart(a.load, o);
+    const stub = placed.get(a.load)!.ports.find((q) => q.pin === a.loadPin)?.stub;
+    if ((a.symbol && stub?.length !== 3) || !standBeside(a.load, a.loadPin, a.part, hp, [hp], 2)) { bridgeLabelLeft.delete(a.load); measurePart(a.load); continue; }
+    notes.push(`power path: ${a.load} beside ${a.part}[${a.pin}]`);
+  }
+  // A fuse or switch in line with a regulator pin, its near pin facing the pin on the same row.
+  for (const a of pathInLine) {
+    const hp = placed.get(a.part)!.pins.find((p) => p.number === a.pin);
+    if (!hp || !isHorizontal(hp.dir) || !pathSides.get(a.part)?.has(a.pin)) continue;
+    const pinDef = placed.get(a.load)!.sym.pins.find((p) => p.number === a.loadPin)!;
+    const o = ([0, 180] as const).map((rot): Orient => ({ rot, flip: false })).find((x) => xformDir(pinDef.dir, x) === opposite(hp.dir));
+    if (!o || !canTurn(a.load, o)) continue;
+    measurePart(a.load, o);
+    if (!standBeside(a.load, a.loadPin, a.part, hp, [hp], 2, true)) { measurePart(a.load); continue; }
+    notes.push(`power path: ${a.load} in line with ${a.part}[${a.pin}]`);
   }
   for (const id of ids) {
     const p = placed.get(id)!;
@@ -964,6 +1134,8 @@ export function layout(project: Project, opts: LayoutOptions = {}): LayoutResult
 
   // Step 7: route wired nets; port stubs are pre-wired.
   const requests: NetRequest[] = [];
+  // A path net's request routes only its path pins, but its saved signature lists every pin.
+  const routeSig = new Map<string, string>();
   for (const n of circuit.nets) {
     const terms = [...drawnNet.entries()].filter(([, nn]) => nn === n.id).map(([t]) => {
       const p = el.pins.find((q) => `${q.part}[${q.number}]` === t)!;
@@ -976,16 +1148,29 @@ export function layout(project: Project, opts: LayoutOptions = {}): LayoutResult
       || colOf.get(partOfTerm(a.id))! - colOf.get(partOfTerm(b.id))! || cmpStr(a.id, b.id));
     if (portNet.has(n.id)) {
       const prewired: Array<[Pt, Pt]> = [];
-      for (const id of ids) for (const q of placed.get(id)!.ports) if (q.net.id === n.id && q.stub.length) {
+      const seal: Pt[] = [];
+      for (const id of ids) for (const q of placed.get(id)!.ports) if (q.net.id === n.id) {
         const o = at(id);
-        const s = q.stub.map((p): Pt => [o[0] + p[0], o[1] + p[1]]);
-        prewired.push(...unitEdges(s));
+        if (q.stub.length) prewired.push(...unitEdges(q.stub.map((p): Pt => [o[0] + p[0], o[1] + p[1]])));
+        seal.push([o[0] + q.anchor[0], o[1] + q.anchor[1]]);
       }
       for (const w of childWires.get(n.id) ?? []) {
         const o = at(w.host);
         prewired.push(...unitEdges(w.run.map((p): Pt => [o[0] + p[0], o[1] + p[1]])));
       }
-      requests.push({ net: n.id, terminals: terms, prewired: [...new Map(prewired.map((e) => [edgeKey(...e), e])).values()], noRoute: true });
+      const wires = [...new Map(prewired.map((e) => [edgeKey(...e), e])).values()];
+      const open = continueByNet.get(n.id);
+      const hanging = open ? terms.filter((t) => open.has(t.id)) : [];
+      if (hanging.length && opts.previous && opts.reuseRoutes !== false && opts.previous.routes[n.id]?.terminals === signature(terms)) {
+        routeSig.set(n.id, signature(terms));
+        requests.push({ net: n.id, terminals: terms, prewired: opts.previous.routes[n.id]!.runs.flatMap((w) => unitEdges(w)), noRoute: true });
+      } else if (hanging.length) {
+        // The path pins join the loads' supply stubs, never a symbol itself.
+        routeSig.set(n.id, signature(terms));
+        requests.push({ net: n.id, terminals: hanging, prewired: wires, seal, noRoute: false });
+      } else {
+        requests.push({ net: n.id, terminals: terms, prewired: wires, noRoute: true });
+      }
     } else if (opts.previous && opts.reuseRoutes !== false && opts.previous.routes[n.id]?.terminals === signature(terms)) {
       // Incremental mode: a net whose drawn terminals did not move keeps its route.
       requests.push({ net: n.id, terminals: terms, prewired: opts.previous.routes[n.id]!.runs.flatMap((w) => unitEdges(w)), noRoute: true });
@@ -1165,7 +1350,7 @@ export function layout(project: Project, opts: LayoutOptions = {}): LayoutResult
   }
   for (const r of routed) {
     const req = requests.find((q) => q.net === r.net)!;
-    state.routes[r.net] = { terminals: signature(req.terminals), runs: mergeRuns(r.edges), ...(portNet.has(r.net) ? { ports: true as const } : {}) };
+    state.routes[r.net] = { terminals: routeSig.get(r.net) ?? signature(req.terminals), runs: mergeRuns(r.edges), ...(portNet.has(r.net) ? { ports: true as const } : {}) };
   }
   if (regions.length) state.templates = regions.map((r) => r.key).sort(cmpStr);
   return state;
@@ -1218,6 +1403,8 @@ function icFor(
   forced?: Partial<Record<Side, string[]>>,
   after?: Partial<Record<Side, string[]>>,
   slotRoom?: ReadonlyMap<string, number>,
+  bridged?: ReadonlyArray<[string, string]>,
+  pathSide?: ReadonlyMap<string, Side>,
 ): SymbolDef {
   const visible = pins.filter((p) => drawnNet.has(`${id}[${p.number}]`) || ncSet.has(`${id}[${p.number}]`));
   const sides = { left: [] as PinDef[], right: [] as PinDef[], top: [] as PinDef[], bottom: [] as PinDef[] };
@@ -1225,7 +1412,8 @@ function icFor(
     const netId = drawnNet.get(`${id}[${p.number}]`);
     const level = netId ? railLevel(netById.get(netId)!) : undefined;
     if ([...Object.values(forced ?? {}), ...Object.values(after ?? {})].some((ns) => ns.includes(p.number))) continue;
-    if (p.role === "ground" || level === 0 || level === -1) sides.bottom.push(p);
+    if (pathSide?.has(p.number)) sides[pathSide.get(p.number)!].push(p);
+    else if (p.role === "ground" || level === 0 || level === -1) sides.bottom.push(p);
     else if (p.role === "power_in" || level === 1) sides.top.push(p);
     else {
       const c = netId ? netCol(netId, id) : undefined;
@@ -1234,6 +1422,24 @@ function icFor(
   }
   const sortKey = (p: PinDef) => { const n = drawnNet.get(`${id}[${p.number}]`); const net = n ? netById.get(n) : undefined; return net?.name ?? `~${p.number}`; };
   for (const s of Object.values(sides)) s.sort((a, b) => cmpStr(sortKey(a), sortKey(b)) || cmpNatural(a.number, b.number));
+  // Two pins a part bridges (src/layout/bridges.ts) sit next to each other, upper first, on the
+  // side their wires go to, at the place of the upper pin. Pins on the top or bottom stay there.
+  for (const [u, l] of bridged ?? []) {
+    const sideOf = (n: string) => (["left", "right"] as const).find((s) => sides[s].some((p) => p.number === n));
+    const su = sideOf(u), sl = sideOf(l);
+    if (!su || !sl) continue;
+    const cs = [u, l].flatMap((n) => { const net = drawnNet.get(`${id}[${n}]`); const c = net ? netCol(net, id) : undefined; return c === undefined ? [] : [c]; });
+    const side = su === sl ? su : cs.length && cs.reduce((a, b) => a + b, 0) / cs.length < col ? "left" : "right";
+    const pu = sides[su].find((p) => p.number === u)!, pl = sides[sl].find((p) => p.number === l)!;
+    sides[su].splice(sides[su].indexOf(pu), 1);
+    sides[sl].splice(sides[sl].indexOf(pl), 1);
+    const list = sides[side];
+    let at = list.findIndex((p) => cmpStr(sortKey(p), sortKey(pu)) > 0 || (sortKey(p) === sortKey(pu) && cmpNatural(p.number, pu.number) > 0));
+    if (at < 0) at = list.length;
+    // Never between the two pins of a pair placed before.
+    while (at > 0 && at < list.length && (bridged ?? []).some(([a, b]) => list[at - 1]!.number === a && list[at]!.number === b)) at++;
+    list.splice(at, 0, pu, pl);
+  }
   // Forced sides (SPEC 11.3 setPinSides): listed pins first, in the given order; a template's, last.
   const listed = (ns: string[]) => ns.map((n) => visible.find((p) => p.number === n)).filter((p): p is PinDef => p !== undefined);
   for (const [side, ns] of Object.entries(forced ?? {}) as Array<[Side, string[]]>) sides[side].unshift(...listed(ns));
