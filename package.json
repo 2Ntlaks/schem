@@ -1,10 +1,44 @@
 {
   "name": "schem",
   "version": "0.0.1",
-  "private": true,
-  "description": "Turn a JSON netlist into a clean, verified schematic drawing (SVG and PNG). Agent-first.",
+  "description": "Turn a JSON netlist into a clean, verified schematic drawing (SVG and PNG). A CLI and an MCP server for AI agents.",
+  "keywords": [
+    "schematic",
+    "circuit",
+    "netlist",
+    "electronics",
+    "svg",
+    "png",
+    "eda",
+    "mcp",
+    "model-context-protocol",
+    "ai-agents"
+  ],
+  "homepage": "https://github.com/2Ntlaks/schem#readme",
+  "bugs": {
+    "url": "https://github.com/2Ntlaks/schem/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/2Ntlaks/schem.git"
+  },
   "license": "MIT",
   "type": "module",
+  "bin": {
+    "schem": "dist/schem.js"
+  },
+  "exports": {
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist/",
+    "docs/netlist-format.md",
+    "docs/parts.md",
+    "docs/editing.md",
+    "docs/install.md",
+    "examples/*.schem.json",
+    "examples/README.md"
+  ],
   "engines": {
     "node": ">=22"
   },
@@ -24,7 +58,8 @@
     "readme:art": "tsx scripts/readme-art.ts",
     "readme:gallery": "tsx scripts/gallery.ts",
     "web:build": "tsx scripts/web.ts build",
-    "web:serve": "tsx scripts/web.ts serve"
+    "web:serve": "tsx scripts/web.ts serve",
+    "prepack": "npm run build"
   },
   "devDependencies": {
     "@types/node": "22.10.2",
