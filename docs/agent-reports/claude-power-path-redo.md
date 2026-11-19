@@ -152,7 +152,7 @@ This report's own commit adds only files under `docs/`.
 
 ```
  Test Files  32 passed (32)
-      Tests  664 passed (664)
+      Tests  665 passed (665)
 ```
 
 `npm run phase0`, exit 0:
