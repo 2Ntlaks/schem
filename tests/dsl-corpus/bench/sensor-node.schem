@@ -1,0 +1,26 @@
+circuit "Battery sensor node"
+
+part B1 battery value=7.4V
+part C1 capacitor value=100n
+part D1 led
+part R1 resistor value=100k
+part R2 resistor value=33k
+part R3 resistor value=10k
+part R4 resistor value=330
+part SW1 spst
+part SW2 pushbutton
+part U1 module:pololu-d24v10f5
+part U2 module:esp32-devkitc-v4
+part U3 module:waveshare-lcd1602-i2c
+
+connect B1[+] SW1[1]
+connect C1[1] R1[2] R2[1] U2[J2-5]
+connect D1[A] R4[2]
+connect R3[2] SW2[1] U2[J2-7]
+connect R4[1] U2[J3-15]
+net 3V3 = R3[1] U2[J2-1]
+net 5V = U1[5] U2[J2-19] U3[1]
+net GND = B1[-] C1[2] D1[K] R2[2] SW2[2] U1[4] U2{GND} U3[2]
+net SCL = U2[J3-3] U3[3]
+net SDA = U2[J3-6] U3[4]
+net VBAT = R1[1] SW1[2] U1[3]

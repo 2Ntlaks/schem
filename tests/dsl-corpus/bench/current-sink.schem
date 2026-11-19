@@ -1,0 +1,17 @@
+circuit "Constant-current LED driver"
+
+part B1 battery value=12V
+part D1 led
+part Q1 nmos
+part R1 resistor value=100
+part R2 resistor value=1
+part RV1 potentiometer value=10k
+part U1 opamp
+
+connect D1[K] Q1[D]
+connect Q1[G] R1[2]
+connect Q1[S] R2[1] U1[2]
+connect R1[1] U1[1]
+connect RV1[2] U1[3]
+net GND = B1[-] R2[2] RV1[3]
+net VCC = B1[+] D1[A] RV1[1]

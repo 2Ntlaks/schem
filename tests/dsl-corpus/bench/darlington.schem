@@ -1,0 +1,17 @@
+circuit "Darlington motor driver"
+
+part B1 battery value=9V
+part D1 diode
+part J1 header label=PWM pins: 1:SIG/passive 2:GND/passive
+part M1 motor
+part Q1 npn
+part Q2 npn
+part R1 resistor value=2.2k
+part R2 resistor value=10k
+
+connect D1[A] M1[2] Q1[C] Q2[C]
+connect J1[1] R1[1]
+connect Q1[B] R1[2]
+connect Q1[E] Q2[B] R2[1]
+net GND = B1[-] J1[2] Q2[E] R2[2]
+net VCC = B1[+] D1[K] M1[1]

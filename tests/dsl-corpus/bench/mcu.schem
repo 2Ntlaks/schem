@@ -1,0 +1,26 @@
+circuit "ATmega328 minimal board"
+
+part C1 capacitor value=100n
+part C2 capacitor value=100n
+part D1 led
+part D2 led
+part J1 header label=UART pins: 1:TX/passive 2:RX/passive 3:GND/passive
+part J2 header label=POWER pins: 1:5V/passive 2:GND/passive
+part R1 resistor value=10k
+part R2 resistor value=330
+part R3 resistor value=330
+part R4 resistor value=10k
+part SW1 pushbutton
+part SW2 pushbutton
+part U1 ic partNumber=ATmega328P pins: 1:RESET/bidir 7:VCC/power_in 8:GND/ground 20:AVCC/power_in 22:AGND/ground 2:RXD/bidir 3:TXD/bidir 4:PD2/bidir 19:PB5/bidir 15:PB1/bidir 27:SDA/bidir 28:SCL/bidir
+
+connect D1[A] R2[2]
+connect D2[A] R3[2]
+connect J1[1] U1[2]
+connect J1[2] U1[3]
+connect R1[2] SW1[1] U1[1]
+connect R2[1] U1[19]
+connect R3[1] U1[15]
+connect R4[2] SW2[1] U1[4]
+net 5V = C1[1] C2[1] J2[1] R1[1] R4[1] U1[7] U1[20]
+net GND = C1[2] C2[2] D1[K] D2[K] J1[3] J2[2] SW1[2] SW2[2] U1[8] U1[22]

@@ -1,0 +1,18 @@
+circuit "5 V linear regulator"
+
+part C1 capacitor value=100u
+part C2 capacitor value=330n
+part C3 capacitor value=100n
+part C4 capacitor value=10u
+part D1 diode partNumber=1N4007
+part D2 led color=green
+part J1 header label="DC IN" pins: 1:+/passive 2:-/passive
+part J2 header label="5V OUT" pins: 1:+/passive 2:-/passive
+part R1 resistor value=1k
+part U1 ic partNumber=LM7805 pins: 1:IN/power_in 2:GND/ground 3:OUT/power_out
+
+connect D1[A] J1[1]
+connect D2[A] R1[2]
+net 5V = C3[1] C4[1] J2[1] R1[1] U1[3]
+net GND = C1[2] C2[2] C3[2] C4[2] D2[K] J1[2] J2[2] U1[2]
+net VIN = C1[1] C2[1] D1[K] U1[1]

@@ -1,0 +1,18 @@
+circuit "Case 3: inverting summing amplifier"
+
+part R1 resistor value=10k
+part R2 resistor value=10k
+part R3 resistor value=10k
+part RL resistor value=2k2
+part Rf resistor value=20k
+part U1 opamp
+part V1 vsource value=1V
+part V2 vsource value=0.5V
+part V3 vsource value=0.2V
+
+connect R1[1] V1[+]
+connect R2[1] V2[+]
+connect R3[1] V3[+]
+net GND = RL[2] U1[3] V1[-] V2[-] V3[-]
+net OUT = RL[1] Rf[2] U1[1]
+net SUM = R1[2] R2[2] R3[2] Rf[1] U1[2]
