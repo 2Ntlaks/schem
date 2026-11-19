@@ -18,6 +18,7 @@ drawn as a box) and `header` (a connector).
 | `battery` |  | `+` (also `pos`, `p`), `-` (also `neg`, `n`) |  |
 | `buzzer` |  | `+` (also `pos`, `p`), `-` (also `neg`, `n`) |  |
 | `capacitor` |  | `1`, `2` |  |
+| `crystal` |  | `1`, `2` |  |
 | `diode` |  | `A` (anode; also `a`, `+`), `K` (cathode; also `k`, `-`) |  |
 | `fuse` |  | `1`, `2` |  |
 | `ground` |  | `1` |  |

@@ -164,7 +164,7 @@ schem is an early prototype. It is useful today for small and medium circuits, a
   <tr>
     <td valign="top">
 
-- 25 symbols: passives, diodes, LEDs, BJTs, MOSFETs, op-amps, relays, switches, sources and more
+- 26 symbols: passives, diodes, LEDs, BJTs, MOSFETs, op-amps, relays, switches, sources and more
 - Chips as labelled boxes, connectors, and 4 boards with their real pinouts (Arduino Uno, ESP32-DevKitC, a Pololu regulator, an I2C LCD)
 - Common circuits drawn in their textbook shape: op-amp amplifiers, Sallen-Key and other active filters, two oscillators, H-bridges, I2C buses and more ([the list](docs/templates.md))
 - All 8 development circuits draw valid; a generated 30-part circuit draws in under 3 seconds

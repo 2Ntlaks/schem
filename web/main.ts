@@ -343,7 +343,7 @@ window.addEventListener("resize", () => fit());
 
 const DEFAULT_PROPS: Record<string, Record<string, string>> = {
   resistor: { value: "10k" }, capacitor: { value: "100n" }, "polarised-capacitor": { value: "10u" }, inductor: { value: "10u" }, battery: { value: "9V" },
-  vsource: { value: "5V" }, "ac-source": { value: "1V" }, led: { color: "red" }, fuse: { value: "1A" }, zener: { value: "5.1V" }, potentiometer: { value: "10k" },
+  vsource: { value: "5V" }, "ac-source": { value: "1V" }, led: { color: "red" }, fuse: { value: "1A" }, zener: { value: "5.1V" }, crystal: { value: "16MHz" }, potentiometer: { value: "10k" },
 };
 const BOX_PINS: Record<string, Json[]> = {
   ic: [{ number: "1", name: "VCC", role: "power_in" }, { number: "2", name: "GND", role: "ground" }, { number: "3", name: "IN", role: "input" }, { number: "4", name: "OUT", role: "output" }],

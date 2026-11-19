@@ -236,6 +236,29 @@ export const SYMBOL_CIRCUITS: Record<string, { covers: string[]; project: Projec
       ],
     } },
   },
+  "mcu-crystal": {
+    covers: ["crystal"],
+    project: { meta: { title: "Microcontroller crystal" }, circuit: {
+      parts: [
+        { id: "U1", type: "ic", props: { label: "MCU", controller: "true" }, pins: [
+          { number: "1", name: "XTAL1", role: "input" },
+          { number: "2", name: "XTAL2", role: "output" },
+          { number: "3", name: "GND", role: "ground" },
+        ] },
+        { id: "Y1", type: "crystal", props: { value: "16MHz" } },
+        { id: "C1", type: "capacitor", props: { value: "22p" } },
+        { id: "C2", type: "capacitor", props: { value: "22p" } },
+      ],
+      nets: [
+        net("n1", "XTAL1", "U1[1]", "Y1[1]", "C1[1]"),
+        net("n2", "XTAL2", "U1[2]", "Y1[2]", "C2[1]"),
+        net("n3", "GND", "U1[3]", "C1[2]", "C2[2]"),
+      ],
+    },
+    // Pin 1 up, so the crystal stands between the two clock pins.
+    intent: { hints: [{ id: "h1", type: "orient", part: "Y1", rot: 90, flip: false, priority: "normal" }] },
+    },
+  },
   "header-feeds-resistor": {
     covers: ["header"],
     project: { meta: { title: "Header feeding a resistor" }, circuit: {

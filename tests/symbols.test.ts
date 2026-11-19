@@ -119,6 +119,11 @@ describe("symbol library: one small circuit per symbol", () => {
           expect(pinAt("D1[K]").at[1]).toBeLessThan(pinAt("D1[A]").at[1]);
           expect(pinAt("D2[A]").at[0]).toBeLessThan(pinAt("D2[K]").at[0]);
         }
+        // The crystal stands with pin 1 up, between the two clock pins.
+        if (name === "mcu-crystal") {
+          expect(pinAt("Y1[1]").at[0]).toBe(pinAt("Y1[2]").at[0]);
+          expect(pinAt("Y1[1]").at[1]).toBeLessThan(pinAt("Y1[2]").at[1]);
+        }
       });
 
       it("headers draw every pin, with its name and number", () => {
