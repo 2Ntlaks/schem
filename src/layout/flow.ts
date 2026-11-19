@@ -358,11 +358,12 @@ export function inferFlow(g: FlowGraph, fixed: ReadonlyMap<string, number>): Flo
     const base = feeders.length ? Math.max(...feeders.map((b) => rank.get(b)!)) : 0;
     const k = (used.get(base) ?? 0) + 1;
     used.set(base, k);
-    // When no rail driver feeds the rail, do not wedge a floating bypass capacitor into a new
-    // column between column 0 and column 1 when column 0 already hosts an IC on that rail.
+    // When no rail driver feeds the rail and column 0 already hosts an IC on that rail, place
+    // floating bypass capacitors immediately to its left so they sit beside the chip without
+    // wedging into the signal bus channel between column 0 and column 1.
     const icAtBase = !feeders.length && [...rank].some(([b, r]) => r === base
       && g.members(b).some((m) => (g.type(m) === "ic" || g.type(m).startsWith("module:")) && pinsOf(b).some((p) => rails.includes(p.net))));
-    for (const b of comp) { rank.set(b, base); col.set(b, icAtBase ? base : base + (feeders.length ? 0.5 : 0) + k / 64); }
+    for (const b of comp) { rank.set(b, base); col.set(b, icAtBase ? base - k / 64 : base + (feeders.length ? 0.5 : 0) + k / 64); }
   }
   for (const b of g.blocks) {
     if (rank.has(b)) continue;

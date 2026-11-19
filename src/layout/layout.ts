@@ -24,7 +24,7 @@ import {
 } from "./templates/index.js";
 import { edgeForbidden } from "../geom/forbidden.js";
 import type { Art, DrawnPin, DrawnPort, Electrical, RenderModel } from "../render/model.js";
-import { hintParts, type Intent, type LayoutState, type Side } from "../core/intent.js";
+import { CAPACITOR_TYPES, hintParts, type Intent, type LayoutState, type Side } from "../core/intent.js";
 
 export interface Project { meta?: { title?: string }; circuit: Circuit; intent?: Intent }
 
@@ -256,13 +256,14 @@ export function layout(project: Project, opts: LayoutOptions = {}): LayoutResult
   const oldCol = (id: string) => { const p = opts.previous?.parts[id]; return p ? (legacy ? p.at[0] : p.column) : undefined; };
   if (opts.previous && ids.some((id) => oldCol(id) !== undefined)) {
     const fresh = new Map(colValue);
+    const minOld = Math.min(...ids.flatMap((o) => (oldCol(o) !== undefined ? [oldCol(o)!] : [])));
     for (const id of ids) {
       if (oldCol(id) !== undefined) { colValue.set(id, oldCol(id)!); continue; }
       const votes = new Map<number, number>();
       for (const o of ids) if (o !== id && oldCol(o) !== undefined && fresh.get(o) === fresh.get(id)) votes.set(oldCol(o)!, (votes.get(oldCol(o)!) ?? 0) + 1);
       const peer = [...votes].sort((a, b) => b[1] - a[1] || a[0] - b[0])[0]?.[0];
       const near = [...neighbours.get(id)!].sort(cmpStr).flatMap((n) => (oldCol(n) !== undefined ? [oldCol(n)!] : []));
-      colValue.set(id, peer ?? (near.length ? near.reduce((a, b) => a + b, 0) / near.length : fresh.get(id)!));
+      colValue.set(id, peer ?? (near.length ? near.reduce((a, b) => a + b, 0) / near.length : Math.max(minOld, fresh.get(id)!)));
     }
   }
   const sortedColumns = () => [...new Set(colValue.values())].sort((a, b) => a - b);
@@ -277,6 +278,27 @@ export function layout(project: Project, opts: LayoutOptions = {}): LayoutResult
 
   // Steps 3b and 4: orientation, measurement, labels, ports.
   const placed = new Map<string, Placed>();
+  // Floating bypass capacitors placed immediately to the left of an IC on their supply rail keep
+  // their label on the outward (left) side, and the IC keeps its label off the left edge so the
+  // capacitor sits directly beside the supply pin it serves.
+  const leftBypassCaps = new Set<string>();
+  const icHasLeftBypass = new Set<string>();
+  if (!opts.place) {
+    const decSet = new Set(decouplers.map((m) => m.part));
+    for (const id of ids) {
+      const part = partOf.get(id)!;
+      if (decSet.has(id) || neighbours.get(id)!.size > 0 || !CAPACITOR_TYPES.has(part.type)) continue;
+      const pins = (defs[id] ?? []).map((p) => drawnNet.get(`${id}[${p.number}]`)).filter((n): n is string => n !== undefined);
+      const pw = pins.find((n) => portNet.has(n) && netKind(netById.get(n)!) === "power");
+      const gd = pins.find((n) => portNet.has(n) && netKind(netById.get(n)!) === "ground");
+      if (!pw || !gd) continue;
+      const nextCol = colOf.get(id)! + 1;
+      const host = ids.find((other) => colOf.get(other) === nextCol
+        && (partOf.get(other)!.type === "ic" || partOf.get(other)!.type.startsWith("module:"))
+        && (defs[other] ?? []).some((p) => p.role === "power_in" && drawnNet.get(`${other}[${p.number}]`) === pw));
+      if (host) { leftBypassCaps.add(id); icHasLeftBypass.add(host); }
+    }
+  }
   const measurePart = (id: string, force?: Orient): void => {
     const part = partOf.get(id)!;
     const col = colOf.get(id)!;
@@ -344,7 +366,8 @@ export function layout(project: Project, opts: LayoutOptions = {}): LayoutResult
       return tp !== undefined && tp.at[0] > ko.x + ko.w / 2;
     });
     const labels = labelFor(part, sym, orient, ko, [...ports.map((q) => q.box), ...approachBoxes], intent.overrides?.labelSide?.[id]
-      ?? (tr ? templateLabel(tr, id) : undefined), !tr, hostDec.length > 0 ? (decRight ? "below-right" : "below-left") : undefined);
+      ?? (tr ? templateLabel(tr, id) : leftBypassCaps.has(id) ? "left" : undefined), !tr,
+      hostDec.length > 0 ? (decRight ? "below-right" : "below-left") : icHasLeftBypass.has(id) ? "above-right" : undefined);
     let env = ko;
     for (const l of labels) env = unionBox(env, gridBox(l.box));
     for (const q of ports) env = unionBox(env, q.box);
@@ -594,9 +617,18 @@ export function layout(project: Project, opts: LayoutOptions = {}): LayoutResult
         }
       }
       const colH = (c: number) => columns[c]!.filter((x) => x !== id).reduce((s, x) => s + blockEnv(x).h + 2, 0);
-      let bestC = curC, bestH = colH(curC);
+      // Never tuck a port-only block into a column crossed by wires between other columns (where
+      // it can land in the path of those wires), and only move it when the target column actually
+      // has enough vertical slack to absorb the block without exceeding the home column's height.
+      const crossed = (c: number) => wired.some((n) => {
+        const cs = partsOfNet.get(n.id)!.map((p) => colOf.get(p)!);
+        return Math.min(...cs) < c && Math.max(...cs) > c;
+      });
+      const curH = colH(curC), idH = blockEnv(id).h + 2;
+      let bestC = curC, bestH = curH;
       for (let c = minC; c <= maxC; c++) {
         if (!Number.isInteger(colVals[c]!) || !columns[c]!.length) continue;
+        if (c !== curC && (crossed(c) || colH(c) + idH > curH)) continue;
         const h = colH(c);
         if (h < bestH || (h === bestH && Math.abs(c - curC) < Math.abs(bestC - curC))) { bestC = c; bestH = h; }
       }
@@ -637,15 +669,6 @@ export function layout(project: Project, opts: LayoutOptions = {}): LayoutResult
         return ns.length ? ns.reduce((s, n) => s + pos.get(n)! + pinFrac(n, id), 0) / ns.length : cur.get(id)! + 0.5;
       };
       columns[c] = [...columns[c]!].sort((a, b) => bary(a) - bary(b) || cur.get(a)! - cur.get(b)! || cmpStr(a, b));
-    }
-  }
-  // Port-only two-pin parts stacked in a shared column (such as an unhinted bypass capacitor)
-  // sit below the wired parts so they do not push the main signal row down.
-  if (!opts.previous && !opts.place) for (let c = 0; c < columns.length; c++) {
-    const isPortCap = (id: string) => !regionOf.has(id) && !heldByIntent(id)
-      && blockNeighbours.get(id)!.size === 0 && placed.get(id)!.sym.kind === "two-pin";
-    if (columns[c]!.length > 1 && columns[c]!.some(isPortCap)) {
-      columns[c] = [...columns[c]!.filter((id) => !isPortCap(id)), ...columns[c]!.filter(isPortCap)];
     }
   }
   // Incremental fallback: a new part starts below the existing drawing, under the parts of its column,
@@ -1288,7 +1311,7 @@ function labelLines(part: Circuit["parts"][0], sym: SymbolDef): string[] {
   return lines;
 }
 
-function labelFor(part: Circuit["parts"][0], sym: SymbolDef, o: Orient, ko: Box, avoid: Box[], side?: string, freeSide = false, belowPrefer?: "below-left" | "below-right"): Placed["labels"] {
+function labelFor(part: Circuit["parts"][0], sym: SymbolDef, o: Orient, ko: Box, avoid: Box[], side?: string, freeSide = false, belowPrefer?: "below-left" | "below-right" | "above-right"): Placed["labels"] {
   if (sym.kind === "port") return [];
   const lines = labelLines(part, sym);
   const w = Math.max(...lines.map((l) => measure(l, LABEL_SIZE).width / 10));
@@ -1301,7 +1324,9 @@ function labelFor(part: Circuit["parts"][0], sym: SymbolDef, o: Orient, ko: Box,
       ? ["below-left", "below-right", "below-right-out", "below-left-out", "right", "left", "above-left", "above-right", "above-left-out", "above-right-out"]
       : belowPrefer === "below-left"
         ? ["below-left", "below-right", "below-left-out", "below-right-out", "left", "right", "above-left", "above-right", "above-left-out", "above-right-out"]
-        : freeSide && wrappedIc && !hasRightPin
+        : belowPrefer === "above-right"
+          ? ["above-right", "above-left", "below-right", "below-left", "above-right-out", "below-right-out", "above-left-out", "below-left-out", "right", "left"]
+          : freeSide && wrappedIc && !hasRightPin
           ? ["right", "above-right", "above-left", "below-right", "below-left", "above-right-out", "below-right-out", "above-left-out", "below-left-out", "left"]
           : ["above-left", "above-right", "below-left", "below-right", "above-left-out", "above-right-out", "below-left-out", "below-right-out", "left", "right"])
     : vertical ? (sym.kind === "source" ? ["left", "right"] : ["right", "left"]) : sym.labelPrefer;
