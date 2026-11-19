@@ -634,6 +634,15 @@ export function layout(project: Project, opts: LayoutOptions = {}): LayoutResult
       columns[c] = [...columns[c]!].sort((a, b) => bary(a) - bary(b) || cur.get(a)! - cur.get(b)! || cmpStr(a, b));
     }
   }
+  // Port-only two-pin parts stacked in a shared column (such as an unhinted bypass capacitor)
+  // sit below the wired parts so they do not push the main signal row down.
+  if (!opts.previous && !opts.place) for (let c = 0; c < columns.length; c++) {
+    const isPortCap = (id: string) => !regionOf.has(id) && !heldByIntent(id)
+      && blockNeighbours.get(id)!.size === 0 && placed.get(id)!.sym.kind === "two-pin";
+    if (columns[c]!.length > 1 && columns[c]!.some(isPortCap)) {
+      columns[c] = [...columns[c]!.filter((id) => !isPortCap(id)), ...columns[c]!.filter(isPortCap)];
+    }
+  }
   // Incremental fallback: a new part starts below the existing drawing, under the parts of its column,
   // so no existing part has to make room for it (SPEC 9.5 stability). The spot is its soft anchor.
   if (opts.previous && opts.newPartsBelow) {
