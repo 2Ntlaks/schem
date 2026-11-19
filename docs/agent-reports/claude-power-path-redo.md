@@ -8,6 +8,7 @@ Branch `claude/power-path-redo`, made from `main` at `54d9ad4` in its own worktr
 | --- | --- | --- | --- |
 | M1 | Crystal: a two-pin part across two pins of one chip stands beside them | `2249ca9` | yes |
 | M2 | PR #7 restored and integrated with the general layout | `69070e2`, `7dd7dc9` | yes |
+| Follow-up | A fuse or switch feeding a regulator pin lies in line with it; edit drift investigated | `5d52854` | partly, see below |
 | M3 | Before and after for every bench circuit with a series supply path | this report | yes (two circuits qualify) |
 
 - All 11 of PR #7's tests pass, unchanged.
@@ -95,7 +96,7 @@ The classifier still notes "U1 joins VBAT to 5V". But U1's input comes through s
 
 These come from `out/tools/extra.ts`, which draws the symbol test circuits and PR #7's four test circuits.
 
-PR #7's regulator test circuit: OUT now goes to the right with C2 beside it, instead of a wire up and across to a 5V symbol.
+PR #7's regulator test circuit has two changes. OUT now goes to the right with C2 beside it, instead of a wire up and across to a 5V symbol. Since the follow-up commit, fuse F1 also lies in line with VIN, instead of standing at the far left with a long loop.
 
 | PR #7 hooked in as it was | After |
 | --- | --- |
@@ -137,7 +138,7 @@ The NMOS motor driver: the fuse now feeds the 12V rail by wire, which is what PR
 
 I compared every bench SVG byte for byte with `main`: only `regulator.svg` differs.
 
-## The four checks on the final code commit (`7dd7dc9`)
+## The four checks on the final code commit (`5d52854`)
 
 This report's own commit adds only files under `docs/`.
 
@@ -152,7 +153,7 @@ This report's own commit adds only files under `docs/`.
 
 ```
  Test Files  32 passed (32)
-      Tests  665 passed (665)
+      Tests  666 passed (666)
 ```
 
 `npm run phase0`, exit 0:
@@ -210,19 +211,43 @@ All of these are new and none were weakened. PR #7's `tests/power-path.test.ts` 
   - ignoring a part across two chips;
   - the crystal standing between its pins with no hint;
   - the same for a resistor.
-- `tests/power-path-layout.test.ts` (7 tests):
+- `tests/power-path-layout.test.ts` (8 tests):
   - OUT on the right with its capacitors in a row, smallest nearest, one symbol;
   - an input with a load going to the left;
   - an input with no load keeping its symbol;
   - decoupled input capacitors keeping their top slots;
+  - a fuse alone on the input's net lying in line with the input pin;
   - three `pathAnchors` unit tests (order, leading value, a non-capacitor load).
 
 One of my own new tests was wrong at first. It expected an input with no load at all to go on the left, but the rule (on purpose) gives such a pin its symbol back. I fixed the test, not the code, and added a separate test for the load case.
 
 ## What I skipped, and open questions
 
-- **PR #7's other drawings are as PR #7 made them.** The fuse, switch and high-side PMOS test circuits (`pp-fuse`, `pp-nosym`, `pp-pmos`) still route their path wires wherever the router finds room, and `pp-pmos` loops round its transistor. None of them is on the bench, and PR #7's tests pass on them. Placing fuses and switches with the same "stand beside" idea is the obvious next step. I did not do it, to keep this change small.
+- **PR #7's other drawings are as PR #7 made them.** The fuse, switch and high-side PMOS test circuits (`pp-fuse`, `pp-nosym`, `pp-pmos`) still route their path wires wherever the router finds room, and `pp-pmos` loops round its transistor. None of them is on the bench, and PR #7's tests pass on them. The follow-up below covers only a fuse or switch that feeds a regulator.
 - **Input capacitors and the decoupling reach.** A row of two input capacitors on the left would match the output side. But convention C13 (at most 8 G from the pin) cannot be met by two labelled capacitors side by side. Is 8 G right for a regulator's input bulk capacitor, or should the row count as one group? I did not touch the conventions.
-- **One hand edit moves more than on `main`.** On `regulator`, I added a part, then lengthened C3's value to "100 nF X7R 50 V". The longer label pushes C4 and the column to its right 6 G. That averages 2.4 G over the untouched parts, above the 2 G limit; `main` gives 1.2 G. The random sweep in `tests/edits.test.ts` is unaffected (131 of 137 on both).
-- **sensor-node shows no power path.** Its regulator board keeps symbols on both sides, because neither pin has a two-pin load to stand beside it. Drawing VBAT, through SW1, into the regulator as one wired line would need the switch to be placed by the same rule.
+- **One hand edit moves more than on `main`** (see the follow-up for what I tried). On `regulator`, I added a part, then lengthened C3's value to "100 nF X7R 50 V". The longer label pushes C4 and the column to its right 6 G. That averages 2.4 G over the untouched parts, above the 2 G limit; `main` gives 1.2 G. The random sweep in `tests/edits.test.ts` is unaffected (131 of 137 on both).
+- **sensor-node shows no power path.** Its regulator board keeps symbols on both sides, because neither pin has a two-pin load to stand beside it. Drawing VBAT, through SW1, into the regulator as one wired line would need the switch to be placed by the same rule. I tried that in the follow-up, and it failed.
 - I did not run anything under the reserved test set, `npm run gates -- --test` or `npm run phase0 -- --test`, and did not update the bench baseline.
+
+## Follow-up after the PR was opened
+
+**A fuse or switch feeding a regulator pin lies in line with it (`5d52854`).**
+- **Rule:** a built-in two-pin part that is alone with a regulator's side pin on a wired net lies on that pin's row. Its near pin faces the regulator, and it rides with the regulator as a rigid child.
+- **Implementation:** this reuses `standBeside`, with a new in-line mode.
+- **Results:**
+  - bench unchanged (906.2, the same 18 drawings);
+  - phase0 unchanged (all 31 drawings identical to `main`);
+  - edit sweep unchanged (131 of 137);
+  - 666 tests pass.
+- **Where it shows:** PR #7's regulator test circuit (image above) is the only drawing it changes.
+
+**Tried and reverted: a fuse or switch standing on a battery terminal.** The aim was to draw sensor-node's B1, SW1 and VBAT, and the motor driver's B1, F1 and 12V, as one vertical line.
+- The rule was: a two-pin part alone on a battery terminal's net, leading to a supply symbol, rides with the battery and stands on its + pin.
+- Tying the switch to the battery as its host changed the flow ranks of the whole sheet. sensor-node went from 92.1 to 196.8 and spread out, and SW1 still did not land on the battery. The motor driver threw its battery and fuse to the far right.
+- I reverted it. Doing this properly needs the battery and its series parts to enter the flow as one block, which is a bigger change than a rigid child.
+
+**Edit drift: investigated, not fixed.** The hand edit makes C3's label about 6 G longer. I tried two things:
+- **The committed behaviour:** C3 keeps its place, and the untouched C4 moves out 6 G. The next column (J2, R1, R9) follows, which averages 2.4 G over the untouched parts. The maximum, 6 G, is within the limit.
+- **Untouched loads first:** C4 kept its place, but C3 went past it, and its long label pushed the next column 13 G. That gave a 3.9 G average and a 13 G maximum, so I reverted it.
+
+The drift comes from keeping the row in the regulator's column: a label that grows 6 G widens that column, so something has to move 6 G. On `main`, only C4 and J2 move, because the capacitors are in their own columns. Fixing it would mean spare room in the row, which costs wire and area on every drawing, or wrapping long values onto two lines. I left it as an open point.
