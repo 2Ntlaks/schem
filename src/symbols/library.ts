@@ -161,6 +161,38 @@ const DIODE: SymbolDef = {
   labelPrefer: ["above", "below", "right", "left"],
 };
 
+/** Same body as the diode. The cathode bar ends are bent, one each way, so the bar reads as a Z. */
+const ZENER: SymbolDef = {
+  id: "zener", version: 1, refPrefix: "D", source: "original", kind: "two-pin",
+  pins: [
+    pin("A", "anode", [0, 0], "left", "passive", { aliases: ["a", "+"], chain: "in" }),
+    pin("K", "cathode", [4, 0], "right", "passive", { aliases: ["k", "-"], chain: "out" }),
+  ],
+  align: [2, 0],
+  graphics: [
+    { d: "M0 0 H1.3 M2.7 0 H4 M2.7 -0.75 V0.75 M2.7 -0.75 L2.2 -1.15 M2.7 0.75 L3.2 1.15" },
+    { d: "M1.3 -0.75 L2.7 0 L1.3 0.75 Z", fill: "stroke" },
+  ],
+  art: { x: 0, y: -1.15, w: 4, h: 2.3 },
+  labelPrefer: ["above", "below", "right", "left"],
+};
+
+/** Same body as the diode. The cathode bar is a squared S: a hook to the left at the top, a hook to the right at the bottom. */
+const SCHOTTKY: SymbolDef = {
+  id: "schottky", version: 1, refPrefix: "D", source: "original", kind: "two-pin",
+  pins: [
+    pin("A", "anode", [0, 0], "left", "passive", { aliases: ["a", "+"], chain: "in" }),
+    pin("K", "cathode", [4, 0], "right", "passive", { aliases: ["k", "-"], chain: "out" }),
+  ],
+  align: [2, 0],
+  graphics: [
+    { d: "M0 0 H1.3 M2.7 0 H4 M2.2 -0.45 V-0.85 H2.7 V0.85 H3.2 V0.45" },
+    { d: "M1.3 -0.75 L2.7 0 L1.3 0.75 Z", fill: "stroke" },
+  ],
+  art: { x: 0, y: -0.85, w: 4, h: 1.7 },
+  labelPrefer: ["above", "below", "right", "left"],
+};
+
 const POLCAP: SymbolDef = {
   id: "polarised-capacitor", version: 1, refPrefix: "C", source: "original", kind: "two-pin",
   pins: [
@@ -371,7 +403,7 @@ const RELAY: SymbolDef = {
 
 export const BUILTIN: Record<string, SymbolDef> = Object.fromEntries(
   [RESISTOR, CAPACITOR, LED, BATTERY, VSOURCE, OPAMP, GROUND, SUPPLY,
-    DIODE, POLCAP, POTENTIOMETER, bjt("npn"), bjt("pnp"), mosfet("nmos"), mosfet("pmos"),
+    DIODE, ZENER, SCHOTTKY, POLCAP, POTENTIOMETER, bjt("npn"), bjt("pnp"), mosfet("nmos"), mosfet("pmos"),
     SPST, PUSHBUTTON, BUZZER, MOTOR, RELAY, FUSE, INDUCTOR, ACSOURCE].map((s) => [s.id, s]),
 );
 
