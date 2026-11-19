@@ -37,6 +37,7 @@
     "docs/editing.md",
     "docs/install.md",
     "examples/*.schem.json",
+    "examples/*.schem",
     "examples/README.md"
   ],
   "engines": {

@@ -84,7 +84,7 @@ export function resolvePath(roots: Roots, input: string, mode: "read" | "create"
     if (!contained(roots, real)) {
       return { ok: false, message: `${showPath(abs)} is outside the configured roots. It resolves to ${showPath(real)}.` };
     }
-    if (mode === "create") return { ok: false, message: `${showPath(real)} already exists. schem_create does not replace a file.` };
+    if (mode === "create") return { ok: false, message: `${showPath(real)} already exists. schem does not replace an existing file here.` };
     if (statSync(real).isDirectory()) return { ok: false, message: `${showPath(real)} is a folder, not a file.` };
     return { ok: true, real };
   }
