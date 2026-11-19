@@ -1,0 +1,9 @@
+circuit "Case 1: LED indicator"
+
+part B1 battery value=9V
+part D1 led color=red
+part R1 resistor value=470
+
+connect D1[A] R1[2]
+net GND = B1[-] D1[K]
+net PWR = B1[+] R1[1]

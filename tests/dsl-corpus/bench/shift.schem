@@ -1,0 +1,27 @@
+circuit "Shift register LED bar"
+
+part C1 capacitor value=100n
+part D1 led
+part D2 led
+part D3 led
+part D4 led
+part R1 resistor value=330
+part R2 resistor value=330
+part R3 resistor value=330
+part R4 resistor value=330
+part U1 ic partNumber=MCU pins: 1:VCC/power_in 2:GND/ground 3:MOSI/bidir 4:SCK/bidir 5:CS/bidir
+part U2 ic partNumber=74HC595 pins: 16:VCC/power_in 8:GND/ground 14:SER/bidir 11:SRCLK/bidir 12:RCLK/bidir 13:OE/bidir 10:SRCLR/bidir 15:QA/bidir 1:QB/bidir 2:QC/bidir 3:QD/bidir
+
+connect D1[A] R1[2]
+connect D2[A] R2[2]
+connect D3[A] R3[2]
+connect D4[A] R4[2]
+connect R1[1] U2[15]
+connect R2[1] U2[1]
+connect R3[1] U2[2]
+connect R4[1] U2[3]
+net 5V = C1[1] U1[1] U2[10] U2[16]
+net CS = U1[5] U2[12]
+net GND = C1[2] D1[K] D2[K] D3[K] D4[K] U1[2] U2[8] U2[13]
+net MOSI = U1[3] U2[14]
+net SCK = U1[4] U2[11]

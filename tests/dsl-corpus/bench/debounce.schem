@@ -1,0 +1,15 @@
+circuit "Button debounce into a Schmitt inverter"
+
+part C1 capacitor value=100n
+part C2 capacitor value=100n
+part J1 header label="TO MCU" pins: 1:SIG/passive
+part R1 resistor value=10k
+part R2 resistor value=1k
+part SW1 pushbutton
+part U1 ic partNumber=74HC14 pins: 14:VCC/power_in 7:GND/ground 1:A/input 2:Y/output
+
+connect C1[1] R2[2] U1[1]
+connect J1[1] U1[2]
+connect R1[2] R2[1] SW1[1]
+net 5V = C2[1] R1[1] U1[14]
+net GND = C1[2] C2[2] SW1[2] U1[7]

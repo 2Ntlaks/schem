@@ -1,0 +1,18 @@
+circuit "I2C level shifter"
+
+part J1 header label="3V3 SIDE" pins: 1:3V3/passive 2:SDA/passive 3:SCL/passive 4:GND/passive
+part J2 header label="5V SIDE" pins: 1:5V/passive 2:SDA/passive 3:SCL/passive 4:GND/passive
+part Q1 nmos partNumber=BSS138
+part Q2 nmos partNumber=BSS138
+part R1 resistor value=10k
+part R2 resistor value=10k
+part R3 resistor value=10k
+part R4 resistor value=10k
+
+connect J1[2] Q1[S] R1[2]
+connect J1[3] Q2[S] R2[2]
+connect J2[2] Q1[D] R3[2]
+connect J2[3] Q2[D] R4[2]
+net 3V3 = J1[1] Q1[G] Q2[G] R1[1] R2[1]
+net 5V = J2[1] R3[1] R4[1]
+net GND = J1[4] J2[4]

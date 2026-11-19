@@ -237,7 +237,12 @@ function renamed(intent: Intent, previous: LayoutState | undefined, from: string
   const out: Intent = structuredClone(intent);
   out.locks = out.locks?.map((l) => ({ ...l, part: r(l.part) }));
   const rp = (e: string) => (e.startsWith(from) && /^[[{.]/.test(e.slice(from.length)) ? to + e.slice(from.length) : e);
-  out.hints = out.hints?.map((h) => (h.type === "align" ? { ...h, parts: h.parts.map(r) } : h.type === "relative" ? { ...h, part: r(h.part), of: r(h.of) } : h.type === "decouples" ? { ...h, part: r(h.part), pin: rp(h.pin) } : { ...h, part: r(h.part) }));
+  out.hints = out.hints?.map((h) => {
+    if (h.type === "align") return { ...h, parts: h.parts.map(r) };
+    if (h.type === "relative" || h.type === "near") return { ...h, part: r(h.part), of: r(h.of) };
+    if (h.type === "decouples") return { ...h, part: r(h.part), pin: rp(h.pin) };
+    return { ...h, part: r(h.part) };
+  });
   if (out.overrides?.labelSide?.[from]) { out.overrides.labelSide[to] = out.overrides.labelSide[from]!; delete out.overrides.labelSide[from]; }
   if (!previous) return [out, previous];
   const prev = structuredClone(previous);

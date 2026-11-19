@@ -1,0 +1,18 @@
+circuit "High-side PNP switch driven by an NPN"
+
+part B1 battery value=12V
+part J1 header label=CTRL pins: 1:IN/passive 2:GND/passive
+part LS1 buzzer
+part Q1 npn
+part Q2 pnp
+part R1 resistor value=10k
+part R2 resistor value=10k
+part R3 resistor value=4.7k
+
+connect J1[1] R1[1]
+connect LS1[+] Q2[C]
+connect Q1[B] R1[2]
+connect Q1[C] R3[1]
+connect Q2[B] R2[2] R3[2]
+net GND = B1[-] J1[2] LS1[-] Q1[E]
+net VCC = B1[+] Q2[E] R2[1]

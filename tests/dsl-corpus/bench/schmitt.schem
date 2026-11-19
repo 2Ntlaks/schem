@@ -1,0 +1,22 @@
+circuit "Comparator with hysteresis driving a MOSFET"
+
+part B1 battery value=12V
+part D1 diode
+part M1 motor
+part Q1 nmos
+part R1 resistor value=10k
+part R2 resistor value=100k
+part R3 resistor value=100
+part R4 resistor value=10k
+part R5 resistor value=10k
+part RV1 potentiometer value=10k
+part U1 opamp
+
+connect D1[A] M1[2] Q1[D]
+connect Q1[G] R3[2]
+connect R1[1] R4[2] R5[1]
+connect R1[2] R2[1] U1[3]
+connect R2[2] R3[1] U1[1]
+connect RV1[2] U1[2]
+net GND = B1[-] Q1[S] R5[2] RV1[3]
+net VCC = B1[+] D1[K] M1[1] R4[1] RV1[1]

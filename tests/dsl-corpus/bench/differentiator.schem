@@ -1,0 +1,22 @@
+circuit "Differentiator and comparator"
+
+part C1 capacitor value=100n
+part D1 led
+part J1 header label=IN pins: 1:SIG/passive 2:GND/passive
+part R1 resistor value=1k
+part R2 resistor value=100k
+part R3 resistor value=10k
+part R4 resistor value=10k
+part R5 resistor value=1k
+part U1 opamp
+part U2 opamp
+
+connect C1[1] J1[1]
+connect C1[2] R1[1]
+connect D1[A] R5[2]
+connect R1[2] R2[1] U1[2]
+connect R2[2] U1[1] U2[3]
+connect R3[2] R4[1] U2[2]
+connect R5[1] U2[1]
+net GND = D1[K] J1[2] R4[2] U1[3]
+net VCC = R3[1]

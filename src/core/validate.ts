@@ -16,7 +16,7 @@ export function resolveEndpoint(text: string, pinDefs: PinDefs): Resolved {
   if (m) {
     const [, part, num] = m as unknown as [string, string, string];
     const pins = pinDefs[part];
-    if (!pins) return fail("E251", `unknown part "${part}" in "${text}".`);
+    if (!Array.isArray(pins)) return fail("E251", `unknown part "${part}" in "${text}".`);
     if (!pins.some((p) => p.number === num)) return fail("E104", `unknown pin "${text}". ${part} has pins ${listPins(pins)}.`);
     return { ok: true, ep: { kind: "terminal", part, number: num } };
   }
@@ -24,7 +24,7 @@ export function resolveEndpoint(text: string, pinDefs: PinDefs): Resolved {
   if (m) {
     const [, part, group] = m as unknown as [string, string, string];
     const pins = pinDefs[part];
-    if (!pins) return fail("E251", `unknown part "${part}" in "${text}".`);
+    if (!Array.isArray(pins)) return fail("E251", `unknown part "${part}" in "${text}".`);
     if (!pins.some((p) => p.group === group)) return fail("E104", `${part} has no pin group "${group}".`);
     return { ok: true, ep: { kind: "group", part, group } };
   }
@@ -32,7 +32,7 @@ export function resolveEndpoint(text: string, pinDefs: PinDefs): Resolved {
   if (m) {
     const [, part, name] = m as unknown as [string, string, string];
     const pins = pinDefs[part];
-    if (!pins) return fail("E251", `unknown part "${part}" in "${text}".`);
+    if (!Array.isArray(pins)) return fail("E251", `unknown part "${part}" in "${text}".`);
     const hits = pins.filter((p) => p.name === name || (p.aliases ?? []).includes(name));
     if (hits.length === 0) return fail("E104", `unknown pin "${text}". ${part} has pins ${listPins(pins)}.`);
     if (hits.length === 1) return { ok: true, ep: { kind: "terminal", part, number: hits[0]!.number } };

@@ -1,0 +1,20 @@
+circuit "Common-emitter amplifier"
+
+part C1 capacitor value=10u
+part C2 capacitor value=100u
+part C3 capacitor value=10u
+part Q1 npn partNumber=2N3904
+part R1 resistor value=47k
+part R2 resistor value=10k
+part R3 resistor value=4.7k
+part R4 resistor value=1k
+part R5 resistor value=10k
+part V1 ac-source
+
+connect C1[1] V1[1]
+connect C1[2] Q1[B] R1[2] R2[1]
+connect C2[1] Q1[E] R4[1]
+connect C3[1] Q1[C] R3[2]
+net GND = C2[2] R2[2] R4[2] R5[2] V1[2]
+net OUT = C3[2] R5[1]
+net VCC = R1[1] R3[1]

@@ -9,6 +9,7 @@ export type Side = "left" | "right" | "top" | "bottom";
 
 export type Hint =
   | { id: string; type: "relative"; part: string; rel: "right-of" | "left-of" | "above" | "below"; of: string; priority: HintPriority }
+  | { id: string; type: "near"; part: string; of: string; priority: HintPriority }
   | { id: string; type: "align"; axis: "row" | "column"; parts: string[]; priority: HintPriority }
   | { id: string; type: "orient"; part: string; rot: Rot; flip: boolean; priority: HintPriority }
   /** Pin numbers per side, in order (top to bottom, left to right). */
@@ -20,7 +21,7 @@ export type Hint =
   | { id: string; type: "decouples"; part: string; pin: string; priority: HintPriority };
 
 export type HintType = Hint["type"];
-export const HINT_TYPES: readonly HintType[] = ["relative", "align", "orient", "pinSides", "decouples"];
+export const HINT_TYPES: readonly HintType[] = ["relative", "align", "orient", "pinSides", "decouples", "near"];
 
 /** A locked part never moves: its origin and orientation are fixed. */
 export interface Lock { part: string; x: number; y: number; rot: Rot; flip: boolean }
@@ -63,7 +64,8 @@ export const CAPACITOR_TYPES: ReadonlySet<string> = new Set(["capacitor", "polar
 export function hintParts(h: Hint): string[] {
   switch (h.type) {
     case "align": return [...h.parts];
-    case "relative": return [h.part, h.of];
+    case "relative":
+    case "near": return [h.part, h.of];
     case "decouples": { const m = /^([A-Za-z][A-Za-z0-9_]*)[[{.]/.exec(h.pin); return m ? [h.part, m[1]!] : [h.part]; }
     default: return [h.part];
   }

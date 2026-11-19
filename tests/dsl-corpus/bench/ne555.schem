@@ -1,0 +1,18 @@
+circuit "555 astable with LED"
+
+part B1 battery value=9V
+part C1 capacitor value=10u
+part C2 capacitor value=10n
+part D1 led color=red
+part R1 resistor value=1k
+part R2 resistor value=47k
+part R3 resistor value=330
+part U1 ic partNumber=NE555 pins: 1:GND/ground 2:TRIG/bidir 3:OUT/bidir 4:RESET/bidir 5:CTRL/bidir 6:THR/bidir 7:DIS/bidir 8:VCC/power_in
+
+connect C1[1] R2[2] U1[2] U1[6]
+connect C2[1] U1[5]
+connect D1[A] R3[2]
+connect R1[2] R2[1] U1[7]
+connect R3[1] U1[3]
+net GND = B1[-] C1[2] C2[2] D1[K] U1[1]
+net VCC = B1[+] R1[1] U1[4] U1[8]

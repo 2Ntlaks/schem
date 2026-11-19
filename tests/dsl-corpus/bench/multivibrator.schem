@@ -1,0 +1,22 @@
+circuit "Astable multivibrator"
+
+part B1 battery value=9V
+part C1 capacitor value=10u
+part C2 capacitor value=10u
+part D1 led
+part D2 led
+part Q1 npn
+part Q2 npn
+part R1 resistor value=470
+part R2 resistor value=47k
+part R3 resistor value=47k
+part R4 resistor value=470
+
+connect C1[1] Q1[C] R1[2]
+connect C1[2] Q2[B] R2[2]
+connect C2[1] Q2[C] R4[2]
+connect C2[2] Q1[B] R3[2]
+connect D1[K] R1[1]
+connect D2[K] R4[1]
+net GND = B1[-] Q1[E] Q2[E]
+net VCC = B1[+] D1[A] D2[A] R2[1] R3[1]

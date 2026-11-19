@@ -1,0 +1,26 @@
+circuit "Summing amplifier into a transistor stage"
+
+part C1 capacitor value=1u
+part C2 capacitor value=10u
+part J1 header label=IN pins: 1:A/passive 2:B/passive 3:GND/passive
+part J2 header label=OUT pins: 1:SIG/passive 2:GND/passive
+part Q1 npn
+part R1 resistor value=10k
+part R2 resistor value=10k
+part R3 resistor value=22k
+part R4 resistor value=47k
+part R5 resistor value=10k
+part R6 resistor value=2.2k
+part R7 resistor value=470
+part U1 opamp
+
+connect C1[1] R3[2] U1[1]
+connect C1[2] Q1[B] R4[2] R5[1]
+connect C2[1] Q1[C] R6[2]
+connect C2[2] J2[1]
+connect J1[1] R1[1]
+connect J1[2] R2[1]
+connect Q1[E] R7[1]
+connect R1[2] R2[2] R3[1] U1[2]
+net GND = J1[3] J2[2] R5[2] R7[2] U1[3]
+net VCC = R4[1] R6[1]
