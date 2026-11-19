@@ -52,6 +52,19 @@ Eight circuits to try are in [`examples/`](examples/). Add `-o <folder>` to writ
 
 To change a circuit without reshuffling its drawing, list the changes in a small JSON file and run `npm run schem -- edit <file> --ops <changes.json>`. [`docs/editing.md`](docs/editing.md) shows how.
 
+## Install
+
+schem is **not on npm yet**. To get a `schem` command on your PATH today, build it from a clone and link it:
+
+```sh
+npm ci
+npm run build
+npm install -g .
+schem draw examples/led.schem.json
+```
+
+The same command runs the MCP server for AI agents: `schem mcp --root <folder>`. [`docs/install.md`](docs/install.md) has the setup for Claude Code, Claude Desktop, Cursor, VS Code and Codex CLI, and the one-line `npx` form for once the package is published.
+
 ## How it works
 
 ```mermaid
