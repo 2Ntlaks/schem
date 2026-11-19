@@ -1,0 +1,172 @@
+{
+  "schema": "schem/1.0",
+  "meta": {
+    "title": "I2C level shifter"
+  },
+  "circuit": {
+    "parts": [
+      {
+        "id": "J1",
+        "type": "header",
+        "props": {
+          "label": "3V3 SIDE"
+        },
+        "pins": [
+          {
+            "number": "1",
+            "name": "3V3",
+            "role": "passive"
+          },
+          {
+            "number": "2",
+            "name": "SDA",
+            "role": "passive"
+          },
+          {
+            "number": "3",
+            "name": "SCL",
+            "role": "passive"
+          },
+          {
+            "number": "4",
+            "name": "GND",
+            "role": "passive"
+          }
+        ]
+      },
+      {
+        "id": "J2",
+        "type": "header",
+        "props": {
+          "label": "5V SIDE"
+        },
+        "pins": [
+          {
+            "number": "1",
+            "name": "5V",
+            "role": "passive"
+          },
+          {
+            "number": "2",
+            "name": "SDA",
+            "role": "passive"
+          },
+          {
+            "number": "3",
+            "name": "SCL",
+            "role": "passive"
+          },
+          {
+            "number": "4",
+            "name": "GND",
+            "role": "passive"
+          }
+        ]
+      },
+      {
+        "id": "Q1",
+        "type": "nmos",
+        "props": {
+          "partNumber": "BSS138"
+        }
+      },
+      {
+        "id": "Q2",
+        "type": "nmos",
+        "props": {
+          "partNumber": "BSS138"
+        }
+      },
+      {
+        "id": "R1",
+        "type": "resistor",
+        "props": {
+          "value": "10k"
+        }
+      },
+      {
+        "id": "R2",
+        "type": "resistor",
+        "props": {
+          "value": "10k"
+        }
+      },
+      {
+        "id": "R3",
+        "type": "resistor",
+        "props": {
+          "value": "10k"
+        }
+      },
+      {
+        "id": "R4",
+        "type": "resistor",
+        "props": {
+          "value": "10k"
+        }
+      }
+    ],
+    "nets": [
+      {
+        "id": "n1",
+        "name": "3V3",
+        "endpoints": [
+          "J1[1]",
+          "R1[1]",
+          "R2[1]",
+          "Q1[G]",
+          "Q2[G]"
+        ]
+      },
+      {
+        "id": "n2",
+        "name": "5V",
+        "endpoints": [
+          "J2[1]",
+          "R3[1]",
+          "R4[1]"
+        ]
+      },
+      {
+        "id": "n3",
+        "endpoints": [
+          "J1[2]",
+          "R1[2]",
+          "Q1[S]"
+        ]
+      },
+      {
+        "id": "n4",
+        "endpoints": [
+          "J2[2]",
+          "R3[2]",
+          "Q1[D]"
+        ]
+      },
+      {
+        "id": "n5",
+        "endpoints": [
+          "J1[3]",
+          "R2[2]",
+          "Q2[S]"
+        ]
+      },
+      {
+        "id": "n6",
+        "endpoints": [
+          "J2[3]",
+          "R4[2]",
+          "Q2[D]"
+        ]
+      },
+      {
+        "id": "n7",
+        "name": "GND",
+        "endpoints": [
+          "J1[4]",
+          "J2[4]"
+        ]
+      }
+    ]
+  }
+}

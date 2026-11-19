@@ -3,7 +3,7 @@
 // looks for a checked fix.
 
 import { key, type Pt } from "../geom/geom.js";
-import { canonical, netKind, type Circuit, type PinDefs } from "../core/model.js";
+import { canonical, netKind, railLevel, type Circuit, type PinDefs } from "../core/model.js";
 import { groupRepresentative, validate } from "../core/validate.js";
 import { BUILTIN } from "../symbols/library.js";
 import type { DrawnPin, RenderModel } from "../render/model.js";
@@ -26,6 +26,7 @@ export function checkConventions(circuit: Circuit, pinDefs: PinDefs, m: RenderMo
   // Drawn terminal of each endpoint (group endpoints at their representative, SPEC 6.2).
   const netPins = new Map<string, DrawnPin[]>();
   const kindOfNet = new Map(circuit.nets.map((n) => [n.id, netKind(n)]));
+  const negativeRails = new Set(circuit.nets.filter((n) => railLevel(n) === -1).map((n) => n.id));
   for (const [netId, eps] of v.valid.endpoints) {
     const ps: DrawnPin[] = [];
     for (const e of eps) {
@@ -60,16 +61,17 @@ export function checkConventions(circuit: Circuit, pinDefs: PinDefs, m: RenderMo
     return false;
   };
 
-  // 7: ground symbols hang below their connection, supply symbols stand above it.
+  // 7: ground and negative supplies hang below their connection.
   for (const port of el.ports) {
     if (port.kind === "label") continue;
     const k = key(port.at);
     const pin = el.pins.find((p) => key(p.at) === k);
     const dirs = c.dirs.get(k);
-    const want = port.kind === "ground" ? "down" : "up";      // direction the connection leaves towards the symbol
-    const from = port.kind === "ground" ? "up" : "down";      // where the conductor must come from
+    const below = railLevel({ kind: port.kind, name: port.text }) !== 1;
+    const want = below ? "down" : "up";
+    const from = below ? "up" : "down";
     const ok = pin ? pin.dir === want : dirs !== undefined && dirs.size === 1 && dirs.has(from);
-    if (!ok) out.push({ id: `C7-${port.kind}-${k}`, severity: "warn", message: `${port.kind === "ground" ? "Ground" : "Supply"} symbol "${port.text}" at ${k} is not ${port.kind === "ground" ? "below" : "above"} its connection.`, parts: pin ? [pin.part] : [], fix: null });
+    if (!ok) out.push({ id: `C7-${port.kind}-${k}`, severity: "warn", message: `${port.kind === "ground" ? "Ground" : "Supply"} symbol "${port.text}" at ${k} is not ${below ? "below" : "above"} its connection.`, parts: pin ? [pin.part] : [], fix: null });
   }
 
   // 7 (sources): a battery or voltage source stands vertical with "+" above "-".
@@ -88,7 +90,8 @@ export function checkConventions(circuit: Circuit, pinDefs: PinDefs, m: RenderMo
     // 10: a two-pin part between a supply and ground is vertical, supply side up.
     if ((ka === "power" && kb === "ground") || (ka === "ground" && kb === "power")) {
       const [pw, gd] = ka === "power" ? [a, b] : [b, a];
-      if (!vertical || pw.at[1] > gd.at[1]) out.push({ id: `C10-${part.id}`, severity: "warn", message: `${part.id} sits between a supply and ground but is not drawn vertical with the supply side up.`, parts: [part.id], fix: null });
+      const negative = negativeRails.has(netOfPin.get(`${pw.part}[${pw.number}]`) ?? "");
+      if (!vertical || (negative ? pw.at[1] < gd.at[1] : pw.at[1] > gd.at[1])) out.push({ id: `C10-${part.id}`, severity: "warn", message: `${part.id} sits between a supply and ground but is not drawn vertical with the supply side ${negative ? "down" : "up"}.`, parts: [part.id], fix: null });
     } else if (part.type === "resistor" && ((asPort(a) && kb === "signal") || (asPort(b) && ka === "signal"))) {
       // 9.4 pull-up / pull-down: vertical from a rail drawn as a symbol to the signal wire.
       if (!vertical) out.push({ id: `C9.4-pull-${part.id}`, severity: "warn", message: `Pull-up or pull-down ${part.id} is not drawn vertical.`, parts: [part.id], fix: null });

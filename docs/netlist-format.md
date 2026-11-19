@@ -84,8 +84,10 @@ A net is power or ground in one of two ways:
 
 Ground names are `GND`, `AGND`, `DGND`, `PGND`, `VSS`, `0V` and `GROUND`.
 
-Power names are `VCC`, `VDD`, `VIN`, `VBAT`, `V+`, `VPP`, `VBUS` and `PWR`, or a voltage such as
-`5V`, `3.3V`, `3V3` or `+12V`.
+Power names include `VCC`, `VDD`, `VIN`, `VBAT`, `V+`, `VPP`, `VBUS`, `PWR`, `VEE` and `V-`,
+or a voltage such as `5V`, `3.3V`, `3V3`, `+12V` or `-12V`. A power net named `VEE`, `V-`
+or starting with `-` has a downward supply symbol with its name underneath.
+To use `VSS` as a negative supply, set its `kind` to `"power"`.
 
 Any other name, or no name, makes the net a signal net.
 

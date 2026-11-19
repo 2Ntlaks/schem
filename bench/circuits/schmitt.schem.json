@@ -1,0 +1,144 @@
+{
+  "schema": "schem/1.0",
+  "meta": {
+    "title": "Comparator with hysteresis driving a MOSFET"
+  },
+  "circuit": {
+    "parts": [
+      {
+        "id": "RV1",
+        "type": "potentiometer",
+        "props": {
+          "value": "10k"
+        }
+      },
+      {
+        "id": "R1",
+        "type": "resistor",
+        "props": {
+          "value": "10k"
+        }
+      },
+      {
+        "id": "R2",
+        "type": "resistor",
+        "props": {
+          "value": "100k"
+        }
+      },
+      {
+        "id": "U1",
+        "type": "opamp"
+      },
+      {
+        "id": "R3",
+        "type": "resistor",
+        "props": {
+          "value": "100"
+        }
+      },
+      {
+        "id": "Q1",
+        "type": "nmos"
+      },
+      {
+        "id": "M1",
+        "type": "motor"
+      },
+      {
+        "id": "D1",
+        "type": "diode"
+      },
+      {
+        "id": "R4",
+        "type": "resistor",
+        "props": {
+          "value": "10k"
+        }
+      },
+      {
+        "id": "R5",
+        "type": "resistor",
+        "props": {
+          "value": "10k"
+        }
+      },
+      {
+        "id": "B1",
+        "type": "battery",
+        "props": {
+          "value": "12V"
+        }
+      }
+    ],
+    "nets": [
+      {
+        "id": "n1",
+        "name": "VCC",
+        "endpoints": [
+          "B1[+]",
+          "RV1[1]",
+          "R4[1]",
+          "M1[1]",
+          "D1[K]"
+        ]
+      },
+      {
+        "id": "n2",
+        "endpoints": [
+          "RV1[2]",
+          "U1[2]"
+        ]
+      },
+      {
+        "id": "n3",
+        "endpoints": [
+          "R4[2]",
+          "R5[1]",
+          "R1[1]"
+        ]
+      },
+      {
+        "id": "n4",
+        "endpoints": [
+          "R1[2]",
+          "U1[3]",
+          "R2[1]"
+        ]
+      },
+      {
+        "id": "n5",
+        "endpoints": [
+          "U1[1]",
+          "R2[2]",
+          "R3[1]"
+        ]
+      },
+      {
+        "id": "n6",
+        "endpoints": [
+          "R3[2]",
+          "Q1[G]"
+        ]
+      },
+      {
+        "id": "n7",
+        "endpoints": [
+          "Q1[D]",
+          "M1[2]",
+          "D1[A]"
+        ]
+      },
+      {
+        "id": "n8",
+        "name": "GND",
+        "endpoints": [
+          "B1[-]",
+          "RV1[3]",
+          "R5[2]",
+          "Q1[S]"
+        ]
+      }
+    ]
+  }
+}

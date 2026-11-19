@@ -17,6 +17,7 @@
     "docs:parts": "tsx scripts/parts-doc.ts",
     "phase0": "tsx scripts/phase0.ts",
     "gates": "tsx scripts/gates.ts",
+    "bench": "tsx scripts/bench.ts",
     "showcase": "tsx scripts/showcase.ts",
     "draw:symbols": "tsx scripts/symbols.ts",
     "readme:art": "tsx scripts/readme-art.ts",

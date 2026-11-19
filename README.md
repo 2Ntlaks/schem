@@ -167,6 +167,7 @@ schem is an early prototype. It is useful today for small and medium circuits, a
 - 26 symbols: passives, diodes, LEDs, BJTs, MOSFETs, op-amps, relays, switches, sources and more
 - Chips as labelled boxes, connectors, and 4 boards with their real pinouts (Arduino Uno, ESP32-DevKitC, a Pololu regulator, an I2C LCD)
 - Common circuits drawn in their textbook shape: op-amp amplifiers, Sallen-Key and other active filters, two oscillators, H-bridges, I2C buses and more ([the list](docs/templates.md))
+- Circuits with no template are laid out from what their parts are: inputs on the left, loads above a transistor and emitter parts below it, a supply-to-ground string in one column. All 18 everyday circuits in the benchmark draw valid ([how it works](docs/general-layout.md))
 - All 8 development circuits draw valid; a generated 30-part circuit draws in under 3 seconds
 - Edits from the command line that keep the drawing and report anything that moved
 - Byte-identical output on Windows and Linux
@@ -176,7 +177,7 @@ schem is an early prototype. It is useful today for small and medium circuits, a
     <td valign="top">
 
 - Dense boards with several chips spread out too far
-- Circuits with no template yet, such as single-transistor amplifiers, 555 timers and crystal oscillators, are drawn by the general rules and can come out messy
+- Some symmetric circuits, such as an instrumentation amplifier, still need a template for their textbook layout ([open jobs](docs/general-layout.md#open-jobs))
 - The symbol and board library is small
 - Not on npm, so no `npx schem` yet
 - No blind rating by outside judges yet
@@ -193,6 +194,7 @@ There is a lot to do, and much of it needs no knowledge of the layout engine.
 - **Draw a symbol.** The library is small; [`CONTRIBUTING.md`](CONTRIBUTING.md#adding-a-symbol) walks through adding one, and the tests check it in all eight orientations.
 - **Add your board.** A dev board or breakout is one JSON file listing its real pins, no code needed. See [adding a board](CONTRIBUTING.md#adding-a-board).
 - **Add an example**, or fix anything in the docs that confused you.
+- **Improve the layout.** [`docs/general-layout.md`](docs/general-layout.md) lists the open jobs, each tied to a benchmark circuit, and `npm run bench` scores your change.
 
 Coding agents are welcome too: [`AGENTS.md`](AGENTS.md) holds their rules. Start with [`CONTRIBUTING.md`](CONTRIBUTING.md).
 

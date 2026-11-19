@@ -1,0 +1,106 @@
+{
+  "schema": "schem/1.0",
+  "meta": {
+    "title": "Constant-current LED driver"
+  },
+  "circuit": {
+    "parts": [
+      {
+        "id": "RV1",
+        "type": "potentiometer",
+        "props": {
+          "value": "10k"
+        }
+      },
+      {
+        "id": "U1",
+        "type": "opamp"
+      },
+      {
+        "id": "R1",
+        "type": "resistor",
+        "props": {
+          "value": "100"
+        }
+      },
+      {
+        "id": "Q1",
+        "type": "nmos"
+      },
+      {
+        "id": "D1",
+        "type": "led"
+      },
+      {
+        "id": "R2",
+        "type": "resistor",
+        "props": {
+          "value": "1"
+        }
+      },
+      {
+        "id": "B1",
+        "type": "battery",
+        "props": {
+          "value": "12V"
+        }
+      }
+    ],
+    "nets": [
+      {
+        "id": "n1",
+        "name": "VCC",
+        "endpoints": [
+          "B1[+]",
+          "RV1[1]",
+          "D1[A]"
+        ]
+      },
+      {
+        "id": "n2",
+        "endpoints": [
+          "RV1[2]",
+          "U1[3]"
+        ]
+      },
+      {
+        "id": "n3",
+        "endpoints": [
+          "U1[1]",
+          "R1[1]"
+        ]
+      },
+      {
+        "id": "n4",
+        "endpoints": [
+          "R1[2]",
+          "Q1[G]"
+        ]
+      },
+      {
+        "id": "n5",
+        "endpoints": [
+          "D1[K]",
+          "Q1[D]"
+        ]
+      },
+      {
+        "id": "n6",
+        "endpoints": [
+          "Q1[S]",
+          "R2[1]",
+          "U1[2]"
+        ]
+      },
+      {
+        "id": "n7",
+        "name": "GND",
+        "endpoints": [
+          "B1[-]",
+          "RV1[3]",
+          "R2[2]"
+        ]
+      }
+    ]
+  }
+}

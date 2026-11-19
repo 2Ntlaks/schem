@@ -29,48 +29,27 @@
   },
   "case08-diffpair": {
     "status": "valid",
-    "findings": [
-      {
-        "id": "C10-V3",
-        "severity": "warn",
-        "message": "V3 sits between a supply and ground but is not drawn vertical with the supply side up.",
-        "fix": {
-          "ops": [
-            {
-              "op": "setOrientation",
-              "part": "V3",
-              "rot": 270
-            }
-          ],
-          "expectedLayout": "08db84f3fcfd3bdb1e01011baea5503fab191d68ac8aef1d3025d83d53f56429",
-          "changesCircuit": false,
-          "expect": {
-            "wireLength": -9
-          },
-          "tradeoff": null
-        }
-      }
-    ]
+    "findings": []
   },
   "generated-30-16": {
-    "status": "valid_low_confidence",
+    "status": "valid",
     "findings": [
       {
         "id": "C13-C5",
         "severity": "warn",
-        "message": "Decoupling capacitor C5 is 81 G from the nearest supply pin it can serve (at most 8 G). No checked fix found among 4 candidates.",
+        "message": "Decoupling capacitor C5 is 116 G from the nearest supply pin it can serve (at most 8 G). No checked fix found among 4 candidates.",
         "fix": null
       },
       {
         "id": "C13-C6",
         "severity": "warn",
-        "message": "Decoupling capacitor C6 is 91 G from the nearest supply pin it can serve (at most 8 G). No checked fix found among 4 candidates.",
+        "message": "Decoupling capacitor C6 is 103 G from the nearest supply pin it can serve (at most 8 G). No checked fix found among 4 candidates.",
         "fix": null
       },
       {
-        "id": "L-jogs",
+        "id": "L-squeezedRuns",
         "severity": "info",
-        "message": "Readability: short steps in wires: 1 (at most 0).",
+        "message": "Readability: wires of different nets squeezed onto adjacent tracks: 1 (at most 0).",
         "fix": {
           "ops": [
             {
@@ -78,22 +57,15 @@
               "factor": 1.5
             }
           ],
-          "expectedLayout": "c6126a10f1ccd18a54fc512447f4ee7dcccdfc0d58457b2337680e3a69f4b844",
+          "expectedLayout": "a8a2131869caa8d68aca46519c08c51c8653339bf726cccb219c1462a547df4b",
           "changesCircuit": false,
           "expect": {
             "breaches": -1,
-            "crossings": -1,
-            "bends": -6,
-            "wireLength": 16
+            "bends": -2,
+            "wireLength": 48
           },
           "tradeoff": null
         }
-      },
-      {
-        "id": "L-squeezedRuns",
-        "severity": "info",
-        "message": "Readability: wires of different nets squeezed onto adjacent tracks: 1 (at most 0). No checked fix found among 3 candidates.",
-        "fix": null
       }
     ]
   }

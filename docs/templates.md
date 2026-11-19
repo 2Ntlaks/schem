@@ -57,6 +57,7 @@ output drives is drawn to its right. Examples:
 
 | Circuit | What schem looks for | How it is drawn | Id |
 |---|---|---|---|
+| Two-transistor LED oscillator | Two grounded NPN emitters. Each collector connects through a timing capacitor to the opposite base. Each base has a resistor to the positive supply. Each collector connects to that supply through a resistor and then an LED. | The transistors stand side by side with their bases facing inward and their loads above. Follow each capacitor across its own row to the junction dot on the opposite base wire. | `npn-led-astable` |
 | H-bridge | Four transistors in two legs between one supply and ground, P-type on the high side and N-type on the low side (MOSFETs or BJTs), with a load between the two leg midpoints | Two vertical legs side by side, high side above low side, the load lying between the midpoints. Gate or base resistors face outward. | `h-bridge-pmos-nmos`, `h-bridge-pnp-npn` |
 | Differential pair | Two transistors sharing a tail resistor, with a current mirror of the opposite type as their load | Two vertical legs, the mirror on top, the pair below, the tail resistor centred under the pair. Inputs face outward. | `diff-pair-npn-pnp-mirror`, `diff-pair-nmos-pmos-mirror` |
 | Low-side switch | An NPN transistor or N-channel MOSFET with its emitter or source on ground and a load (a relay coil, motor, resistor) from its collector or drain to the supply | The load above the transistor on one vertical line. The base or gate resistor lies on the left; a flyback diode stands beside the load. | `low-side-npn-relay`, `low-side-nmos-relay`, `low-side-npn-two-pin`, `low-side-nmos-two-pin` |
@@ -84,13 +85,16 @@ as one filter and not as a non-inverting amplifier with loose parts around it.
 
 ## What is not here yet
 
-These are drawn by the general rules for now, and can come out untidy:
+These have no template. The general rules ([`general-layout.md`](general-layout.md)) draw them:
 
-- A differentiator (capacitors into IN-).
-- Sallen-Key band-pass filters and multiple-feedback filters.
-- Single-transistor amplifiers (common emitter, emitter follower).
-- 555 timer circuits and crystal oscillators.
-- Instrumentation amplifiers and other circuits with several op-amps wired across each other.
+- Single-transistor amplifiers (common emitter, emitter follower) and 555 timer circuits come out
+  close to their textbook shape: the general rules stack a transistor's load above it and its
+  emitter parts below, and stand a timing string in one column.
+- A differentiator, Sallen-Key band-pass filters and multiple-feedback filters are drawn in signal
+  order, but not in a fixed shape.
+- Symmetric circuits (an instrumentation amplifier, a push-pull output
+  stage) are drawn left to right, valid but not in the shape an engineer expects. These are the
+  best candidates for new templates.
 
 If a circuit you draw often is missing, open an issue with the circuit file and a picture of the
 shape you expect. A template is data, not code: see the notes at the top of

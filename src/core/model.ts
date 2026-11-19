@@ -46,13 +46,21 @@ export function canonical(e: Endpoint): string {
   return e.kind === "terminal" ? `${e.part}[${e.number}]` : `${e.part}{${e.group}}`;
 }
 
-const POWER_NAME = /^(\+?\d+(\.\d+)?V\d*|\d+V\d+|VCC|VDD|VIN|VBAT|V\+|VPP|VBUS|PWR)$/i;
+const POWER_NAME = /^([+-]?\d+(\.\d+)?V\d*|VCC|VDD|VIN|VBAT|V[+-]|VEE|VPP|VBUS|PWR)$/i;
 const GROUND_NAME = /^(GND|AGND|DGND|PGND|VSS|0V|GROUND)$/i;
 
 /** SPEC 6.3: explicit kind wins, else name-based default, else signal. */
-export function netKind(n: Net): NetKind {
+export function netKind(n: Pick<Net, "kind" | "name">): NetKind {
   if (n.kind) return n.kind;
   if (n.name && GROUND_NAME.test(n.name)) return "ground";
   if (n.name && POWER_NAME.test(n.name)) return "power";
   return "signal";
+}
+
+/** The voltage band used for drawing. VSS defaults to ground but can be declared as power. */
+export function railLevel(n: Pick<Net, "kind" | "name">): -1 | 0 | 1 | undefined {
+  const kind = netKind(n);
+  if (kind === "ground") return 0;
+  if (kind === "power") return n.name?.startsWith("-") || /^(VEE|V-|VSS)$/i.test(n.name ?? "") ? -1 : 1;
+  return undefined;
 }

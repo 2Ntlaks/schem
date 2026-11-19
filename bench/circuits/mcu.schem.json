@@ -1,0 +1,261 @@
+{
+  "schema": "schem/1.0",
+  "meta": {
+    "title": "ATmega328 minimal board"
+  },
+  "circuit": {
+    "parts": [
+      {
+        "id": "U1",
+        "type": "ic",
+        "props": {
+          "partNumber": "ATmega328P"
+        },
+        "pins": [
+          {
+            "number": "1",
+            "name": "RESET"
+          },
+          {
+            "number": "7",
+            "name": "VCC",
+            "role": "power_in"
+          },
+          {
+            "number": "8",
+            "name": "GND",
+            "role": "ground"
+          },
+          {
+            "number": "20",
+            "name": "AVCC",
+            "role": "power_in"
+          },
+          {
+            "number": "22",
+            "name": "AGND",
+            "role": "ground"
+          },
+          {
+            "number": "2",
+            "name": "RXD"
+          },
+          {
+            "number": "3",
+            "name": "TXD"
+          },
+          {
+            "number": "4",
+            "name": "PD2"
+          },
+          {
+            "number": "19",
+            "name": "PB5"
+          },
+          {
+            "number": "15",
+            "name": "PB1"
+          },
+          {
+            "number": "27",
+            "name": "SDA"
+          },
+          {
+            "number": "28",
+            "name": "SCL"
+          }
+        ]
+      },
+      {
+        "id": "R1",
+        "type": "resistor",
+        "props": {
+          "value": "10k"
+        }
+      },
+      {
+        "id": "SW1",
+        "type": "pushbutton"
+      },
+      {
+        "id": "C1",
+        "type": "capacitor",
+        "props": {
+          "value": "100n"
+        }
+      },
+      {
+        "id": "C2",
+        "type": "capacitor",
+        "props": {
+          "value": "100n"
+        }
+      },
+      {
+        "id": "R2",
+        "type": "resistor",
+        "props": {
+          "value": "330"
+        }
+      },
+      {
+        "id": "D1",
+        "type": "led"
+      },
+      {
+        "id": "R3",
+        "type": "resistor",
+        "props": {
+          "value": "330"
+        }
+      },
+      {
+        "id": "D2",
+        "type": "led"
+      },
+      {
+        "id": "SW2",
+        "type": "pushbutton"
+      },
+      {
+        "id": "R4",
+        "type": "resistor",
+        "props": {
+          "value": "10k"
+        }
+      },
+      {
+        "id": "J1",
+        "type": "header",
+        "props": {
+          "label": "UART"
+        },
+        "pins": [
+          {
+            "number": "1",
+            "name": "TX",
+            "role": "passive"
+          },
+          {
+            "number": "2",
+            "name": "RX",
+            "role": "passive"
+          },
+          {
+            "number": "3",
+            "name": "GND",
+            "role": "passive"
+          }
+        ]
+      },
+      {
+        "id": "J2",
+        "type": "header",
+        "props": {
+          "label": "POWER"
+        },
+        "pins": [
+          {
+            "number": "1",
+            "name": "5V",
+            "role": "passive"
+          },
+          {
+            "number": "2",
+            "name": "GND",
+            "role": "passive"
+          }
+        ]
+      }
+    ],
+    "nets": [
+      {
+        "id": "n1",
+        "name": "5V",
+        "endpoints": [
+          "J2[1]",
+          "U1[7]",
+          "U1[20]",
+          "R1[1]",
+          "C1[1]",
+          "C2[1]",
+          "R4[1]"
+        ]
+      },
+      {
+        "id": "n2",
+        "endpoints": [
+          "U1[1]",
+          "R1[2]",
+          "SW1[1]"
+        ]
+      },
+      {
+        "id": "n3",
+        "endpoints": [
+          "U1[2]",
+          "J1[1]"
+        ]
+      },
+      {
+        "id": "n4",
+        "endpoints": [
+          "U1[3]",
+          "J1[2]"
+        ]
+      },
+      {
+        "id": "n5",
+        "endpoints": [
+          "U1[19]",
+          "R2[1]"
+        ]
+      },
+      {
+        "id": "n6",
+        "endpoints": [
+          "R2[2]",
+          "D1[A]"
+        ]
+      },
+      {
+        "id": "n7",
+        "endpoints": [
+          "U1[15]",
+          "R3[1]"
+        ]
+      },
+      {
+        "id": "n8",
+        "endpoints": [
+          "R3[2]",
+          "D2[A]"
+        ]
+      },
+      {
+        "id": "n9",
+        "endpoints": [
+          "U1[4]",
+          "R4[2]",
+          "SW2[1]"
+        ]
+      },
+      {
+        "id": "n10",
+        "name": "GND",
+        "endpoints": [
+          "J2[2]",
+          "U1[8]",
+          "U1[22]",
+          "SW1[2]",
+          "C1[2]",
+          "C2[2]",
+          "D1[K]",
+          "D2[K]",
+          "SW2[2]",
+          "J1[3]"
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,253 @@
+{
+  "schema": "schem/1.0",
+  "meta": {
+    "title": "Shift register LED bar"
+  },
+  "circuit": {
+    "parts": [
+      {
+        "id": "U1",
+        "type": "ic",
+        "props": {
+          "partNumber": "MCU"
+        },
+        "pins": [
+          {
+            "number": "1",
+            "name": "VCC",
+            "role": "power_in"
+          },
+          {
+            "number": "2",
+            "name": "GND",
+            "role": "ground"
+          },
+          {
+            "number": "3",
+            "name": "MOSI"
+          },
+          {
+            "number": "4",
+            "name": "SCK"
+          },
+          {
+            "number": "5",
+            "name": "CS"
+          }
+        ]
+      },
+      {
+        "id": "U2",
+        "type": "ic",
+        "props": {
+          "partNumber": "74HC595"
+        },
+        "pins": [
+          {
+            "number": "16",
+            "name": "VCC",
+            "role": "power_in"
+          },
+          {
+            "number": "8",
+            "name": "GND",
+            "role": "ground"
+          },
+          {
+            "number": "14",
+            "name": "SER"
+          },
+          {
+            "number": "11",
+            "name": "SRCLK"
+          },
+          {
+            "number": "12",
+            "name": "RCLK"
+          },
+          {
+            "number": "13",
+            "name": "OE"
+          },
+          {
+            "number": "10",
+            "name": "SRCLR"
+          },
+          {
+            "number": "15",
+            "name": "QA"
+          },
+          {
+            "number": "1",
+            "name": "QB"
+          },
+          {
+            "number": "2",
+            "name": "QC"
+          },
+          {
+            "number": "3",
+            "name": "QD"
+          }
+        ]
+      },
+      {
+        "id": "R1",
+        "type": "resistor",
+        "props": {
+          "value": "330"
+        }
+      },
+      {
+        "id": "D1",
+        "type": "led"
+      },
+      {
+        "id": "R2",
+        "type": "resistor",
+        "props": {
+          "value": "330"
+        }
+      },
+      {
+        "id": "D2",
+        "type": "led"
+      },
+      {
+        "id": "R3",
+        "type": "resistor",
+        "props": {
+          "value": "330"
+        }
+      },
+      {
+        "id": "D3",
+        "type": "led"
+      },
+      {
+        "id": "R4",
+        "type": "resistor",
+        "props": {
+          "value": "330"
+        }
+      },
+      {
+        "id": "D4",
+        "type": "led"
+      },
+      {
+        "id": "C1",
+        "type": "capacitor",
+        "props": {
+          "value": "100n"
+        }
+      }
+    ],
+    "nets": [
+      {
+        "id": "n1",
+        "name": "5V",
+        "endpoints": [
+          "U1[1]",
+          "U2[16]",
+          "U2[10]",
+          "C1[1]"
+        ]
+      },
+      {
+        "id": "n2",
+        "name": "MOSI",
+        "endpoints": [
+          "U1[3]",
+          "U2[14]"
+        ]
+      },
+      {
+        "id": "n3",
+        "name": "SCK",
+        "endpoints": [
+          "U1[4]",
+          "U2[11]"
+        ]
+      },
+      {
+        "id": "n4",
+        "name": "CS",
+        "endpoints": [
+          "U1[5]",
+          "U2[12]"
+        ]
+      },
+      {
+        "id": "n5",
+        "endpoints": [
+          "U2[15]",
+          "R1[1]"
+        ]
+      },
+      {
+        "id": "n6",
+        "endpoints": [
+          "R1[2]",
+          "D1[A]"
+        ]
+      },
+      {
+        "id": "n7",
+        "endpoints": [
+          "U2[1]",
+          "R2[1]"
+        ]
+      },
+      {
+        "id": "n8",
+        "endpoints": [
+          "R2[2]",
+          "D2[A]"
+        ]
+      },
+      {
+        "id": "n9",
+        "endpoints": [
+          "U2[2]",
+          "R3[1]"
+        ]
+      },
+      {
+        "id": "n10",
+        "endpoints": [
+          "R3[2]",
+          "D3[A]"
+        ]
+      },
+      {
+        "id": "n11",
+        "endpoints": [
+          "U2[3]",
+          "R4[1]"
+        ]
+      },
+      {
+        "id": "n12",
+        "endpoints": [
+          "R4[2]",
+          "D4[A]"
+        ]
+      },
+      {
+        "id": "n13",
+        "name": "GND",
+        "endpoints": [
+          "U1[2]",
+          "U2[8]",
+          "U2[13]",
+          "C1[2]",
+          "D1[K]",
+          "D2[K]",
+          "D3[K]",
+          "D4[K]"
+        ]
+      }
+    ]
+  }
+}

@@ -145,22 +145,22 @@ describe("schem edit", () => {
 });
 
 describe("schem edit --strict", () => {
-  // Generated circuit 38 with its random edit: the edit's best layout moves one untouched part 8 G
+  // Generated circuit 50 with its random edit: the edit reroutes two nets it did not involve
   // (the limit is 6), one of the few such edits in the tests/edits.test.ts sweep.
   const unstable = () => {
     const dir = join(WORK, `strict${++n}`);
     mkdirSync(dir, { recursive: true });
-    const g = generate(38, 5);
-    const file = join(dir, "g38.schem.json");
+    const g = generate(50, 5);
+    const file = join(dir, "g50.schem.json");
     writeFileSync(file, JSON.stringify({ schema: "schem/1.0", circuit: g.circuit }));
-    return { dir, file, ops: ops(dir, "e.json", randomEdit(g.circuit, 38 * 31)), out: join(dir, "out") };
+    return { dir, file, ops: ops(dir, "e.json", randomEdit(g.circuit, 50 * 31)), out: join(dir, "out") };
   };
 
   it("without --strict, an edit past the stability limit is saved with a warning", () => {
     const t = unstable();
     const r = cli("edit", t.file, "--ops", t.ops, "-o", t.out);
     expect(r.code).toBe(0);
-    expect(r.out).toContain("warning: this edit moves untouched parts more than the limit (an untouched part moved 8 G (at most 6))");
+    expect(r.out).toContain("warning: this edit moves untouched parts more than the limit (routes changed on 2 nets the edit did not involve (at most 1): n5, n6)");
   });
 
   it("with --strict, the same edit is refused and nothing is written", () => {
@@ -169,7 +169,7 @@ describe("schem edit --strict", () => {
     const r = cli("edit", t.file, "--ops", t.ops, "-o", t.out, "--strict");
     expect(r.code).toBe(1);
     expect(r.out).toContain("edit refused (unstable)");
-    expect(r.out).toContain("would move: an untouched part moved 8 G (at most 6)");
+    expect(r.out).toContain("would move: routes changed on 2 nets the edit did not involve (at most 1): n5, n6");
     expect(readFileSync(t.file, "utf8")).toBe(before);
     expect(existsSync(t.out)).toBe(false);
   });
