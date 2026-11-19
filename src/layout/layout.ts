@@ -334,7 +334,7 @@ export function layout(project: Project, opts: LayoutOptions = {}): LayoutResult
     // Labels must keep clear of port symbols and of every pin's approach point.
     const approachBoxes = pins.map((p): Box => { const a = step(p.at, p.dir); return { x: a[0] - 0.5, y: a[1] - 0.5, w: 1, h: 1 }; });
     const labels = labelFor(part, sym, orient, ko, [...ports.map((q) => q.box), ...approachBoxes], intent.overrides?.labelSide?.[id]
-      ?? (tr ? templateLabel(tr, id) : undefined) ?? (decouplers.some((m) => m.host === id) ? "below-left-out" : undefined));
+      ?? (tr ? templateLabel(tr, id) : undefined) ?? (decouplers.some((m) => m.host === id) ? "below-left-out" : undefined), !tr);
     let env = ko;
     for (const l of labels) env = unionBox(env, gridBox(l.box));
     for (const q of ports) env = unionBox(env, q.box);
@@ -1125,21 +1125,54 @@ function displayValue(type: string, raw: string): string {
   return `${n} ${p}${sym}`;
 }
 
+const WRAP_IC_LABEL_AT = 16; // G; wrap long IC/module titles so one banner does not widen a whole column
+const WRAP_IC_LABEL_W = 11;  // G; target line width once wrapping triggers
+
+function wrapLine(text: string, triggerW: number, maxW: number): string[] {
+  const width = (s: string) => measure(s, LABEL_SIZE).width / 10;
+  if (width(text) <= triggerW) return [text];
+  const words = text.trim().split(/\s+/);
+  if (words.length <= 1) return [text];
+  // Balance lines across the minimum line count that fits within maxW (greedily with balanced target).
+  const greedy = (limit: number): string[] => {
+    const out: string[] = [];
+    let cur = words[0]!;
+    for (let i = 1; i < words.length; i++) {
+      const next = `${cur} ${words[i]}`;
+      if (width(next) <= limit) cur = next;
+      else { out.push(cur); cur = words[i]!; }
+    }
+    out.push(cur);
+    return out;
+  };
+  const base = greedy(maxW);
+  const target = Math.min(maxW, Math.max(width(text) / base.length * 1.15, Math.max(...words.map(width))));
+  const balanced = greedy(target);
+  return balanced.length <= base.length ? balanced : base;
+}
+
 function labelLines(part: Circuit["parts"][0], sym: SymbolDef): string[] {
   const lines = [part.id];
   const value = part.props?.value ?? part.props?.label ?? part.props?.color ?? part.props?.partNumber ?? part.title;
-  if (value) lines.push(sym.kind === "ic" ? value : displayValue(part.type, value));
+  if (value) {
+    if (sym.kind === "ic") lines.push(...wrapLine(value, WRAP_IC_LABEL_AT, WRAP_IC_LABEL_W));
+    else lines.push(displayValue(part.type, value));
+  }
   return lines;
 }
 
-function labelFor(part: Circuit["parts"][0], sym: SymbolDef, o: Orient, ko: Box, avoid: Box[], side?: string): Placed["labels"] {
+function labelFor(part: Circuit["parts"][0], sym: SymbolDef, o: Orient, ko: Box, avoid: Box[], side?: string, freeSide = false): Placed["labels"] {
   if (sym.kind === "port") return [];
   const lines = labelLines(part, sym);
   const w = Math.max(...lines.map((l) => measure(l, LABEL_SIZE).width / 10));
   const h = lines.length * LINE;
   const vertical = (sym.kind === "two-pin" || sym.kind === "source") && (o.rot === 90 || o.rot === 270);
+  const wrappedIc = sym.kind === "ic" && lines.length > 2;
+  const hasRightPin = sym.pins.some((p) => xformDir(p.dir, o) === "right");
   const prefer = sym.kind === "ic"
-    ? ["above-left", "above-right", "below-left", "below-right", "above-left-out", "above-right-out", "below-left-out", "below-right-out", "left", "right"]
+    ? (freeSide && wrappedIc && !hasRightPin
+      ? ["right", "above-right", "above-left", "below-right", "below-left", "above-right-out", "below-right-out", "above-left-out", "below-left-out", "left"]
+      : ["above-left", "above-right", "below-left", "below-right", "above-left-out", "above-right-out", "below-left-out", "below-right-out", "left", "right"])
     : vertical ? (sym.kind === "source" ? ["left", "right"] : ["right", "left"]) : sym.labelPrefer;
   const order = side ? [side, ...prefer.filter((x) => x !== side)] : prefer; // label-side override first (SPEC 6.4)
   const gap = 0.4;
