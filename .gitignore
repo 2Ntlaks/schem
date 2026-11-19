@@ -3,3 +3,5 @@ out/
 .schem-history/
 .claude/worktrees/
 __pycache__/
+dist/
+*.tgz

@@ -33,6 +33,23 @@ jobs:
           name: hashes-${{ runner.os }}
           path: hashes-${{ runner.os }}.txt
 
+  # The npm package installed from nothing (scripts/pack-smoke.ts): npm pack, install the
+  # tarball into an empty folder, then draw, run the MCP server and compare with the repo.
+  pack-smoke:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run pack:smoke
+
   same-output:
     needs: test
     runs-on: ubuntu-latest
