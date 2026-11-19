@@ -8,7 +8,7 @@ import { netKind, type Net, type Part, type PinDef, type PinDefs } from "../../c
 import type { Side } from "../../core/intent.js";
 import type { SymbolDef } from "../../symbols/library.js";
 import { solveWithDrops, type Constraint, type Priority } from "../solver.js";
-import type { NetPred, PinSel, Ref, Rel, Slot, SlotPin, Template } from "./types.js";
+import type { NetPred, PinSel, Ref, Rel, Slot, SlotPin, Template, When } from "./types.js";
 
 /** What the matcher reads: the full typed graph (SPEC 9.2 step 0). */
 export interface TemplateGraph {
@@ -35,6 +35,8 @@ export interface Region {
   slots: Map<string, Bound[]>;
   /** Net variable -> net id. */
   nets: Map<string, string>;
+  /** Net variable -> drawn endpoint count. */
+  netEndpoints: Map<string, number>;
   defs: PinDefs;
 }
 
@@ -171,7 +173,7 @@ function matchOne(t: Template, g: TemplateGraph, nets: Map<string, NetInfo>): Re
           if (ms.length < s.many!.min) return undefined;
           all.set(s.name, ms);
         }
-        return region(t, all, bound, g.defs);
+        return region(t, all, bound, nets, g.defs);
       }
       const s = single[i]!;
       for (const p of i === 0 ? [start] : candidates(s)) {
@@ -195,11 +197,12 @@ function matchOne(t: Template, g: TemplateGraph, nets: Map<string, NetInfo>): Re
 
 function prefers(s: Slot, p: Part): boolean { return !!s.prefer && p.props?.[s.prefer.prop] === s.prefer.value; }
 
-function region(t: Template, slots: Map<string, Bound[]>, nets: Map<string, string>, defs: PinDefs): Region {
+function region(t: Template, slots: Map<string, Bound[]>, nets: Map<string, string>, netInfo: Map<string, NetInfo>, defs: PinDefs): Region {
   const members: string[] = [], links: string[] = [];
   for (const s of t.slots) for (const b of slots.get(s.name) ?? []) (s.role === "member" ? members : links).push(b.part);
   const key = `${t.id}@${t.version}:${[...members, ...links].sort(cmpStr).join(",")}`;
-  return { key, template: t, rep: members[0] ?? links[0]!, members, links, slots, nets, defs };
+  const netEndpoints = new Map([...nets].map(([v, id]) => [v, netInfo.get(id)?.endpoints ?? 0]));
+  return { key, template: t, rep: members[0] ?? links[0]!, members, links, slots, nets, netEndpoints, defs };
 }
 
 /** Pin numbers a selector names on a part, in natural order. */
@@ -291,12 +294,19 @@ function expand(rel: Rel, r: Region, geo: (id: string) => Geo, priority: Priorit
   return out;
 }
 
+function whenOk(when: When | undefined, r: Region): boolean {
+  if (!when) return true;
+  if ("slot" in when) {
+    const n = r.slots.get(when.slot)?.length ?? 0;
+    return (when.min === undefined || n >= when.min) && (when.max === undefined || n <= when.max);
+  }
+  const n = r.netEndpoints.get(when.net) ?? 0;
+  return (when.minEndpoints === undefined || n >= when.minEndpoints) && (when.maxEndpoints === undefined || n <= when.maxEndpoints);
+}
+
 /** Member indices a relation uses for its `a` and `b` refs (see `Rel.each`). */
 function pairsOf(rel: Rel, r: Region): Array<[number, number]> {
-  if (rel.when) {
-    const n = r.slots.get(rel.when.slot)?.length ?? 0;
-    if ((rel.when.min !== undefined && n < rel.when.min) || (rel.when.max !== undefined && n > rel.when.max)) return [];
-  }
+  if (!whenOk(rel.when, r)) return [];
   const manyOf = (ref: Ref) => { const s = refSlot(ref); return s && r.template.slots.find((x) => x.name === s)?.many ? s : undefined; };
   const ma = manyOf(rel.a), mb = manyOf(rel.b);
   const slotName = ma ?? mb;
@@ -391,6 +401,7 @@ export function trunkRows(r: Region, geo: (id: string) => Geo): Array<{ net: str
   const out: Array<{ net: string; part: string; off: number; ends: string[] }> = [];
   const parts = (ref: Ref | Ref[]) => (Array.isArray(ref) ? ref : [ref]).flatMap((x) => { const s = refSlot(x); return s ? (r.slots.get(s) ?? []).map((b) => b.part) : []; });
   for (const tr of r.template.trunks ?? []) {
+    if (!whenOk(tr.when, r)) continue;
     const netId = r.nets.get(tr.net);
     if (!netId) continue;
     for (let i = 0; i + 1 < tr.points.length; i++) {
@@ -435,6 +446,7 @@ export function trunkRuns(r: Region, geo: (id: string) => Geo, at: (id: string) 
     return (ref.agg ?? agg) === "min" ? Math.min(...vals) : Math.max(...vals);
   };
   for (const tr of r.template.trunks ?? []) {
+    if (!whenOk(tr.when, r)) continue;
     const netId = r.nets.get(tr.net);
     if (!netId) continue;
     const ok = (tr.require ?? []).every((q) => (r.slots.get(q.pin[0]) ?? []).every((b) => {

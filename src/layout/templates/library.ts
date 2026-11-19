@@ -160,7 +160,11 @@ const I2C: Template = {
   ],
 };
 
-/** Voltage divider: one vertical column, the tap between the resistors (a T to the right). */
+/**
+ * Voltage divider: one vertical column for a 3-endpoint tap, or lower resistor staggered 2 G right
+ * on a pass-through signal line (4+ endpoints on the tap) so the signal runs straight through two
+ * clean T-junctions instead of looping under the lower resistor to avoid a four-way node.
+ */
 const DIVIDER: Template = {
   id: "voltage-divider", version: 1, priority: 8,
   summary: "two resistors in series between a supply and ground with a tap",
@@ -172,11 +176,23 @@ const DIVIDER: Template = {
       pins: [{ pin: "1", net: "TAP" }, { pin: "2", net: "BOT" }] },
   ],
   interior: [
-    rel("x", pin("rb", net("TAP")), "=", pin("rt", net("TAP")), 0, "one vertical column"),
+    rel("x", pin("rb", net("TAP")), "=", pin("rt", net("TAP")), 0, "one vertical column", { when: { net: "TAP", maxEndpoints: 3 } }),
+    rel("x", pin("rb", net("TAP")), "=", pin("rt", net("TAP")), 2, "stagger lower resistor 2 G right for two clean T-junctions", { when: { net: "TAP", minEndpoints: 4 } }),
     // 4 G apart: the tap row (2 G below the upper resistor, where the straight-wire pass puts a
     // sideways pin) is the middle of the link, so the T sits clear of both resistor ends.
     rel("y", pin("rb", net("TAP")), "=", pin("rt", net("TAP")), 4, "the tap node between the two resistors"),
   ],
+  trunks: [{
+    net: "TAP", why: "staggered tap link between the upper and lower divider resistors",
+    when: { net: "TAP", minEndpoints: 4 },
+    points: [
+      { x: pin("rt", net("TAP")), y: pin("rt", net("TAP")), dy: 1 },
+      { x: pin("rt", net("TAP")), y: pin("rt", net("TAP")), dy: 2 },
+      { x: pin("rb", net("TAP")), y: pin("rt", net("TAP")), dy: 2 },
+      { x: pin("rb", net("TAP")), y: pin("rb", net("TAP")), dy: -1 },
+    ],
+    require: [{ pin: ["rt", { net: "TAP" }], dir: "down" }, { pin: ["rb", { net: "TAP" }], dir: "up" }],
+  }],
 };
 
 /**
