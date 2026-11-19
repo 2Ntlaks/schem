@@ -31,7 +31,12 @@ const OPAMP_INVERTING: Template = {
     { name: "rf", types: ["resistor"], role: "member", symmetric: true, orient: { net: "OUT", dir: "right" },
       pins: [{ pin: "1", net: "SUM" }, { pin: "2", net: "OUT" }] },
     { name: "rin", types: ["resistor"], role: "member", symmetric: true, many: { min: 1 }, orient: { net: "SUM", dir: "right" },
-      pins: [{ pin: "1", net: "*", pred: { kind: ["signal"] } }, { pin: "2", net: "SUM" }] },
+      pins: [{ pin: "1", net: "*", pred: { kind: ["signal"], forbidPin: [{ type: "opamp", pin: "2" }] } }, { pin: "2", net: "SUM" }] },
+    // Difference amplifier: optional resistor into IN+ and shunt resistor from IN+ to ground.
+    { name: "rplus", types: ["resistor"], role: "member", symmetric: true, many: { min: 0 }, orient: { net: "REF", dir: "right" }, label: "below",
+      pins: [{ pin: "1", net: "*", pred: { kind: ["signal"] } }, { pin: "2", net: "REF", pred: { kind: ["signal"] } }] },
+    { name: "rgnd", types: ["resistor"], role: "member", symmetric: true, many: { min: 0 }, orient: { net: "REF", dir: "up" }, label: "left",
+      pins: [{ pin: "1", net: "REF", pred: { kind: ["signal"] } }, { pin: "2", net: "*", pred: { kind: ["ground"] } }] },
     // The source driving each input, when every input has one (Appendix A.1: staggered, "+" up).
     { name: "src", types: ["vsource", "battery"], role: "link", many: { min: 0 }, follow: { slot: "rin" }, pins: [] },
   ],
@@ -50,13 +55,19 @@ const OPAMP_INVERTING: Template = {
     rel("y", pin("rin", net("SUM")), "=", pin("u", "IN-"), -2, "first input 2 G above IN-", { each: "first", when: { slot: "rin", min: 2 } }),
     rel("y", env("rin", "top"), ">=", pin("rin", net("SUM")), 2, "next input's label 2 G below the previous input's wire", { each: "chain", when: { slot: "rin", min: 2 } }),
     rel("y", env("rf", "bottom"), "<=", env("u", "top"), -1, "feedback resistor above the op-amp, 1 G corridor"),
+    // Optional IN+ difference-amplifier resistors.
+    rel("y", pin("rplus", net("REF")), "=", pin("u", "IN+"), 0, "IN+ resistor in line with IN+", { when: { slot: "rplus", min: 1 } }),
+    rel("x", pin("rplus", net("REF")), "=", pin("rin", net("SUM")), 0, "IN+ resistor aligned with IN- resistor", { each: "first", when: { slot: "rplus", min: 1 } }),
+    rel("x", pin("rgnd", net("REF")), "=", pin("u", "IN+"), -2, "IN+ shunt resistor hangs 2 G left of IN+", { when: { slot: "rgnd", min: 1 } }),
+    rel("y", pin("rgnd", net("REF")), "=", pin("u", "IN+"), 2, "IN+ shunt resistor hangs from the IN+ line", { when: { slot: "rgnd", min: 1 } }),
+    rel("x", env("rplus", "right"), "<=", env("rgnd", "left"), -1, "IN+ resistor clear of the shunt resistor and its label", { when: { slot: "rgnd", min: 1 } }),
   ],
   link: [
     // Sources stay stacked in their column; each one sits right of the one above, so its wire
     // runs straight up past it and turns once into its input (Appendix A.1: "+" up, one bend).
     rel("x", pin("src", net("*")), ">=", env("src", "right"), 1, "sources stepped right, in input order", { each: "chain" }),
   ],
-  boundary: [["rin", { net: "*" }], ["u", "OUT"], ["u", "IN+"]],
+  boundary: [["rin", { net: "*" }], ["rplus", { net: "*" }], ["rgnd", { net: "*" }], ["u", "OUT"], ["u", "IN+"]],
   trunks: [{
     net: "SUM", why: "the summing node: one vertical conductor at S from the feedback row to the lowest input",
     points: [

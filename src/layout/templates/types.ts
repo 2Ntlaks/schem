@@ -24,6 +24,8 @@ export interface NetPred {
   /** Number of drawn endpoints on the net. */
   endpoints?: number;
   minEndpoints?: number;
+  /** Reject the net if any endpoint belongs to one of these (part type, pin number) pairs. */
+  forbidPin?: Array<{ type: string; pin: string }>;
 }
 
 export interface SlotPin {

@@ -178,18 +178,25 @@ export function inferFlow(g: FlowGraph, fixed: ReadonlyMap<string, number>): Flo
       for (const d of D) for (const x of all) if (!D.includes(x)) directed.add(dkey(d, x));
     }
   }
-  // A part from a block's output straight back to its input is that block's feedback part.
+  // A part (or two-pin feedback stack) from a block's output straight back to its input is a feedback block.
   const sibling = new Map<string, string>();
+  const fbStackHosts = new Map<string, string[]>();
   for (const k of [...directed].sort(cmpStr)) {
     const [a, b] = k.split(">") as [string, string];
     if (!directed.has(dkey(b, a)) || !directed.has(k)) continue;
     directed.delete(k); directed.delete(dkey(b, a));
     const [passive, host] = twoPin(a) ? [a, b] : twoPin(b) ? [b, a] : [undefined, undefined];
-    if (passive && host && !fixed.has(passive)) sibling.set(passive, host); else undirected.add(ukey(a, b));
+    if (passive && host && !fixed.has(passive)) sibling.set(passive, host);
+    else {
+      const [stack, h] = allTwoPin(a) && !single(a) ? [a, b] : allTwoPin(b) && !single(b) ? [b, a] : [undefined, undefined];
+      if (stack && h && !fixed.has(stack)) fbStackHosts.set(stack, [...(fbStackHosts.get(stack) ?? []), h]);
+      else undirected.add(ukey(a, b));
+    }
   }
   const touches = (b: string) => [...directed, ...undirected].some((k) => k.split(/[>|]/).includes(b));
   for (const b of [...sibling.keys()]) if (touches(b)) sibling.delete(b); // it has other connections: rank it
-  const ranked = nodes.filter((b) => !sibling.has(b));
+  for (const b of [...fbStackHosts.keys()]) if (touches(b)) fbStackHosts.delete(b);
+  const ranked = nodes.filter((b) => !sibling.has(b) && !fbStackHosts.has(b));
   const out = new Map(ranked.map((b) => [b, [] as string[]])), inn = new Map(ranked.map((b) => [b, [] as string[]])), und = new Map(ranked.map((b) => [b, [] as string[]]));
   for (const k of directed) { const [a, b] = k.split(">") as [string, string]; out.get(a)!.push(b); inn.get(b)!.push(a); }
   for (const k of undirected) { const [a, b] = k.split("|") as [string, string]; und.get(a)!.push(b); und.get(b)!.push(a); }
@@ -291,10 +298,15 @@ export function inferFlow(g: FlowGraph, fixed: ReadonlyMap<string, number>): Flo
   }
   const rank = new Map<string, number>();
   for (const u of order) rank.set(u, fixed.get(u) ?? Math.max(0, ...pred.get(u)!.map((p) => rank.get(p)! + 1)));
-  // A block that only feeds others moves up next to what it feeds.
+  // A block that only feeds others moves up next to what it feeds. A two-pin passive bridging
+  // two or more parallel blocks in the same column (such as an instrumentation amplifier's gain
+  // resistor between two input op-amps) joins their column instead of sitting upstream of them.
   for (const u of [...order].reverse()) {
     if (fixed.has(u) || explicit(u) || pred.get(u)!.length || !succ.get(u)!.size) continue;
-    rank.set(u, Math.min(...[...succ.get(u)!].map((w) => rank.get(w)!)) - 1);
+    const succRanks = [...succ.get(u)!].map((w) => rank.get(w)!);
+    const sameStage = twoPin(u) && !pinsOf(u).some((p) => g.portNet.has(p.net))
+      && succ.get(u)!.size >= 2 && new Set(succRanks).size === 1;
+    rank.set(u, sameStage ? succRanks[0]! : Math.min(...succRanks) - 1);
   }
   // Separate pieces of the drawing sit side by side, the largest first.
   const big = [...comps].sort((a, b) => b.length - a.length || cmpStr(a[0]!, b[0]!))[0];
@@ -308,6 +320,11 @@ export function inferFlow(g: FlowGraph, fixed: ReadonlyMap<string, number>): Flo
 
   const col = new Map(rank);
   for (const [b, host] of sibling) { rank.set(b, rank.get(host)!); col.set(b, col.get(host)!); }
+  for (const [b, hosts] of fbStackHosts) {
+    const r = Math.max(...hosts.map((h) => rank.get(h) ?? 0));
+    rank.set(b, r);
+    col.set(b, r + 0.5);
+  }
   // Taps: half a column after the first block on their wire, or before it when they only feed inputs.
   // Feedback siblings return to an upstream column, so they do not pull a load tap upstream with them.
   const graphRanked = new Set([...rank.keys()].filter((b) => !sibling.has(b)));

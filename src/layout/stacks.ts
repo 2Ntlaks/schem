@@ -35,6 +35,8 @@ export interface Stack {
   root: string;
   /** For a string or chain: the root's pin that faces up. A transistor root keeps its own orientation. */
   rootUp?: string;
+  /** For a symmetric op-amp feedback bridge: [top op-amp, bottom op-amp] whose IN- pins face inward. */
+  bridgeOpamps?: [string, string];
   /** Parents before their children. */
   children: StackChild[];
 }
@@ -168,6 +170,39 @@ export function findStacks(g: StackGraph): Stack[] {
     if (!top || !wire(far(p, top.pin).net)) continue;
     const path = toGround(p, top.pin, []);
     if (path && path.length >= 2) stacks.push(stackOf(path));
+  }
+
+  // Symmetric feedback bridge: two free op-amps each with a two-pin feedback part (OUT -> IN-),
+  // linked by a two-pin gain part between their IN- pins (instrumentation-amplifier input stage).
+  // Stack the three parts in one vertical column: top feedback, bridge, bottom feedback.
+  const opamps = ids.filter((id) => typeOf.get(id) === "opamp" && g.free(id) && !used.has(id));
+  for (let i = 0; i < opamps.length; i++) {
+    const a = opamps[i]!;
+    if (used.has(a)) continue;
+    const aOut = pinsOf.get(a)?.find((x) => x.pin === "1")?.net;
+    const aIn = pinsOf.get(a)?.find((x) => x.pin === "2")?.net;
+    if (!aOut || !aIn || !wire(aOut) || !wire(aIn)) continue;
+    const fbA = (onNet.get(aIn) ?? []).find((t) => usable(t.part) && far(t.part, t.pin).net === aOut);
+    if (!fbA) continue;
+    for (let j = i + 1; j < opamps.length; j++) {
+      const b = opamps[j]!;
+      if (used.has(b)) continue;
+      const bOut = pinsOf.get(b)?.find((x) => x.pin === "1")?.net;
+      const bIn = pinsOf.get(b)?.find((x) => x.pin === "2")?.net;
+      if (!bOut || !bIn || !wire(bOut) || !wire(bIn) || bIn === aIn) continue;
+      const fbB = (onNet.get(bIn) ?? []).find((t) => usable(t.part) && t.part !== fbA.part && far(t.part, t.pin).net === bOut);
+      const bridge = (onNet.get(aIn) ?? []).find((t) => usable(t.part) && t.part !== fbA.part && t.part !== fbB?.part && far(t.part, t.pin).net === bIn);
+      if (!fbB || !bridge) continue;
+      stacks.push({
+        ...stackOf([
+          { part: fbA.part, near: far(fbA.part, fbA.pin).pin },
+          { part: bridge.part, near: bridge.pin },
+          { part: fbB.part, near: fbB.pin },
+        ]),
+        bridgeOpamps: [a, b],
+      });
+      break;
+    }
   }
 
   // Hanging chains: strictly in series, ending at ground or starting at a supply.

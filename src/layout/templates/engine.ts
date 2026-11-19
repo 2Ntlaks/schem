@@ -47,14 +47,16 @@ export interface Geo { pins: ReadonlyArray<{ number: string; at: Pt; dir: Dir }>
 // ---------------------------------------------------------------------------
 // Step 1: matching.
 
-interface NetInfo { kind: string; port: boolean; endpoints: number; ifaces: Set<string> }
+interface NetInfo { kind: string; port: boolean; endpoints: number; ifaces: Set<string>; pins: Set<string> }
 
 export function matchTemplates(g: TemplateGraph, library: readonly Template[], skip: ReadonlySet<string> = new Set()): Region[] {
+  const typeOf = new Map(g.parts.map((p) => [p.id, p.type]));
   const nets = new Map<string, NetInfo>();
   for (const [t, netId] of [...g.drawnNet].sort((a, b) => cmpStr(a[0], b[0]))) {
-    const n = nets.get(netId) ?? { kind: netKind(g.netById.get(netId)!), port: g.portNet.has(netId), endpoints: 0, ifaces: new Set<string>() };
+    const n = nets.get(netId) ?? { kind: netKind(g.netById.get(netId)!), port: g.portNet.has(netId), endpoints: 0, ifaces: new Set<string>(), pins: new Set<string>() };
     n.endpoints++;
     const part = t.slice(0, t.indexOf("[")), num = t.slice(part.length + 1, -1);
+    n.pins.add(`${typeOf.get(part) ?? ""}[${num}]`);
     for (const i of g.defs[part]?.find((d) => d.number === num)?.iface ?? []) n.ifaces.add(i);
     nets.set(netId, n);
   }
@@ -95,6 +97,7 @@ function matchOne(t: Template, g: TemplateGraph, nets: Map<string, NetInfo>): Re
     if (p.port !== undefined && p.port !== n.port) return false;
     if (p.endpoints !== undefined && n.endpoints !== p.endpoints) return false;
     if (p.minEndpoints !== undefined && n.endpoints < p.minEndpoints) return false;
+    if (p.forbidPin?.some((f) => n.pins.has(`${f.type}[${f.pin}]`))) return false;
     if (p.iface !== undefined) {
       const family = p.iface.slice(0, p.iface.indexOf(".") + 1);
       if (!n.ifaces.has(p.iface) || [...n.ifaces].some((i) => i !== p.iface && i.startsWith(family))) return false;
@@ -127,7 +130,7 @@ function matchOne(t: Template, g: TemplateGraph, nets: Map<string, NetInfo>): Re
         }
         vars.set(sp.net, num);
         const have = bound.get(sp.net) ?? add.get(sp.net);
-        if (have !== undefined) { if (have !== net) { ok = false; break; } continue; }
+        if (have !== undefined) { if (have !== net || !predOk(net, sp.pred)) { ok = false; break; } continue; }
         if (!allowNew || taken.has(net) || !predOk(net, t.nets[sp.net]) || !predOk(net, sp.pred)) { ok = false; break; }
         add.set(sp.net, net);
       }

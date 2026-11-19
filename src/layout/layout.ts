@@ -212,6 +212,7 @@ export function layout(project: Project, opts: LayoutOptions = {}): LayoutResult
     regions = regions.filter((r) => !r.members.some((m) => taken.has(m)));
   }
   const stackRoot = new Map(stacks.flatMap((st) => st.children.map((c) => [c.part, st.root] as const)));
+  const bridgeTopOpamp = new Set(stacks.flatMap((st) => (st.bridgeOpamps ? [st.bridgeOpamps[0]] : [])));
   const regionOf = new Map<string, Region>(), linkOf = new Map<string, Region>();
   for (const r of regions) { for (const p of r.members) regionOf.set(p, r); for (const p of r.links) linkOf.set(p, r); }
   const blockOf = (id: string) => regionOf.get(id)?.rep ?? id;
@@ -285,7 +286,7 @@ export function layout(project: Project, opts: LayoutOptions = {}): LayoutResult
     if (BUILTIN[part.type]) {
       sym = BUILTIN[part.type]!;
       if (sym.kind === "source") orient = { rot: 90, flip: false }; // "+" (left pin) up
-      else if (sym.kind === "two-pin") orient = twoPinOrient(sym, id, drawnNet, netById, portNet, netCol);
+      else if (sym.kind === "two-pin") orient = twoPinOrient(sym, id, drawnNet, netById, portNet, col, netCol);
       else orient = defaultOrient(sym, id, { drawnNet, netById, portNet, col, netCol }) ?? orient;
     } else if (part.type === HEADER) {
       sym = headerFor(defs[id]!);
@@ -308,6 +309,7 @@ export function layout(project: Project, opts: LayoutOptions = {}): LayoutResult
     else if (prev) orient = prev.orient;
     else if (to) orient = to;
     else if (opts.opampOrient?.[id]) orient = opts.opampOrient[id]!;
+    else if (bridgeTopOpamp.has(id)) orient = { rot: 180, flip: true };
     const ko = xformBox(keepOut(sym), [0, 0], orient);
     const pins = sym.pins
       .filter((p) => drawnNet.has(`${id}[${p.number}]`) || ncSet.has(`${id}[${p.number}]`) || sym.kind !== "ic")
@@ -716,6 +718,19 @@ export function layout(project: Project, opts: LayoutOptions = {}): LayoutResult
   const vars = ids.flatMap((id) => [vx(id), vy(id)]);
   for (const [id, child] of childOffsets) cons.push(...eq(vx(id), vx(child.host), child.at[0], "template", `decoupling ${id}`), ...eq(vy(id), vy(child.host), child.at[1], "template", `decoupling ${id}`));
   for (const [id, child] of rigid) cons.push(...eq(vx(id), vx(child.host), child.at[0], "template", `stack ${id}`), ...eq(vy(id), vy(child.host), child.at[1], "template", `stack ${id}`));
+  // Symmetric op-amp feedback bridge: align the top and bottom op-amp outputs to the outer ends of the vertical ladder.
+  if (!opts.previous) for (const st of stacks) {
+    if (!st.bridgeOpamps || st.children.length < 2) continue;
+    const [topOp, botOp] = st.bridgeOpamps;
+    const botPart = st.children[st.children.length - 1]!.part;
+    if (!rigid.has(botPart)) continue;
+    const topOut = placed.get(topOp)?.pins.find((p) => p.number === "1");
+    const botOut = placed.get(botOp)?.pins.find((p) => p.number === "1");
+    const rTop = placed.get(st.root)?.pins.find((p) => p.dir === "up");
+    const rBot = placed.get(botPart)?.pins.find((p) => p.dir === "down");
+    if (topOut && rTop) cons.push(...eq(vy(topOp), vy(st.root), rTop.at[1] - 2 - topOut.at[1], "template", `bridge ${topOp}`));
+    if (botOut && rBot) cons.push(...eq(vy(botOp), vy(botPart), rBot.at[1] + 2 - botOut.at[1], "template", `bridge ${botOp}`));
+  }
   const known = new Set(ids);
   for (const l of locks.values()) if (known.has(l.part)) cons.push(...eq(vx(l.part), X0, l.x, "lock", `lock ${l.part}`), ...eq(vy(l.part), X0, l.y, "lock", `lock ${l.part}`));
   for (const h of hints) {
@@ -1073,7 +1088,7 @@ function shift(b: Box, o: Pt): Box { return { x: b.x + o[0], y: b.y + o[1], w: b
 /** SPEC 9.2 step 3b for two-pin parts. */
 function twoPinOrient(
   sym: SymbolDef, id: string, drawnNet: Map<string, string>, netById: Map<string, Net>, portNet: Set<string>,
-  netCol: (net: string, self: string) => number | undefined,
+  col: number, netCol: (net: string, self: string) => number | undefined,
 ): Orient {
   const [p1, p2] = sym.pins as [SymbolDef["pins"][0], SymbolDef["pins"][0]];
   const n1 = drawnNet.get(`${id}[${p1.number}]`), n2 = drawnNet.get(`${id}[${p2.number}]`);
@@ -1081,6 +1096,8 @@ function twoPinOrient(
   const lower = lowerRailEnd(netById.get(n1 ?? ""), netById.get(n2 ?? ""), portNet);
   if (lower) return { rot: lower === 2 ? 90 : 270, flip: false };
   const c1 = n1 ? netCol(n1, id) : undefined, c2 = n2 ? netCol(n2, id) : undefined;
+  // A two-pin part whose both ends connect within its own column bridges vertically stacked blocks.
+  if (c1 !== undefined && c2 !== undefined && c1 === col && c2 === col) return { rot: 90, flip: false };
   if (c1 !== undefined && c2 !== undefined && c2 < c1) return { rot: 180, flip: false };
   return { rot: 0, flip: false };
 }
