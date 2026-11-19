@@ -1,0 +1,121 @@
+{
+  "schema": "schem/1.0",
+  "meta": {
+    "title": "Wien bridge oscillator"
+  },
+  "circuit": {
+    "parts": [
+      {
+        "id": "U1",
+        "type": "opamp"
+      },
+      {
+        "id": "R1",
+        "type": "resistor",
+        "props": {
+          "value": "10k"
+        }
+      },
+      {
+        "id": "C1",
+        "type": "capacitor",
+        "props": {
+          "value": "16n"
+        }
+      },
+      {
+        "id": "R2",
+        "type": "resistor",
+        "props": {
+          "value": "10k"
+        }
+      },
+      {
+        "id": "C2",
+        "type": "capacitor",
+        "props": {
+          "value": "16n"
+        }
+      },
+      {
+        "id": "R3",
+        "type": "resistor",
+        "props": {
+          "value": "20k"
+        }
+      },
+      {
+        "id": "R4",
+        "type": "resistor",
+        "props": {
+          "value": "10k"
+        }
+      },
+      {
+        "id": "J1",
+        "type": "header",
+        "props": {
+          "label": "OUT"
+        },
+        "pins": [
+          {
+            "number": "1",
+            "name": "SIG",
+            "role": "passive"
+          },
+          {
+            "number": "2",
+            "name": "GND",
+            "role": "passive"
+          }
+        ]
+      }
+    ],
+    "nets": [
+      {
+        "id": "n1",
+        "endpoints": [
+          "C1[1]",
+          "R1[2]"
+        ]
+      },
+      {
+        "id": "n2",
+        "endpoints": [
+          "C1[2]",
+          "C2[1]",
+          "R2[1]",
+          "U1[3]"
+        ]
+      },
+      {
+        "id": "n3",
+        "endpoints": [
+          "R3[1]",
+          "R4[1]",
+          "U1[2]"
+        ]
+      },
+      {
+        "id": "n4",
+        "name": "OUT",
+        "endpoints": [
+          "J1[1]",
+          "R1[1]",
+          "R3[2]",
+          "U1[1]"
+        ]
+      },
+      {
+        "id": "n5",
+        "name": "GND",
+        "endpoints": [
+          "C2[2]",
+          "J1[2]",
+          "R2[2]",
+          "R4[2]"
+        ]
+      }
+    ]
+  }
+}

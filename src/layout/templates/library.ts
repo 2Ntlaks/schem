@@ -491,9 +491,368 @@ const BRIDGE_RECTIFIER: Template = {
   ],
 };
 
+// ---------------------------------------------------------------------------
+// Active filters around one op-amp.
+
+/** The op-amp turned so IN+ is on top and the input comes in straight from the left. */
+const PLUS_UP = { rot: 180 as const, flip: true };
+
+/**
+ * Sallen-Key second-order filter, in its textbook shape. The two series parts lie in one line
+ * into IN+ (the op-amp is turned so IN+ is on top); the shunt part hangs from the node at IN+;
+ * the feedback part runs above, from the node between the series parts (column A) to the output
+ * tap column T. Low-pass: series resistors, feedback and shunt capacitors. High-pass: the
+ * reverse. Unity gain: the output returns below the op-amp to IN- (row R, column S). With gain:
+ * the feedback resistor and ground resistor of a non-inverting amplifier hang below, as in that
+ * template.
+ */
+function sallenKey(pass: "lowpass" | "highpass", gain: boolean): Template {
+  const series = pass === "lowpass" ? "resistor" : "capacitor", cross = pass === "lowpass" ? "capacitor" : "resistor";
+  const FB = gain ? "FB" : "OUT";
+  const slots: Template["slots"] = [
+    { name: "u", types: ["opamp"], role: "member", orient: PLUS_UP,
+      pins: [{ pin: "IN-", net: FB }, { pin: "OUT", net: "OUT" }, { pin: "IN+", net: "B" }] },
+    { name: "z2", types: [series], role: "member", symmetric: true, orient: { net: "B", dir: "right" },
+      pins: [{ pin: "1", net: "A" }, { pin: "2", net: "B" }] },
+    { name: "zf", types: [cross], role: "member", symmetric: true, orient: { net: "OUT", dir: "right" },
+      pins: [{ pin: "1", net: "A" }, { pin: "2", net: "OUT" }] },
+    { name: "zs", types: [cross], role: "member", symmetric: true, orient: { net: "B", dir: "up" }, label: "left",
+      pins: [{ pin: "1", net: "B" }, { pin: "2", net: "REF" }] },
+    { name: "z1", types: [series], role: "member", symmetric: true, orient: { net: "A", dir: "right" },
+      pins: [{ pin: "1", net: "*" }, { pin: "2", net: "A" }] },
+  ];
+  const interior: Rel[] = [
+    // One line into IN+: z1, node A, z2, node B (where the shunt part hangs), IN+.
+    rel("x", guide("A"), "=", pin("z1", net("A")), 2, "node A 2 G right of the first series part"),
+    rel("x", pin("z2", net("A")), "=", guide("A"), 2, "second series part 2 G right of node A"),
+    rel("x", pin("zs", net("B")), "=", pin("z2", net("B")), 2, "shunt part under the node 2 G right of the second series part"),
+    rel("x", pin("u", "IN+"), ">=", pin("zs", net("B")), 4, "IN+ at least 4 G right of the shunt node"),
+    rel("x", guide("S"), "=", pin("u", "IN-"), -2, "return column S = IN-.x - 2"),
+    rel("x", guide("S"), ">=", env("zs", "right"), 1, "shunt part and its label clear of the return column"),
+    rel("y", pin("z1", net("A")), "=", pin("u", "IN+"), 0, "series parts in line with IN+"),
+    rel("y", pin("z2", net("B")), "=", pin("u", "IN+"), 0, "series parts in line with IN+"),
+    rel("y", pin("zs", net("B")), "=", pin("u", "IN+"), 2, "shunt part hangs from the IN+ line"),
+    // The feedback part above everything it passes over, between column A and the tap column T.
+    rel("x", pin("zf", net("A")), "=", guide("A"), 2, "feedback part starts 2 G right of node A"),
+    rel("x", guide("T"), ">=", pin("u", "OUT"), 2, "output tap column T >= OUT.x + 2"),
+    rel("x", guide("U"), "=", guide("T"), 2, "feedback column U 2 G right of the tap: no four-way node on the output line"),
+    rel("x", pin("zf", net("OUT")), "<=", guide("U"), -1, "feedback part ends left of its column"),
+    rel("x", env("zf", "right"), "<=", guide("U"), -1, "feedback label clear of its column"),
+    rel("y", env("zf", "bottom"), "<=", env("z2", "top"), -1, "feedback part above the series part and its label"),
+    rel("y", env("zf", "bottom"), "<=", env("u", "top"), -1, "feedback part above the op-amp"),
+  ];
+  const trunks: NonNullable<Template["trunks"]> = [{
+    net: "A", why: "node A: one vertical conductor from the series line up to the feedback part",
+    points: [
+      { x: guide("A"), y: pin("z2", net("A")) },
+      { x: guide("A"), y: pin("zf", net("A")) },
+      { x: pin("zf", net("A")), dx: -1, y: pin("zf", net("A")) },
+    ],
+    require: [{ pin: ["zf", { net: "A" }], dir: "left" }],
+  }, {
+    net: "OUT", why: "the output line past the tap column, and up to the feedback part",
+    points: [
+      { x: pin("u", "OUT"), dx: 1, y: pin("u", "OUT") },
+      { x: guide("U"), y: pin("u", "OUT") },
+      { x: guide("U"), y: pin("zf", net("OUT")) },
+      { x: pin("zf", net("OUT")), dx: 1, y: pin("zf", net("OUT")) },
+    ],
+    require: [{ pin: ["u", "OUT"], dir: "right" }, { pin: ["zf", { net: "OUT" }], dir: "right" }],
+  }];
+  const boundary: NonNullable<Template["boundary"]> = [["z1", { net: "*" }], ["u", "OUT"], ["zs", { net: "REF" }]];
+  if (gain) {
+    slots.push(
+      { name: "rf", types: ["resistor"], role: "member", symmetric: true, orient: { net: "OUT", dir: "right" },
+        pins: [{ pin: "1", net: "FB" }, { pin: "2", net: "OUT" }] },
+      { name: "rg", types: ["resistor"], role: "member", symmetric: true, orient: { net: "FB", dir: "up" },
+        pins: [{ pin: "1", net: "FB" }, { pin: "2", net: "REF" }] },
+    );
+    interior.push(
+      rel("x", pin("rg", net("FB")), "=", guide("S"), 0, "ground resistor below the feedback node"),
+      rel("x", pin("rf", net("FB")), ">=", guide("S"), 2, "feedback resistor starts 2 G right of the node"),
+      rel("x", pin("rf", net("OUT")), "<=", guide("T"), -1, "feedback resistor ends left of the tap"),
+      rel("x", env("rf", "right"), "<=", guide("T"), -1, "feedback resistor's label clear of the tap column"),
+      rel("x", env("rg", "left"), ">=", env("zs", "right"), 1, "ground resistor right of the shunt part"),
+      rel("y", env("rf", "top"), ">=", env("u", "bottom"), 1, "feedback resistor below the op-amp, 1 G corridor"),
+      rel("y", env("rg", "top"), ">=", env("rf", "bottom"), 1, "ground resistor below the feedback row"),
+    );
+    trunks.push({
+      net: "FB", why: "the feedback node: one vertical conductor at S from IN- to the feedback row",
+      points: [{ x: guide("S"), y: pin("u", "IN-") }, { x: guide("S"), y: pin("rf", net("FB")) }],
+    }, {
+      net: "OUT", why: "the tap column down to the feedback resistor",
+      points: [{ x: guide("T"), y: pin("u", "OUT") }, { x: guide("T"), y: pin("rf", net("OUT")) }, { x: pin("rf", net("OUT")), dx: 1, y: pin("rf", net("OUT")) }],
+      require: [{ pin: ["u", "OUT"], dir: "right" }, { pin: ["rf", { net: "OUT" }], dir: "right" }],
+    });
+    boundary.push(["rg", { net: "REF" }]);
+  } else {
+    interior.push(rel("y", guide("R"), ">=", env("u", "bottom"), 1, "return row below the op-amp and its label"));
+    trunks.push({
+      net: "OUT", why: "unity gain: the output returns below the op-amp to IN-",
+      points: [
+        { x: guide("T"), y: pin("u", "OUT") },
+        { x: guide("T"), y: guide("R") },
+        { x: guide("S"), y: guide("R") },
+        { x: guide("S"), y: pin("u", "IN-") },
+        { x: pin("u", "IN-"), dx: -1, y: pin("u", "IN-") },
+      ],
+      require: [{ pin: ["u", "OUT"], dir: "right" }, { pin: ["u", "IN-"], dir: "left" }],
+    });
+  }
+  return {
+    id: `sallen-key-${pass}${gain ? "-gain" : ""}`, version: 1, priority: 2,
+    summary: `Sallen-Key ${pass === "lowpass" ? "low-pass" : "high-pass"} filter${gain ? " with a gain network" : ", unity gain"}: two series ${series}s into IN+, a ${cross} from between them to OUT, a ${cross} from IN+ to the reference`,
+    nets: { A: { kind: ["signal"] }, B: { kind: ["signal"] }, OUT: { kind: ["signal"] }, FB: { kind: ["signal"] }, REF: {} },
+    slots, interior, trunks, boundary, reserve: ["U"],
+  };
+}
+
+/**
+ * Inverting stages with a capacitor, in the shape of the inverting amplifier above (node column S,
+ * feedback above the op-amp, output tap column T). Integrator: a capacitor is the feedback part.
+ * Low-pass (`parallel`): a capacitor across the feedback resistor, drawn above it between the
+ * same two columns. A differentiator (capacitor inputs) is not here yet: tests/findings.test.ts
+ * uses a capacitor-input summing stage as its example of a circuit that matches no template.
+ */
+function invertingStage(id: string, fb: "resistor" | "capacitor", parallel: boolean, summary: string): Template {
+  const top = parallel ? "cf" : "rf"; // the highest feedback part: the node and tap columns reach its row
+  return {
+    id, version: 1, priority: 1, summary,
+    nets: { SUM: { kind: ["signal"] }, OUT: { kind: ["signal"] }, REF: {} },
+    slots: [
+      { name: "u", types: ["opamp"], role: "member", orient: { rot: 0, flip: false }, label: "below",
+        pins: [{ pin: "IN-", net: "SUM" }, { pin: "OUT", net: "OUT" }, { pin: "IN+", net: "REF" }] },
+      { name: "rf", types: [fb], role: "member", symmetric: true, orient: { net: "OUT", dir: "right" },
+        pins: [{ pin: "1", net: "SUM" }, { pin: "2", net: "OUT" }] },
+      ...(parallel ? [{ name: "cf", types: ["capacitor"], role: "member" as const, symmetric: true, orient: { net: "OUT", dir: "right" as const },
+        pins: [{ pin: "1", net: "SUM" }, { pin: "2", net: "OUT" }] }] : []),
+      { name: "rin", types: ["resistor"], role: "member", symmetric: true, many: { min: 1 }, orient: { net: "SUM", dir: "right" },
+        pins: [{ pin: "1", net: "*", pred: { kind: ["signal"] } }, { pin: "2", net: "SUM" }] },
+      { name: "src", types: ["vsource", "battery"], role: "link", many: { min: 0 }, follow: { slot: "rin" }, pins: [] },
+    ],
+    interior: [
+      rel("x", guide("S"), "=", pin("u", "IN-"), -3, "node column S = IN-.x - 3 (clear of the IN+ symbol)"),
+      rel("x", pin("rin", net("SUM")), "<=", guide("S"), -2, "inputs end at least 2 G left of the node"),
+      rel("x", pin("rin", net("SUM")), "=", pin("rin", net("SUM")), 0, "inputs end in one column", { each: "chain" }),
+      rel("x", env("rin", "right"), "<=", guide("S"), -1, "input labels clear of the node column"),
+      rel("x", pin("rf", net("SUM")), ">=", guide("S"), 2, "feedback part starts 2 G right of the node"),
+      rel("x", guide("T"), ">=", pin("u", "OUT"), 2, "output tap column T >= OUT.x + 2"),
+      rel("x", pin("rf", net("OUT")), "<=", guide("T"), -1, "feedback part ends left of the tap"),
+      rel("x", env("rf", "right"), "<=", guide("T"), -1, "feedback label clear of the tap column"),
+      rel("y", pin("rin", net("SUM")), "=", pin("u", "IN-"), 0, "a single input is in line with IN-", { when: { slot: "rin", max: 1 } }),
+      rel("y", pin("rin", net("SUM")), "=", pin("u", "IN-"), -2, "first input 2 G above IN-", { each: "first", when: { slot: "rin", min: 2 } }),
+      rel("y", env("rin", "top"), ">=", pin("rin", net("SUM")), 2, "next input's label 2 G below the previous input's wire", { each: "chain", when: { slot: "rin", min: 2 } }),
+      rel("y", env("rf", "bottom"), "<=", env("u", "top"), -1, "feedback part above the op-amp, 1 G corridor"),
+      ...(parallel ? [
+        rel("x", pin("cf", net("SUM")), "=", pin("rf", net("SUM")), 1, "capacitor centred over the feedback resistor"),
+        rel("x", env("cf", "right"), "<=", guide("T"), -1, "capacitor label clear of the tap column"),
+        rel("x", env("cf", "left"), ">=", guide("S"), 1, "capacitor label clear of the node column"),
+        rel("y", env("cf", "bottom"), "<=", env("rf", "top"), -1, "capacitor above the feedback resistor and its label"),
+      ] : []),
+    ],
+    link: [
+      rel("x", pin("src", net("*")), ">=", env("src", "right"), 1, "sources stepped right, in input order", { each: "chain" }),
+    ],
+    boundary: [["rin", { net: "*" }], ["u", "OUT"], ["u", "IN+"]],
+    trunks: [{
+      net: "SUM", why: "the summing node: one vertical conductor at S from the top feedback row to the lowest input",
+      points: [
+        { x: guide("S"), y: pin(top, net("SUM")) },
+        { x: guide("S"), y: [pin("rin", net("SUM"), "max"), pin("u", "IN-")], agg: "max" },
+      ],
+    }, {
+      net: "OUT", why: "the output line to the tap column, and up to the top feedback part",
+      points: [
+        { x: pin("u", "OUT"), dx: 1, y: pin("u", "OUT") },
+        { x: guide("T"), y: pin("u", "OUT") },
+        { x: guide("T"), y: pin(top, net("OUT")) },
+      ],
+      require: [{ pin: ["u", "OUT"], dir: "right" }],
+    }],
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Oscillators around one op-amp.
+
+/**
+ * Relaxation oscillator (astable multivibrator): the timing resistor above the op-amp from the
+ * output back to IN-, the timing capacitor hanging from that node on the left; the positive
+ * feedback divider below, its upper resistor from the output back to IN+ and its lower resistor
+ * hanging from that node. The output turns down at the tap column T and up at column U, further
+ * on, so the output line has no four-way node.
+ */
+const RELAXATION_OSCILLATOR: Template = {
+  id: "relaxation-oscillator", version: 1, priority: 2,
+  summary: "op-amp; resistor OUT -> IN-, capacitor IN- -> reference; resistor OUT -> IN+, resistor IN+ -> reference",
+  nets: { N: { kind: ["signal"] }, P: { kind: ["signal"] }, OUT: { kind: ["signal"] }, REF: {} },
+  slots: [
+    // Ranked: an oscillator has no input, so it is where the signal starts and its load goes after it.
+    { name: "u", types: ["opamp"], role: "member", orient: UPRIGHT, rank: { offset: 0 },
+      pins: [{ pin: "IN-", net: "N" }, { pin: "OUT", net: "OUT" }, { pin: "IN+", net: "P" }] },
+    { name: "rt", types: ["resistor"], role: "member", symmetric: true, orient: { net: "OUT", dir: "right" },
+      pins: [{ pin: "1", net: "N" }, { pin: "2", net: "OUT" }] },
+    { name: "ct", types: ["capacitor"], role: "member", symmetric: true, orient: { net: "N", dir: "up" }, label: "left",
+      pins: [{ pin: "1", net: "N" }, { pin: "2", net: "REF" }] },
+    { name: "rp", types: ["resistor"], role: "member", symmetric: true, orient: { net: "OUT", dir: "right" }, label: "below",
+      pins: [{ pin: "1", net: "P" }, { pin: "2", net: "OUT" }] },
+    { name: "rh", types: ["resistor"], role: "member", symmetric: true, orient: { net: "P", dir: "up" }, label: "left",
+      pins: [{ pin: "1", net: "P" }, { pin: "2", net: "REF" }] },
+  ],
+  interior: [
+    rel("x", guide("SP"), "=", pin("u", "IN+"), -2, "IN+ node column SP = IN+.x - 2"),
+    rel("x", guide("SP"), ">=", env("ct", "right"), 3, "timing capacitor and its ground symbol well left of the IN+ node column"),
+    rel("x", env("rh", "left"), ">=", env("ct", "right"), 1, "lower divider resistor and its label right of the timing capacitor"),
+    rel("x", guide("SN"), "=", pin("ct", net("N")), 0, "IN- node column SN: the timing capacitor hangs from it"),
+    rel("y", pin("ct", net("N")), "=", pin("u", "IN-"), 2, "timing capacitor hangs from the IN- line"),
+    rel("x", pin("rt", net("N")), ">=", guide("SN"), 2, "timing resistor starts 2 G right of its node"),
+    rel("x", guide("T"), ">=", pin("u", "OUT"), 2, "output tap column T >= OUT.x + 2"),
+    rel("x", guide("U"), "=", guide("T"), 2, "column U 2 G right of the tap: no four-way node on the output line"),
+    rel("x", pin("rt", net("OUT")), "<=", guide("U"), -1, "timing resistor ends left of its column"),
+    rel("x", env("rt", "right"), "<=", guide("U"), -1, "timing resistor label clear of its column"),
+    rel("y", env("rt", "bottom"), "<=", env("u", "top"), -1, "timing resistor above the op-amp, 1 G corridor"),
+    rel("x", pin("rp", net("P")), ">=", guide("SP"), 2, "feedback resistor starts 2 G right of the IN+ node"),
+    rel("x", pin("rp", net("OUT")), "<=", guide("T"), -1, "feedback resistor ends left of the tap"),
+    rel("x", env("rp", "right"), "<=", guide("T"), -1, "feedback resistor label clear of the tap column"),
+    rel("y", env("rp", "top"), ">=", env("u", "bottom"), 1, "feedback resistor below the op-amp, 1 G corridor"),
+    rel("x", pin("rh", net("P")), "=", guide("SP"), 0, "lower divider resistor below the IN+ node"),
+    rel("y", pin("rh", net("P")), "=", pin("rp", net("P")), 2, "lower divider resistor hangs from the feedback row"),
+    rel("x", env("rp", "left"), ">=", box("rh", "right"), 1, "feedback resistor and its label right of the lower divider resistor"),
+  ],
+  boundary: [["u", "OUT"], ["ct", { net: "REF" }], ["rh", { net: "REF" }]],
+  reserve: ["U"],
+  trunks: [{
+    net: "N", why: "the IN- node: one vertical conductor from the timing resistor row down to the capacitor",
+    points: [
+      { x: pin("rt", net("N")), dx: -1, y: pin("rt", net("N")) },
+      { x: guide("SN"), y: pin("rt", net("N")) },
+      { x: guide("SN"), y: pin("ct", net("N")), dy: -1 },
+    ],
+    require: [{ pin: ["rt", { net: "N" }], dir: "left" }, { pin: ["ct", { net: "N" }], dir: "up" }],
+  }, {
+    net: "N", why: "the IN- line from the node column to the pin",
+    points: [{ x: guide("SN"), y: pin("u", "IN-") }, { x: pin("u", "IN-"), dx: -1, y: pin("u", "IN-") }],
+    require: [{ pin: ["u", "IN-"], dir: "left" }],
+  }, {
+    net: "P", why: "the IN+ node: one vertical conductor at SP from IN+ down to the feedback row",
+    points: [{ x: guide("SP"), y: pin("u", "IN+") }, { x: guide("SP"), y: pin("rp", net("P")) }],
+  }, {
+    net: "OUT", why: "the output line past the tap column, and up to the timing resistor",
+    points: [
+      { x: pin("u", "OUT"), dx: 1, y: pin("u", "OUT") },
+      { x: guide("U"), y: pin("u", "OUT") },
+      { x: guide("U"), y: pin("rt", net("OUT")) },
+      { x: pin("rt", net("OUT")), dx: 1, y: pin("rt", net("OUT")) },
+    ],
+    require: [{ pin: ["u", "OUT"], dir: "right" }, { pin: ["rt", { net: "OUT" }], dir: "right" }],
+  }, {
+    net: "OUT", why: "the tap column down to the feedback resistor",
+    points: [{ x: guide("T"), y: pin("u", "OUT") }, { x: guide("T"), y: pin("rp", net("OUT")) }, { x: pin("rp", net("OUT")), dx: 1, y: pin("rp", net("OUT")) }],
+    require: [{ pin: ["u", "OUT"], dir: "right" }, { pin: ["rp", { net: "OUT" }], dir: "right" }],
+  }],
+};
+
+/**
+ * Wien bridge oscillator. The op-amp is turned so IN+ is on top. The gain network hangs below, as
+ * in the non-inverting amplifier. The series resistor and capacitor run in one line above the
+ * op-amp, from column P (the IN+ node) to column U on the output line; the parallel resistor and
+ * capacitor hang side by side from the IN+ line. `first`: the series part on the IN+ side.
+ */
+function wienBridge(first: "resistor" | "capacitor"): Template {
+  const second = first === "resistor" ? "capacitor" : "resistor";
+  return {
+    id: `wien-bridge-${first === "resistor" ? "rc" : "cr"}`, version: 1, priority: 2,
+    summary: `Wien bridge oscillator: a ${first} then a ${second} in series from IN+ to OUT, a resistor and a capacitor from IN+ to the reference, and a non-inverting gain network`,
+    nets: { P: { kind: ["signal"] }, M: { kind: ["signal"], endpoints: 2 }, FB: { kind: ["signal"] }, OUT: { kind: ["signal"] }, REF: {} },
+    slots: [
+      // Ranked: an oscillator has no input, so it is where the signal starts and its load goes after it.
+      { name: "u", types: ["opamp"], role: "member", orient: PLUS_UP, rank: { offset: 0 },
+        pins: [{ pin: "IN-", net: "FB" }, { pin: "OUT", net: "OUT" }, { pin: "IN+", net: "P" }] },
+      { name: "sa", types: [first], role: "member", symmetric: true, orient: { net: "M", dir: "right" },
+        pins: [{ pin: "1", net: "P" }, { pin: "2", net: "M" }] },
+      { name: "sb", types: [second], role: "member", symmetric: true, orient: { net: "OUT", dir: "right" },
+        pins: [{ pin: "1", net: "M" }, { pin: "2", net: "OUT" }] },
+      { name: "rp", types: ["resistor"], role: "member", symmetric: true, orient: { net: "P", dir: "up" }, label: "left",
+        pins: [{ pin: "1", net: "P" }, { pin: "2", net: "REF" }] },
+      { name: "cp", types: ["capacitor"], role: "member", symmetric: true, orient: { net: "P", dir: "up" }, label: "right",
+        pins: [{ pin: "1", net: "P" }, { pin: "2", net: "REF" }] },
+      { name: "rf", types: ["resistor"], role: "member", symmetric: true, orient: { net: "OUT", dir: "right" },
+        pins: [{ pin: "1", net: "FB" }, { pin: "2", net: "OUT" }] },
+      { name: "rg", types: ["resistor"], role: "member", symmetric: true, orient: { net: "FB", dir: "up" },
+        pins: [{ pin: "1", net: "FB" }, { pin: "2", net: "REF" }] },
+    ],
+    interior: [
+      // The IN+ line: column P, the parallel resistor under it, the parallel capacitor, IN+.
+      rel("x", guide("P"), "=", pin("rp", net("P")), 0, "column P: the parallel resistor hangs under it"),
+      rel("x", pin("cp", net("P")), ">=", pin("rp", net("P")), 4, "parallel capacitor right of the parallel resistor"),
+      rel("x", env("cp", "left"), ">=", env("rp", "right"), 1, "parallel parts clear of each other"),
+      rel("y", pin("rp", net("P")), "=", pin("u", "IN+"), 2, "parallel resistor hangs from the IN+ line"),
+      rel("y", pin("cp", net("P")), "=", pin("u", "IN+"), 2, "parallel capacitor hangs from the IN+ line"),
+      rel("x", pin("u", "IN+"), ">=", pin("cp", net("P")), 4, "IN+ at least 4 G right of the parallel capacitor"),
+      rel("x", guide("S"), "=", pin("u", "IN-"), -2, "node column S = IN-.x - 2"),
+      rel("x", guide("S"), ">=", env("cp", "right"), 1, "parallel capacitor and its label clear of the node column"),
+      // The series pair in one line above the op-amp.
+      rel("x", pin("sa", net("P")), ">=", guide("P"), 2, "series pair starts 2 G right of column P"),
+      rel("x", pin("sb", net("M")), "=", pin("sa", net("M")), 2, "a short wire between the series parts"),
+      rel("y", pin("sb", net("M")), "=", pin("sa", net("M")), 0, "series parts in one line"),
+      rel("x", env("sb", "left"), ">=", env("sa", "right"), 1, "series labels clear of each other"),
+      rel("y", env("sa", "bottom"), "<=", env("u", "top"), -1, "series pair above the op-amp, 1 G corridor"),
+      rel("y", env("sb", "bottom"), "<=", env("u", "top"), -1, "series pair above the op-amp, 1 G corridor"),
+      rel("x", guide("T"), ">=", pin("u", "OUT"), 2, "output tap column T >= OUT.x + 2"),
+      rel("x", guide("U"), "=", guide("T"), 2, "column U 2 G right of the tap: no four-way node on the output line"),
+      rel("x", pin("sb", net("OUT")), "<=", guide("U"), -1, "series pair ends left of its column"),
+      rel("x", env("sb", "right"), "<=", guide("U"), -1, "series label clear of its column"),
+      // The gain network, as in the non-inverting amplifier.
+      rel("x", pin("rg", net("FB")), "=", guide("S"), 0, "ground resistor below the feedback node"),
+      rel("x", env("rg", "left"), ">=", env("cp", "right"), 1, "ground resistor right of the parallel capacitor"),
+      rel("x", pin("rf", net("FB")), ">=", guide("S"), 2, "feedback resistor starts 2 G right of the node"),
+      rel("x", pin("rf", net("OUT")), "<=", guide("T"), -1, "feedback resistor ends left of the tap"),
+      rel("x", env("rf", "right"), "<=", guide("T"), -1, "feedback label clear of the tap column"),
+      rel("y", env("rf", "top"), ">=", env("u", "bottom"), 1, "feedback resistor below the op-amp, 1 G corridor"),
+      rel("y", env("rg", "top"), ">=", env("rf", "bottom"), 1, "ground resistor below the feedback row"),
+    ],
+    boundary: [["u", "OUT"], ["rp", { net: "REF" }], ["cp", { net: "REF" }], ["rg", { net: "REF" }]],
+    reserve: ["U"],
+    trunks: [{
+      net: "P", why: "column P: from the series pair down to the IN+ line and the parallel resistor",
+      points: [
+        { x: pin("sa", net("P")), dx: -1, y: pin("sa", net("P")) },
+        { x: guide("P"), y: pin("sa", net("P")) },
+        { x: guide("P"), y: pin("rp", net("P")), dy: -1 },
+      ],
+      require: [{ pin: ["sa", { net: "P" }], dir: "left" }, { pin: ["rp", { net: "P" }], dir: "up" }],
+    }, {
+      net: "P", why: "the IN+ line from column P to the pin",
+      points: [{ x: guide("P"), y: pin("u", "IN+") }, { x: pin("u", "IN+"), dx: -1, y: pin("u", "IN+") }],
+      require: [{ pin: ["u", "IN+"], dir: "left" }],
+    }, {
+      net: "FB", why: "the feedback node: one vertical conductor at S from IN- to the feedback row",
+      points: [{ x: guide("S"), y: pin("u", "IN-") }, { x: guide("S"), y: pin("rf", net("FB")) }],
+    }, {
+      net: "OUT", why: "the output line past the tap column, and up to the series pair",
+      points: [
+        { x: pin("u", "OUT"), dx: 1, y: pin("u", "OUT") },
+        { x: guide("U"), y: pin("u", "OUT") },
+        { x: guide("U"), y: pin("sb", net("OUT")) },
+        { x: pin("sb", net("OUT")), dx: 1, y: pin("sb", net("OUT")) },
+      ],
+      require: [{ pin: ["u", "OUT"], dir: "right" }, { pin: ["sb", { net: "OUT" }], dir: "right" }],
+    }, {
+      net: "OUT", why: "the tap column down to the feedback resistor",
+      points: [{ x: guide("T"), y: pin("u", "OUT") }, { x: guide("T"), y: pin("rf", net("OUT")) }, { x: pin("rf", net("OUT")), dx: 1, y: pin("rf", net("OUT")) }],
+      require: [{ pin: ["u", "OUT"], dir: "right" }, { pin: ["rf", { net: "OUT" }], dir: "right" }],
+    }],
+  };
+}
+
 /** All templates; the engine sorts matches by priority. Decoupling is handled by src/layout/decoupling.ts. */
 export const TEMPLATES: readonly Template[] = [
-  OPAMP_INVERTING, OPAMP_NONINVERTING, hBridge("pmos", "nmos"), hBridge("pnp", "npn"), diffPair("npn", "pnp"), diffPair("nmos", "pmos"), BRIDGE_RECTIFIER, I2C,
+  OPAMP_INVERTING, OPAMP_NONINVERTING,
+  invertingStage("opamp-inverting-lowpass", "resistor", true, "op-amp; resistor and capacitor side by side between OUT and IN-; at least one resistor into IN-"),
+  invertingStage("opamp-integrator", "capacitor", false, "op-amp; capacitor between OUT and IN-; at least one resistor into IN-"),
+  sallenKey("lowpass", false), sallenKey("lowpass", true), sallenKey("highpass", false), sallenKey("highpass", true),
+  RELAXATION_OSCILLATOR, wienBridge("resistor"), wienBridge("capacitor"),
+  hBridge("pmos", "nmos"), hBridge("pnp", "npn"), diffPair("npn", "pnp"), diffPair("nmos", "pmos"), BRIDGE_RECTIFIER, I2C,
   lowSide("npn", "relay"), lowSide("nmos", "relay"), lowSide("npn", "two-pin"), lowSide("nmos", "two-pin"),
   DIVIDER, PULL_UP, PULL_DOWN, LED_VERTICAL, LED_HORIZONTAL,
 ];

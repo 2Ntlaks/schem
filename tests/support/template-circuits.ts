@@ -282,7 +282,126 @@ export const I2C_RESET_RC: Project = {
   },
 };
 
+// ---------------------------------------------------------------------------
+// Active filters and oscillators around one op-amp.
+
+const R = (id: string, value: string) => ({ id, type: "resistor", props: { value } });
+const C = (id: string, value: string) => ({ id, type: "capacitor", props: { value } });
+
+/** Sallen-Key low-pass, unity gain: two series resistors into IN+, C1 back from the output, C2 to ground. */
+export const SALLEN_KEY_LOWPASS: Project = {
+  meta: { title: "Sallen-Key low-pass filter" },
+  circuit: {
+    parts: [{ id: "V1", type: "vsource", props: { value: "1V" } }, R("R1", "10k"), R("R2", "10k"), C("C1", "22n"), C("C2", "10n"), { id: "U1", type: "opamp" }, R("RL", "10k")],
+    nets: [
+      { id: "n1", endpoints: ["V1.+", "R1.1"] },
+      { id: "n2", endpoints: ["R1.2", "R2.1", "C1.1"] },
+      { id: "n3", endpoints: ["R2.2", "C2.1", "U1.IN+"] },
+      { id: "n4", name: "OUT", endpoints: ["U1.OUT", "U1.IN-", "C1.2", "RL.1"] },
+      { id: "n5", name: "GND", endpoints: ["V1.-", "C2.2", "RL.2"] },
+    ],
+  },
+};
+
+/** Sallen-Key high-pass with gain: series capacitors, R1 back from the output, R2 to ground, gain 1 + R3/R4. */
+export const SALLEN_KEY_HIGHPASS_GAIN: Project = {
+  meta: { title: "Sallen-Key high-pass filter with gain" },
+  circuit: {
+    parts: [{ id: "V1", type: "vsource", props: { value: "1V" } }, C("C1", "10n"), C("C2", "10n"), R("R1", "11k"), R("R2", "22k"), { id: "U1", type: "opamp" }, R("R3", "5k6"), R("R4", "10k"), R("RL", "10k")],
+    nets: [
+      { id: "n1", endpoints: ["V1.+", "C1.1"] },
+      { id: "n2", endpoints: ["C1.2", "C2.1", "R1.1"] },
+      { id: "n3", endpoints: ["C2.2", "R2.1", "U1.IN+"] },
+      { id: "n4", name: "OUT", endpoints: ["U1.OUT", "R3.1", "R1.2", "RL.1"] },
+      { id: "n5", endpoints: ["U1.IN-", "R3.2", "R4.1"] },
+      { id: "n6", name: "GND", endpoints: ["V1.-", "R2.2", "R4.2", "RL.2"] },
+    ],
+  },
+};
+
+/** Fourth-order low-pass: two Sallen-Key stages in a row, the second fed by the first one's output. */
+export const SALLEN_KEY_TWO_STAGE: Project = {
+  meta: { title: "Fourth-order low-pass filter" },
+  circuit: {
+    parts: [
+      { id: "V1", type: "vsource", props: { value: "1V" } },
+      R("R1", "10k"), R("R2", "10k"), C("C1", "22n"), C("C2", "10n"), { id: "U1", type: "opamp" },
+      R("R3", "10k"), R("R4", "10k"), C("C3", "47n"), C("C4", "4n7"), { id: "U2", type: "opamp" },
+      R("RL", "10k"),
+    ],
+    nets: [
+      { id: "n1", endpoints: ["V1.+", "R1.1"] },
+      { id: "n2", endpoints: ["R1.2", "R2.1", "C1.1"] },
+      { id: "n3", endpoints: ["R2.2", "C2.1", "U1.IN+"] },
+      { id: "n4", endpoints: ["U1.OUT", "U1.IN-", "C1.2", "R3.1"] },
+      { id: "n5", endpoints: ["R3.2", "R4.1", "C3.1"] },
+      { id: "n6", endpoints: ["R4.2", "C4.1", "U2.IN+"] },
+      { id: "n7", name: "OUT", endpoints: ["U2.OUT", "U2.IN-", "C3.2", "RL.1"] },
+      { id: "n8", name: "GND", endpoints: ["V1.-", "C2.2", "C4.2", "RL.2"] },
+    ],
+  },
+};
+
+/** Integrator: input resistor into IN-, capacitor from the output back to IN-. */
+export const INTEGRATOR: Project = {
+  meta: { title: "Integrator" },
+  circuit: {
+    parts: [{ id: "V1", type: "vsource", props: { value: "1V" } }, R("R1", "10k"), C("C1", "100n"), { id: "U1", type: "opamp" }, R("RL", "10k")],
+    nets: [
+      { id: "n1", endpoints: ["V1.+", "R1.1"] },
+      { id: "n2", endpoints: ["R1.2", "C1.1", "U1.IN-"] },
+      { id: "n3", name: "OUT", endpoints: ["U1.OUT", "C1.2", "RL.1"] },
+      { id: "n4", name: "GND", endpoints: ["V1.-", "U1.IN+", "RL.2"] },
+    ],
+  },
+};
+
+/** Active low-pass: an inverting amplifier with a capacitor across its feedback resistor. */
+export const ACTIVE_LOWPASS: Project = {
+  meta: { title: "Active low-pass filter" },
+  circuit: {
+    parts: [{ id: "V1", type: "vsource", props: { value: "1V" } }, R("R1", "10k"), R("R2", "100k"), C("C1", "1n"), { id: "U1", type: "opamp" }, R("RL", "10k")],
+    nets: [
+      { id: "n1", endpoints: ["V1.+", "R1.1"] },
+      { id: "n2", endpoints: ["R1.2", "R2.1", "C1.1", "U1.IN-"] },
+      { id: "n3", name: "OUT", endpoints: ["U1.OUT", "R2.2", "C1.2", "RL.1"] },
+      { id: "n4", name: "GND", endpoints: ["V1.-", "U1.IN+", "RL.2"] },
+    ],
+  },
+};
+
+/** Relaxation oscillator: R3 and C1 set the period, R1 and R2 set the switching thresholds. */
+export const RELAXATION_OSCILLATOR: Project = {
+  meta: { title: "Relaxation oscillator" },
+  circuit: {
+    parts: [{ id: "U1", type: "opamp" }, R("R1", "100k"), R("R2", "100k"), R("R3", "47k"), C("C1", "10n"), R("RL", "10k")],
+    nets: [
+      { id: "n1", endpoints: ["U1.IN+", "R1.1", "R2.1"] },
+      { id: "n2", endpoints: ["U1.IN-", "R3.1", "C1.1"] },
+      { id: "n3", name: "OUT", endpoints: ["U1.OUT", "R1.2", "R3.2", "RL.1"] },
+      { id: "n4", name: "GND", endpoints: ["R2.2", "C1.2", "RL.2"] },
+    ],
+  },
+};
+
+/** Wien bridge oscillator: R1 and C1 in series from the output to IN+, R2 and C2 to ground, gain 1 + R3/R4. */
+export const WIEN_BRIDGE: Project = {
+  meta: { title: "Wien bridge oscillator" },
+  circuit: {
+    parts: [{ id: "U1", type: "opamp" }, R("R1", "10k"), C("C1", "16n"), R("R2", "10k"), C("C2", "16n"), R("R3", "20k"), R("R4", "10k"), R("RL", "10k")],
+    nets: [
+      { id: "n1", endpoints: ["R1.2", "C1.1"] },
+      { id: "n2", endpoints: ["C1.2", "U1.IN+", "R2.1", "C2.1"] },
+      { id: "n3", endpoints: ["U1.IN-", "R3.1", "R4.1"] },
+      { id: "n4", name: "OUT", endpoints: ["U1.OUT", "R1.1", "R3.2", "RL.1"] },
+      { id: "n5", name: "GND", endpoints: ["R2.2", "C2.2", "R4.2", "RL.2"] },
+    ],
+  },
+};
+
 export const TEMPLATE_CIRCUITS: Record<string, Project> = {
   "noninverting": NONINVERTING, "inverting": INVERTING, "divider": DIVIDER, "pulls": PULLS, "led-gpio": LED_GPIO, "led-sink": LED_SINK,
   "bridge": BRIDGE, "hbridge-bjt": HBRIDGE_BJT, "low-side": LOW_SIDE, "diff-pair": DIFF_PAIR, "i2c-decoupled": I2C_DECOUPLED, "i2c-reset-rc": I2C_RESET_RC,
+  "sallen-key-lowpass": SALLEN_KEY_LOWPASS, "sallen-key-highpass-gain": SALLEN_KEY_HIGHPASS_GAIN, "sallen-key-two-stage": SALLEN_KEY_TWO_STAGE,
+  "integrator": INTEGRATOR, "active-lowpass": ACTIVE_LOWPASS, "relaxation-oscillator": RELAXATION_OSCILLATOR, "wien-bridge": WIEN_BRIDGE,
 };
