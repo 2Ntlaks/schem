@@ -31,7 +31,12 @@ const OPAMP_INVERTING: Template = {
     { name: "rf", types: ["resistor"], role: "member", symmetric: true, orient: { net: "OUT", dir: "right" },
       pins: [{ pin: "1", net: "SUM" }, { pin: "2", net: "OUT" }] },
     { name: "rin", types: ["resistor"], role: "member", symmetric: true, many: { min: 1 }, orient: { net: "SUM", dir: "right" },
-      pins: [{ pin: "1", net: "*", pred: { kind: ["signal"] } }, { pin: "2", net: "SUM" }] },
+      pins: [{ pin: "1", net: "*", pred: { kind: ["signal"], forbidPin: [{ type: "opamp", pin: "2" }] } }, { pin: "2", net: "SUM" }] },
+    // Difference amplifier: optional resistor into IN+ and shunt resistor from IN+ to ground.
+    { name: "rplus", types: ["resistor"], role: "member", symmetric: true, many: { min: 0 }, orient: { net: "REF", dir: "right" }, label: "below",
+      pins: [{ pin: "1", net: "*", pred: { kind: ["signal"] } }, { pin: "2", net: "REF", pred: { kind: ["signal"] } }] },
+    { name: "rgnd", types: ["resistor"], role: "member", symmetric: true, many: { min: 0 }, orient: { net: "REF", dir: "up" }, label: "left",
+      pins: [{ pin: "1", net: "REF", pred: { kind: ["signal"] } }, { pin: "2", net: "*", pred: { kind: ["ground"] } }] },
     // The source driving each input, when every input has one (Appendix A.1: staggered, "+" up).
     { name: "src", types: ["vsource", "battery"], role: "link", many: { min: 0 }, follow: { slot: "rin" }, pins: [] },
   ],
@@ -50,13 +55,19 @@ const OPAMP_INVERTING: Template = {
     rel("y", pin("rin", net("SUM")), "=", pin("u", "IN-"), -2, "first input 2 G above IN-", { each: "first", when: { slot: "rin", min: 2 } }),
     rel("y", env("rin", "top"), ">=", pin("rin", net("SUM")), 2, "next input's label 2 G below the previous input's wire", { each: "chain", when: { slot: "rin", min: 2 } }),
     rel("y", env("rf", "bottom"), "<=", env("u", "top"), -1, "feedback resistor above the op-amp, 1 G corridor"),
+    // Optional IN+ difference-amplifier resistors.
+    rel("y", pin("rplus", net("REF")), "=", pin("u", "IN+"), 0, "IN+ resistor in line with IN+", { when: { slot: "rplus", min: 1 } }),
+    rel("x", pin("rplus", net("REF")), "=", pin("rin", net("SUM")), 0, "IN+ resistor aligned with IN- resistor", { each: "first", when: { slot: "rplus", min: 1 } }),
+    rel("x", pin("rgnd", net("REF")), "=", pin("u", "IN+"), -2, "IN+ shunt resistor hangs 2 G left of IN+", { when: { slot: "rgnd", min: 1 } }),
+    rel("y", pin("rgnd", net("REF")), "=", pin("u", "IN+"), 2, "IN+ shunt resistor hangs from the IN+ line", { when: { slot: "rgnd", min: 1 } }),
+    rel("x", env("rplus", "right"), "<=", env("rgnd", "left"), -1, "IN+ resistor clear of the shunt resistor and its label", { when: { slot: "rgnd", min: 1 } }),
   ],
   link: [
     // Sources stay stacked in their column; each one sits right of the one above, so its wire
     // runs straight up past it and turns once into its input (Appendix A.1: "+" up, one bend).
     rel("x", pin("src", net("*")), ">=", env("src", "right"), 1, "sources stepped right, in input order", { each: "chain" }),
   ],
-  boundary: [["rin", { net: "*" }], ["u", "OUT"], ["u", "IN+"]],
+  boundary: [["rin", { net: "*" }], ["rplus", { net: "*" }], ["rgnd", { net: "*" }], ["u", "OUT"], ["u", "IN+"]],
   trunks: [{
     net: "SUM", why: "the summing node: one vertical conductor at S from the feedback row to the lowest input",
     points: [
@@ -160,7 +171,11 @@ const I2C: Template = {
   ],
 };
 
-/** Voltage divider: one vertical column, the tap between the resistors (a T to the right). */
+/**
+ * Voltage divider: one vertical column for a 3-endpoint tap, or lower resistor staggered 2 G right
+ * on a pass-through signal line (4+ endpoints on the tap) so the signal runs straight through two
+ * clean T-junctions instead of looping under the lower resistor to avoid a four-way node.
+ */
 const DIVIDER: Template = {
   id: "voltage-divider", version: 1, priority: 8,
   summary: "two resistors in series between a supply and ground with a tap",
@@ -172,11 +187,23 @@ const DIVIDER: Template = {
       pins: [{ pin: "1", net: "TAP" }, { pin: "2", net: "BOT" }] },
   ],
   interior: [
-    rel("x", pin("rb", net("TAP")), "=", pin("rt", net("TAP")), 0, "one vertical column"),
+    rel("x", pin("rb", net("TAP")), "=", pin("rt", net("TAP")), 0, "one vertical column", { when: { net: "TAP", maxEndpoints: 3 } }),
+    rel("x", pin("rb", net("TAP")), "=", pin("rt", net("TAP")), 2, "stagger lower resistor 2 G right for two clean T-junctions", { when: { net: "TAP", minEndpoints: 4 } }),
     // 4 G apart: the tap row (2 G below the upper resistor, where the straight-wire pass puts a
     // sideways pin) is the middle of the link, so the T sits clear of both resistor ends.
     rel("y", pin("rb", net("TAP")), "=", pin("rt", net("TAP")), 4, "the tap node between the two resistors"),
   ],
+  trunks: [{
+    net: "TAP", why: "staggered tap link between the upper and lower divider resistors",
+    when: { net: "TAP", minEndpoints: 4 },
+    points: [
+      { x: pin("rt", net("TAP")), y: pin("rt", net("TAP")), dy: 1 },
+      { x: pin("rt", net("TAP")), y: pin("rt", net("TAP")), dy: 2 },
+      { x: pin("rb", net("TAP")), y: pin("rt", net("TAP")), dy: 2 },
+      { x: pin("rb", net("TAP")), y: pin("rb", net("TAP")), dy: -1 },
+    ],
+    require: [{ pin: ["rt", { net: "TAP" }], dir: "down" }, { pin: ["rb", { net: "TAP" }], dir: "up" }],
+  }],
 };
 
 /**

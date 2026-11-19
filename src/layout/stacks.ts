@@ -35,6 +35,8 @@ export interface Stack {
   root: string;
   /** For a string or chain: the root's pin that faces up. A transistor root keeps its own orientation. */
   rootUp?: string;
+  /** For a symmetric op-amp feedback bridge: [top op-amp, bottom op-amp] whose IN- pins face inward. */
+  bridgeOpamps?: [string, string];
   /** Parents before their children. */
   children: StackChild[];
 }
@@ -104,14 +106,29 @@ export function findStacks(g: StackGraph): Stack[] {
     const t = TRANSISTOR[typeOf.get(q) ?? ""];
     if (!t || !g.free(q)) continue;
     const net = (pin: string) => pinsOf.get(q)?.find((x) => x.pin === pin)?.net;
-    const mainDir = mainPinUp(t, (pin) => {
-      const n = net(pin);
-      return n === undefined ? undefined : g.net(n);
-    }) ? "up" : "down";
+    const mainDirOf = (part: string) => {
+      const tt = TRANSISTOR[typeOf.get(part) ?? ""];
+      if (!tt) return undefined;
+      return mainPinUp(tt, (pin) => {
+        const n = pinsOf.get(part)?.find((x) => x.pin === pin)?.net;
+        return n === undefined ? undefined : g.net(n);
+      }) ? "up" : "down";
+    };
+    const mainDir = mainDirOf(q)!;
     const children: StackChild[] = [];
     for (const [pin, dir] of [[t.main, mainDir], [t.ref, mainDir === "up" ? "down" : "up"]] as const) {
       const n = net(pin);
       if (n === undefined || !wire(n)) continue;
+      // Complementary pair (push-pull output): another transistor meets this pin from the opposite
+      // vertical side, so leave loads off the vertical line between the two transistors.
+      if ((onNet.get(n) ?? []).some((x) => {
+        if (x.part === q) return false;
+        const ot = TRANSISTOR[typeOf.get(x.part) ?? ""];
+        if (!ot || (x.pin !== ot.main && x.pin !== ot.ref)) return false;
+        const om = mainDirOf(x.part)!;
+        const otherDir = x.pin === ot.main ? om : (om === "up" ? "down" : "up");
+        return otherDir !== dir;
+      })) continue;
       const chains = hangers(n, dir, q).slice(0, MAX_LANES);
       const alone = (onNet.get(n) ?? []).length === 2;
       chains.forEach((chain, lane) => chain.forEach((c, i) => {
@@ -153,6 +170,39 @@ export function findStacks(g: StackGraph): Stack[] {
     if (!top || !wire(far(p, top.pin).net)) continue;
     const path = toGround(p, top.pin, []);
     if (path && path.length >= 2) stacks.push(stackOf(path));
+  }
+
+  // Symmetric feedback bridge: two free op-amps each with a two-pin feedback part (OUT -> IN-),
+  // linked by a two-pin gain part between their IN- pins (instrumentation-amplifier input stage).
+  // Stack the three parts in one vertical column: top feedback, bridge, bottom feedback.
+  const opamps = ids.filter((id) => typeOf.get(id) === "opamp" && g.free(id) && !used.has(id));
+  for (let i = 0; i < opamps.length; i++) {
+    const a = opamps[i]!;
+    if (used.has(a)) continue;
+    const aOut = pinsOf.get(a)?.find((x) => x.pin === "1")?.net;
+    const aIn = pinsOf.get(a)?.find((x) => x.pin === "2")?.net;
+    if (!aOut || !aIn || !wire(aOut) || !wire(aIn)) continue;
+    const fbA = (onNet.get(aIn) ?? []).find((t) => usable(t.part) && far(t.part, t.pin).net === aOut);
+    if (!fbA) continue;
+    for (let j = i + 1; j < opamps.length; j++) {
+      const b = opamps[j]!;
+      if (used.has(b)) continue;
+      const bOut = pinsOf.get(b)?.find((x) => x.pin === "1")?.net;
+      const bIn = pinsOf.get(b)?.find((x) => x.pin === "2")?.net;
+      if (!bOut || !bIn || !wire(bOut) || !wire(bIn) || bIn === aIn) continue;
+      const fbB = (onNet.get(bIn) ?? []).find((t) => usable(t.part) && t.part !== fbA.part && far(t.part, t.pin).net === bOut);
+      const bridge = (onNet.get(aIn) ?? []).find((t) => usable(t.part) && t.part !== fbA.part && t.part !== fbB?.part && far(t.part, t.pin).net === bIn);
+      if (!fbB || !bridge) continue;
+      stacks.push({
+        ...stackOf([
+          { part: fbA.part, near: far(fbA.part, fbA.pin).pin },
+          { part: bridge.part, near: bridge.pin },
+          { part: fbB.part, near: fbB.pin },
+        ]),
+        bridgeOpamps: [a, b],
+      });
+      break;
+    }
   }
 
   // Hanging chains: strictly in series, ending at ground or starting at a supply.

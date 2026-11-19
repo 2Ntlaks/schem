@@ -178,18 +178,25 @@ export function inferFlow(g: FlowGraph, fixed: ReadonlyMap<string, number>): Flo
       for (const d of D) for (const x of all) if (!D.includes(x)) directed.add(dkey(d, x));
     }
   }
-  // A part from a block's output straight back to its input is that block's feedback part.
+  // A part (or two-pin feedback stack) from a block's output straight back to its input is a feedback block.
   const sibling = new Map<string, string>();
+  const fbStackHosts = new Map<string, string[]>();
   for (const k of [...directed].sort(cmpStr)) {
     const [a, b] = k.split(">") as [string, string];
     if (!directed.has(dkey(b, a)) || !directed.has(k)) continue;
     directed.delete(k); directed.delete(dkey(b, a));
     const [passive, host] = twoPin(a) ? [a, b] : twoPin(b) ? [b, a] : [undefined, undefined];
-    if (passive && host && !fixed.has(passive)) sibling.set(passive, host); else undirected.add(ukey(a, b));
+    if (passive && host && !fixed.has(passive)) sibling.set(passive, host);
+    else {
+      const [stack, h] = allTwoPin(a) && !single(a) ? [a, b] : allTwoPin(b) && !single(b) ? [b, a] : [undefined, undefined];
+      if (stack && h && !fixed.has(stack)) fbStackHosts.set(stack, [...(fbStackHosts.get(stack) ?? []), h]);
+      else undirected.add(ukey(a, b));
+    }
   }
   const touches = (b: string) => [...directed, ...undirected].some((k) => k.split(/[>|]/).includes(b));
   for (const b of [...sibling.keys()]) if (touches(b)) sibling.delete(b); // it has other connections: rank it
-  const ranked = nodes.filter((b) => !sibling.has(b));
+  for (const b of [...fbStackHosts.keys()]) if (touches(b)) fbStackHosts.delete(b);
+  const ranked = nodes.filter((b) => !sibling.has(b) && !fbStackHosts.has(b));
   const out = new Map(ranked.map((b) => [b, [] as string[]])), inn = new Map(ranked.map((b) => [b, [] as string[]])), und = new Map(ranked.map((b) => [b, [] as string[]]));
   for (const k of directed) { const [a, b] = k.split(">") as [string, string]; out.get(a)!.push(b); inn.get(b)!.push(a); }
   for (const k of undirected) { const [a, b] = k.split("|") as [string, string]; und.get(a)!.push(b); und.get(b)!.push(a); }
@@ -258,10 +265,11 @@ export function inferFlow(g: FlowGraph, fixed: ReadonlyMap<string, number>): Flo
   }
   // Break cycles (feedback loops through several blocks): depth-first from the seeds, back edges dropped.
   const state = new Map<string, 1 | 2>();
+  const backTarget = new Map<string, string[]>();
   const visit = (u: string) => {
     state.set(u, 1);
     for (const w of [...succ.get(u)!].sort(cmpStr)) {
-      if (state.get(w) === 1) succ.get(u)!.delete(w);
+      if (state.get(w) === 1) { succ.get(u)!.delete(w); backTarget.set(u, [...(backTarget.get(u) ?? []), w]); }
       else if (!state.has(w)) visit(w);
     }
     state.set(u, 2);
@@ -269,6 +277,14 @@ export function inferFlow(g: FlowGraph, fixed: ReadonlyMap<string, number>): Flo
   for (const s of [...[...seeds].sort(cmpStr), ...ranked]) if (!state.has(s)) visit(s);
   const pred = new Map(ranked.map((b) => [b, [] as string[]]));
   for (const [a, ws] of succ) for (const w of ws) pred.get(w)!.push(a);
+  // Multi-stage feedback: a two-pin part whose only outgoing edge was a cycle back-edge returns
+  // from a downstream stage to an upstream block, so it belongs in that upstream block's column.
+  for (const [u, targets] of backTarget) {
+    if (targets.length === 1 && twoPin(u) && !fixed.has(u) && !explicit(u) && !isSink(u)
+      && succ.get(u)!.size === 0 && pred.get(u)!.length > 0) {
+      sibling.set(u, targets[0]!);
+    }
+  }
 
   // Longest paths, in topological order.
   const order: string[] = [];
@@ -282,10 +298,15 @@ export function inferFlow(g: FlowGraph, fixed: ReadonlyMap<string, number>): Flo
   }
   const rank = new Map<string, number>();
   for (const u of order) rank.set(u, fixed.get(u) ?? Math.max(0, ...pred.get(u)!.map((p) => rank.get(p)! + 1)));
-  // A block that only feeds others moves up next to what it feeds.
+  // A block that only feeds others moves up next to what it feeds. A two-pin passive bridging
+  // two or more parallel blocks in the same column (such as an instrumentation amplifier's gain
+  // resistor between two input op-amps) joins their column instead of sitting upstream of them.
   for (const u of [...order].reverse()) {
     if (fixed.has(u) || explicit(u) || pred.get(u)!.length || !succ.get(u)!.size) continue;
-    rank.set(u, Math.min(...[...succ.get(u)!].map((w) => rank.get(w)!)) - 1);
+    const succRanks = [...succ.get(u)!].map((w) => rank.get(w)!);
+    const sameStage = twoPin(u) && !pinsOf(u).some((p) => g.portNet.has(p.net))
+      && succ.get(u)!.size >= 2 && new Set(succRanks).size === 1;
+    rank.set(u, sameStage ? succRanks[0]! : Math.min(...succRanks) - 1);
   }
   // Separate pieces of the drawing sit side by side, the largest first.
   const big = [...comps].sort((a, b) => b.length - a.length || cmpStr(a[0]!, b[0]!))[0];
@@ -299,11 +320,19 @@ export function inferFlow(g: FlowGraph, fixed: ReadonlyMap<string, number>): Flo
 
   const col = new Map(rank);
   for (const [b, host] of sibling) { rank.set(b, rank.get(host)!); col.set(b, col.get(host)!); }
+  for (const [b, hosts] of fbStackHosts) {
+    const r = Math.max(...hosts.map((h) => rank.get(h) ?? 0));
+    rank.set(b, r);
+    col.set(b, r + 0.5);
+  }
   // Taps: half a column after the first block on their wire, or before it when they only feed inputs.
-  const graphRanked = new Set(rank.keys());
+  // Feedback siblings return to an upstream column, so they do not pull a load tap upstream with them.
+  const graphRanked = new Set([...rank.keys()].filter((b) => !sibling.has(b)));
   const seriesTaps: Flow["seriesTaps"] = new Map();
   for (const t of [...taps].sort(cmpStr)) {
-    const others = (onNet.get(wireOf(t)) ?? []).filter((p) => graphRanked.has(g.blockOf(p.part)));
+    const onWire = onNet.get(wireOf(t)) ?? [];
+    const primary = onWire.filter((p) => graphRanked.has(g.blockOf(p.part)));
+    const others = primary.length ? primary : onWire.filter((p) => rank.has(g.blockOf(p.part)));
     if (!others.length) { rank.set(t, 0); col.set(t, 0); continue; }
     const lowest = Math.min(...others.map((p) => rank.get(g.blockOf(p.part))!));
     // On one block's plain pin, when that block drives something else: the input side (see above).
@@ -329,7 +358,12 @@ export function inferFlow(g: FlowGraph, fixed: ReadonlyMap<string, number>): Flo
     const base = feeders.length ? Math.max(...feeders.map((b) => rank.get(b)!)) : 0;
     const k = (used.get(base) ?? 0) + 1;
     used.set(base, k);
-    for (const b of comp) { rank.set(b, base); col.set(b, base + (feeders.length ? 0.5 : 0) + k / 64); }
+    // When no rail driver feeds the rail and column 0 already hosts an IC on that rail, place
+    // floating bypass capacitors immediately to its left so they sit beside the chip without
+    // wedging into the signal bus channel between column 0 and column 1.
+    const icAtBase = !feeders.length && [...rank].some(([b, r]) => r === base
+      && g.members(b).some((m) => (g.type(m) === "ic" || g.type(m).startsWith("module:")) && pinsOf(b).some((p) => rails.includes(p.net))));
+    for (const b of comp) { rank.set(b, base); col.set(b, icAtBase ? base - k / 64 : base + (feeders.length ? 0.5 : 0) + k / 64); }
   }
   for (const b of g.blocks) {
     if (rank.has(b)) continue;

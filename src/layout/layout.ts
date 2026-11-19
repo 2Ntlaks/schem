@@ -24,7 +24,7 @@ import {
 } from "./templates/index.js";
 import { edgeForbidden } from "../geom/forbidden.js";
 import type { Art, DrawnPin, DrawnPort, Electrical, RenderModel } from "../render/model.js";
-import { hintParts, type Intent, type LayoutState, type Side } from "../core/intent.js";
+import { CAPACITOR_TYPES, hintParts, type Intent, type LayoutState, type Side } from "../core/intent.js";
 
 export interface Project { meta?: { title?: string }; circuit: Circuit; intent?: Intent }
 
@@ -77,6 +77,8 @@ export interface LayoutOptions {
   staggerBranches?: boolean;
   /** Pin order for generated IC boxes, from a first layout (set by the layout itself, see "Pin order"). */
   pinOrder?: Record<string, Partial<Record<Side, string[]>>>;
+  /** Vertical flip for non-template op-amps, from a first layout so IN+ / IN- match connected heights. */
+  opampOrient?: Record<string, Orient>;
 }
 
 const LABEL_SIZE = 12;   // SVG units (1.2 G)
@@ -210,6 +212,7 @@ export function layout(project: Project, opts: LayoutOptions = {}): LayoutResult
     regions = regions.filter((r) => !r.members.some((m) => taken.has(m)));
   }
   const stackRoot = new Map(stacks.flatMap((st) => st.children.map((c) => [c.part, st.root] as const)));
+  const bridgeTopOpamp = new Set(stacks.flatMap((st) => (st.bridgeOpamps ? [st.bridgeOpamps[0]] : [])));
   const regionOf = new Map<string, Region>(), linkOf = new Map<string, Region>();
   for (const r of regions) { for (const p of r.members) regionOf.set(p, r); for (const p of r.links) linkOf.set(p, r); }
   const blockOf = (id: string) => regionOf.get(id)?.rep ?? id;
@@ -253,13 +256,14 @@ export function layout(project: Project, opts: LayoutOptions = {}): LayoutResult
   const oldCol = (id: string) => { const p = opts.previous?.parts[id]; return p ? (legacy ? p.at[0] : p.column) : undefined; };
   if (opts.previous && ids.some((id) => oldCol(id) !== undefined)) {
     const fresh = new Map(colValue);
+    const minOld = Math.min(...ids.flatMap((o) => (oldCol(o) !== undefined ? [oldCol(o)!] : [])));
     for (const id of ids) {
       if (oldCol(id) !== undefined) { colValue.set(id, oldCol(id)!); continue; }
       const votes = new Map<number, number>();
       for (const o of ids) if (o !== id && oldCol(o) !== undefined && fresh.get(o) === fresh.get(id)) votes.set(oldCol(o)!, (votes.get(oldCol(o)!) ?? 0) + 1);
       const peer = [...votes].sort((a, b) => b[1] - a[1] || a[0] - b[0])[0]?.[0];
       const near = [...neighbours.get(id)!].sort(cmpStr).flatMap((n) => (oldCol(n) !== undefined ? [oldCol(n)!] : []));
-      colValue.set(id, peer ?? (near.length ? near.reduce((a, b) => a + b, 0) / near.length : fresh.get(id)!));
+      colValue.set(id, peer ?? (near.length ? near.reduce((a, b) => a + b, 0) / near.length : Math.max(minOld, fresh.get(id)!)));
     }
   }
   const sortedColumns = () => [...new Set(colValue.values())].sort((a, b) => a - b);
@@ -274,6 +278,27 @@ export function layout(project: Project, opts: LayoutOptions = {}): LayoutResult
 
   // Steps 3b and 4: orientation, measurement, labels, ports.
   const placed = new Map<string, Placed>();
+  // Floating bypass capacitors placed immediately to the left of an IC on their supply rail keep
+  // their label on the outward (left) side, and the IC keeps its label off the left edge so the
+  // capacitor sits directly beside the supply pin it serves.
+  const leftBypassCaps = new Set<string>();
+  const icHasLeftBypass = new Set<string>();
+  if (!opts.place) {
+    const decSet = new Set(decouplers.map((m) => m.part));
+    for (const id of ids) {
+      const part = partOf.get(id)!;
+      if (decSet.has(id) || neighbours.get(id)!.size > 0 || !CAPACITOR_TYPES.has(part.type)) continue;
+      const pins = (defs[id] ?? []).map((p) => drawnNet.get(`${id}[${p.number}]`)).filter((n): n is string => n !== undefined);
+      const pw = pins.find((n) => portNet.has(n) && netKind(netById.get(n)!) === "power");
+      const gd = pins.find((n) => portNet.has(n) && netKind(netById.get(n)!) === "ground");
+      if (!pw || !gd) continue;
+      const nextCol = colOf.get(id)! + 1;
+      const host = ids.find((other) => colOf.get(other) === nextCol
+        && (partOf.get(other)!.type === "ic" || partOf.get(other)!.type.startsWith("module:"))
+        && (defs[other] ?? []).some((p) => p.role === "power_in" && drawnNet.get(`${other}[${p.number}]`) === pw));
+      if (host) { leftBypassCaps.add(id); icHasLeftBypass.add(host); }
+    }
+  }
   const measurePart = (id: string, force?: Orient): void => {
     const part = partOf.get(id)!;
     const col = colOf.get(id)!;
@@ -283,7 +308,7 @@ export function layout(project: Project, opts: LayoutOptions = {}): LayoutResult
     if (BUILTIN[part.type]) {
       sym = BUILTIN[part.type]!;
       if (sym.kind === "source") orient = { rot: 90, flip: false }; // "+" (left pin) up
-      else if (sym.kind === "two-pin") orient = twoPinOrient(sym, id, drawnNet, netById, portNet, netCol);
+      else if (sym.kind === "two-pin") orient = twoPinOrient(sym, id, drawnNet, netById, portNet, col, netCol);
       else orient = defaultOrient(sym, id, { drawnNet, netById, portNet, col, netCol }) ?? orient;
     } else if (part.type === HEADER) {
       sym = headerFor(defs[id]!);
@@ -305,6 +330,8 @@ export function layout(project: Project, opts: LayoutOptions = {}): LayoutResult
     else if (oh) orient = { rot: oh.rot, flip: oh.flip };
     else if (prev) orient = prev.orient;
     else if (to) orient = to;
+    else if (opts.opampOrient?.[id]) orient = opts.opampOrient[id]!;
+    else if (bridgeTopOpamp.has(id)) orient = { rot: 180, flip: true };
     const ko = xformBox(keepOut(sym), [0, 0], orient);
     const pins = sym.pins
       .filter((p) => drawnNet.has(`${id}[${p.number}]`) || ncSet.has(`${id}[${p.number}]`) || sym.kind !== "ic")
@@ -333,8 +360,14 @@ export function layout(project: Project, opts: LayoutOptions = {}): LayoutResult
     }
     // Labels must keep clear of port symbols and of every pin's approach point.
     const approachBoxes = pins.map((p): Box => { const a = step(p.at, p.dir); return { x: a[0] - 0.5, y: a[1] - 0.5, w: 1, h: 1 }; });
+    const hostDec = decouplers.filter((m) => m.host === id);
+    const decRight = hostDec.length > 0 && hostDec.every((m) => {
+      const tp = pins.find((p) => p.number === m.pin);
+      return tp !== undefined && tp.at[0] > ko.x + ko.w / 2;
+    });
     const labels = labelFor(part, sym, orient, ko, [...ports.map((q) => q.box), ...approachBoxes], intent.overrides?.labelSide?.[id]
-      ?? (tr ? templateLabel(tr, id) : undefined) ?? (decouplers.some((m) => m.host === id) ? "below-left-out" : undefined));
+      ?? (tr ? templateLabel(tr, id) : leftBypassCaps.has(id) ? "left" : undefined), !tr,
+      hostDec.length > 0 ? (decRight ? "below-right" : "below-left") : icHasLeftBypass.has(id) ? "above-right" : undefined);
     let env = ko;
     for (const l of labels) env = unionBox(env, gridBox(l.box));
     for (const q of ports) env = unionBox(env, q.box);
@@ -542,6 +575,72 @@ export function layout(project: Project, opts: LayoutOptions = {}): LayoutResult
   const withoutStagger = (reason: string) => retry(`chip branch staggering dropped: ${reason}`, { ...opts, staggerBranches: false });
   // Ordering candidate B: barycentre sweeps (fixed count) within each column.
   const columns: string[][] = colVals.map((_, c) => reps.filter((id) => colOf.get(id) === c && !childOffsets.has(id) && !rigid.has(id)));
+  // Standalone port-only blocks (batteries, power headers, port-only regulators) have no wires to
+  // any column. Tuck each into the shortest main column within its valid rail-flow range so it
+  // does not inflate an already tall column or widen a signal column beside it.
+  if (!opts.previous && !opts.place) {
+    const railFeeders = new Map<string, string[]>();
+    for (const id of ids) {
+      const p = partOf.get(id)!;
+      for (const pin of placed.get(id)!.pins) {
+        const netId = drawnNet.get(`${id}[${pin.number}]`);
+        if (!netId || !portNet.has(netId) || netKind(netById.get(netId)!) !== "power") continue;
+        const role = defs[id]?.find((d) => d.number === pin.number)?.role;
+        const isPathFeeder = (p.type === "diode" || p.type === "schottky" || p.type === "fuse" || p.type === "spst")
+          && ((p.type !== "diode" && p.type !== "schottky") || pin.number === "K");
+        if ((BUILTIN[p.type]?.kind !== "source" && role === "power_out") || isPathFeeder) {
+          railFeeders.set(netId, [...(railFeeders.get(netId) ?? []), blockOf(id)]);
+        }
+      }
+    }
+    const portOnly = reps.filter((id) => !childOffsets.has(id) && !rigid.has(id) && !regionOf.has(id) && !heldByIntent(id)
+      && blockNeighbours.get(id)!.size === 0 && (placed.get(id)!.sym.kind === "header" || placed.get(id)!.sym.kind === "ic"));
+    for (const id of portOnly) {
+      const curC = colOf.get(id)!;
+      if (columns[curC]!.length <= 1) continue; // already in its own column
+      let minC = 0, maxC = columns.length - 1;
+      const myRails = placed.get(id)!.pins
+        .map((p) => ({ num: p.number, net: drawnNet.get(`${id}[${p.number}]`) }))
+        .filter((p): p is { num: string; net: string } => p.net !== undefined && portNet.has(p.net) && netKind(netById.get(p.net)!) === "power");
+      for (const { num, net } of myRails) {
+        const role = defs[id]?.find((d) => d.number === num)?.role;
+        const isOut = BUILTIN[partOf.get(id)!.type]?.kind !== "source" && role === "power_out";
+        if (isOut) {
+          for (const other of partsOfNet.get(net) ?? []) {
+            const ob = blockOf(other);
+            if (ob !== id && colOf.get(ob)! > curC) maxC = Math.min(maxC, colOf.get(ob)! - 1);
+          }
+        } else {
+          for (const f of railFeeders.get(net) ?? []) {
+            if (f !== id) minC = Math.max(minC, colOf.get(f)! + (placed.get(id)!.sym.kind === "header" ? 1 : 0));
+          }
+        }
+      }
+      const colH = (c: number) => columns[c]!.filter((x) => x !== id).reduce((s, x) => s + blockEnv(x).h + 2, 0);
+      // Never tuck a port-only block into a column crossed by wires between other columns (where
+      // it can land in the path of those wires), and only move it when the target column actually
+      // has enough vertical slack to absorb the block without exceeding the home column's height.
+      const crossed = (c: number) => wired.some((n) => {
+        const cs = partsOfNet.get(n.id)!.map((p) => colOf.get(p)!);
+        return Math.min(...cs) < c && Math.max(...cs) > c;
+      });
+      const curH = colH(curC), idH = blockEnv(id).h + 2;
+      let bestC = curC, bestH = curH;
+      for (let c = minC; c <= maxC; c++) {
+        if (!Number.isInteger(colVals[c]!) || !columns[c]!.length) continue;
+        if (c !== curC && (crossed(c) || colH(c) + idH > curH)) continue;
+        const h = colH(c);
+        if (h < bestH || (h === bestH && Math.abs(c - curC) < Math.abs(bestC - curC))) { bestC = c; bestH = h; }
+      }
+      if (bestC !== curC) {
+        columns[curC] = columns[curC]!.filter((x) => x !== id);
+        if (placed.get(id)!.sym.kind === "source") columns[bestC]!.unshift(id);
+        else columns[bestC]!.push(id);
+        colOf.set(id, bestC);
+        colValue.set(id, colVals[bestC]!);
+      }
+    }
+  }
   for (let sweep = 0; sweep < 4; sweep++) {
     const forward = sweep % 2 === 0;
     const order = forward ? columns.map((_, i) => i) : columns.map((_, i) => columns.length - 1 - i);
@@ -652,7 +751,14 @@ export function layout(project: Project, opts: LayoutOptions = {}): LayoutResult
     for (let i = 0; i + 1 < col.length; i++) {
       if (apart.has(`${col[i]}|${col[i + 1]}`)) continue;
       const ea = blockEnv(col[i]!), eb = blockEnv(col[i + 1]!);
-      cons.push({ a: vy(col[i + 1]!), b: vy(col[i]!), c: keptGap(col[i]!, col[i + 1]!, 1, gapY + ea.y + ea.h - eb.y), priority: "structural", why: `order in column ${c}` });
+      // If the upper block has a wired down-facing pin on its bottom edge, leave 3 G to the next
+      // block so a corner wire at pin.y + 2 clears the lower block's top edge (avoiding a 1 G jog).
+      const hasBottomWire = groupOf(col[i]!).some((m) => placed.get(m)!.pins.some((p) => {
+        const net = drawnNet.get(`${m}[${p.number}]`);
+        return net !== undefined && !portNet.has(net) && p.dir === "down" && p.at[1] + offsetOf(m)[1] >= ea.y + ea.h;
+      }));
+      const needY = Math.max(gapY, hasBottomWire ? 3 : 0);
+      cons.push({ a: vy(col[i + 1]!), b: vy(col[i]!), c: keptGap(col[i]!, col[i + 1]!, 1, needY + ea.y + ea.h - eb.y), priority: "structural", why: `order in column ${c}` });
     }
   }
   // Bus corridors: a template run that crosses columns (an I2C trunk from the controller to its
@@ -713,6 +819,19 @@ export function layout(project: Project, opts: LayoutOptions = {}): LayoutResult
   const vars = ids.flatMap((id) => [vx(id), vy(id)]);
   for (const [id, child] of childOffsets) cons.push(...eq(vx(id), vx(child.host), child.at[0], "template", `decoupling ${id}`), ...eq(vy(id), vy(child.host), child.at[1], "template", `decoupling ${id}`));
   for (const [id, child] of rigid) cons.push(...eq(vx(id), vx(child.host), child.at[0], "template", `stack ${id}`), ...eq(vy(id), vy(child.host), child.at[1], "template", `stack ${id}`));
+  // Symmetric op-amp feedback bridge: align the top and bottom op-amp outputs to the outer ends of the vertical ladder.
+  if (!opts.previous) for (const st of stacks) {
+    if (!st.bridgeOpamps || st.children.length < 2) continue;
+    const [topOp, botOp] = st.bridgeOpamps;
+    const botPart = st.children[st.children.length - 1]!.part;
+    if (!rigid.has(botPart)) continue;
+    const topOut = placed.get(topOp)?.pins.find((p) => p.number === "1");
+    const botOut = placed.get(botOp)?.pins.find((p) => p.number === "1");
+    const rTop = placed.get(st.root)?.pins.find((p) => p.dir === "up");
+    const rBot = placed.get(botPart)?.pins.find((p) => p.dir === "down");
+    if (topOut && rTop) cons.push(...eq(vy(topOp), vy(st.root), rTop.at[1] - 2 - topOut.at[1], "template", `bridge ${topOp}`));
+    if (botOut && rBot) cons.push(...eq(vy(botOp), vy(botPart), rBot.at[1] + 2 - botOut.at[1], "template", `bridge ${botOp}`));
+  }
   const known = new Set(ids);
   for (const l of locks.values()) if (known.has(l.part)) cons.push(...eq(vx(l.part), X0, l.x, "lock", `lock ${l.part}`), ...eq(vy(l.part), X0, l.y, "lock", `lock ${l.part}`));
   for (const h of hints) {
@@ -782,6 +901,10 @@ export function layout(project: Project, opts: LayoutOptions = {}): LayoutResult
         const [h, vv] = isHorizontal(pa.dir) ? [pa, pb] : [pb, pa];
         const off = vv.dir === "up" ? -2 : 2;
         candidates.push({ k: eq(vy(h.part), vy(vv.part), vv.at[1] + off - h.at[1], "align", `corner ${ps[i]}-${ps[j]}`), order: [Math.abs(ca - cb) + 0.5, tag] });
+      } else if (pa.dir === pb.dir && (placed.get(pa.part)!.sym.kind === "transistor" || placed.get(pb.part)!.sym.kind === "transistor")) {
+        // Two pins facing the same vertical direction in different columns (e.g. a pull-up and a
+        // transistor source on one bus): level their tips so one horizontal wire connects them.
+        candidates.push({ k: eq(vy(pb.part), vy(pa.part), pa.at[1] - pb.at[1], "align", `level ${ps[i]}-${ps[j]}`), order: [Math.abs(ca - cb) + 1, tag] });
       }
     }
   }
@@ -846,7 +969,11 @@ export function layout(project: Project, opts: LayoutOptions = {}): LayoutResult
       const p = el.pins.find((q) => `${q.part}[${q.number}]` === t)!;
       return { id: t, at: p.at, dir: p.dir };
     });
-    terms.sort((a, b) => colOf.get(partOfTerm(a.id))! - colOf.get(partOfTerm(b.id))! || cmpStr(a.id, b.id));
+    // Start from a horizontal terminal when present so multi-pin nets establish their straight
+    // horizontal trunk row before vertical taps join it (avoids U-loops around tap corners).
+    const horizFirst = terms.length >= 3 && terms.some((t) => isHorizontal(t.dir)) && terms.some((t) => !isHorizontal(t.dir));
+    terms.sort((a, b) => (horizFirst ? Number(!isHorizontal(a.dir)) - Number(!isHorizontal(b.dir)) : 0)
+      || colOf.get(partOfTerm(a.id))! - colOf.get(partOfTerm(b.id))! || cmpStr(a.id, b.id));
     if (portNet.has(n.id)) {
       const prewired: Array<[Pt, Pt]> = [];
       for (const id of ids) for (const q of placed.get(id)!.ports) if (q.net.id === n.id && q.stub.length) {
@@ -961,32 +1088,53 @@ export function layout(project: Project, opts: LayoutOptions = {}): LayoutResult
     ...(regionOf.has(b) ? { template: regionOf.get(b)!.key, links: regionOf.get(b)!.links } : {}) }));
   const result: LayoutResult = { status: failed.length ? "budget_exhausted" : lowConfidence ? "valid_low_confidence" : "valid", render, pinDefs: defs, issues: failed.map((f) => `could not route ${f}`), notes, state: stateOf(), blocks };
   // Pin order: on the left and right of a generated IC box, the pins follow the height of what they
-  // connect to. The first layout shows where that is; a second layout with the pins in that order
-  // is kept only if it has fewer crossings, then fewer bends, then less wire.
-  if (!failed.length && !opts.previous && !place && !opts.pinOrder) {
+  // connect to; on a free op-amp, IN+ and IN- follow the height of what they connect to (keeping
+  // OUT facing right). The first layout shows where that is; a second layout with that order is
+  // kept only if it has fewer crossings, then fewer bends, then less wire.
+  if (!failed.length && !opts.previous && !place && !opts.pinOrder && !opts.opampOrient) {
     const want: NonNullable<LayoutOptions["pinOrder"]> = {};
+    const wantOpamp: Record<string, Orient> = {};
+    const pinHeight = (id: string, num: string, o: Pt): number | undefined => {
+      const net = drawnNet.get(`${id}[${num}]`);
+      if (net === undefined) return undefined;
+      if (portNet.has(net)) {
+        const lvl = railLevel(netById.get(net)!);
+        return lvl === 1 ? o[1] - 100 : lvl === 0 || lvl === -1 ? o[1] + 100 : undefined;
+      }
+      const others = el.pins.filter((q) => q.part !== id && drawnNet.get(`${q.part}[${q.number}]`) === net);
+      return others.length ? others.reduce((sum, q) => sum + q.at[1], 0) / others.length : undefined;
+    };
     for (const id of ids) {
       const P = placed.get(id)!;
-      if (P.sym.kind !== "ic" || sidesHint.has(id) || regionOf.has(id) || linkOf.has(id)) continue;
+      if (regionOf.has(id) || linkOf.has(id)) continue;
       const o = at(id);
-      const heightOf = (num: string): number | undefined => {
-        const net = drawnNet.get(`${id}[${num}]`);
-        if (net === undefined || portNet.has(net)) return undefined;
-        const others = el.pins.filter((q) => q.part !== id && drawnNet.get(`${q.part}[${q.number}]`) === net);
-        return others.length ? others.reduce((sum, q) => sum + q.at[1], 0) / others.length : undefined;
-      };
-      for (const side of ["left", "right"] as const) {
-        const now = P.pins.filter((q) => q.dir === side).sort((a, b) => a.at[1] - b.at[1]).map((q, i) => ({ n: q.number, y: heightOf(q.number) ?? o[1] + q.at[1], i }));
-        const sorted = [...now].sort((a, b) => a.y - b.y || a.i - b.i);
-        if (sorted.some((k, i) => k.n !== now[i]!.n)) (want[id] ??= {})[side] = sorted.map((k) => k.n);
+      if (P.sym.kind === "ic" && !sidesHint.has(id)) {
+        for (const side of ["left", "right"] as const) {
+          const now = P.pins.filter((q) => q.dir === side).sort((a, b) => a.at[1] - b.at[1]).map((q, i) => ({ n: q.number, y: pinHeight(id, q.number, o) ?? o[1] + q.at[1], i }));
+          const sorted = [...now].sort((a, b) => a.y - b.y || a.i - b.i);
+          if (sorted.some((k, i) => k.n !== now[i]!.n)) (want[id] ??= {})[side] = sorted.map((k) => k.n);
+        }
+      } else if (partOf.get(id)!.type === "opamp" && !locks.has(id) && !orientHint.has(id)) {
+        const inMinus = P.pins.find((q) => q.number === "2"), inPlus = P.pins.find((q) => q.number === "3");
+        if (!inMinus || !inPlus || inMinus.dir !== "left" || inPlus.dir !== "left") continue;
+        const ym = pinHeight(id, "2", o), yp = pinHeight(id, "3", o);
+        if (ym === undefined || yp === undefined || ym === yp) continue;
+        const plusOnTop = yp < ym;
+        const isPlusOnTop = inPlus.at[1] < inMinus.at[1];
+        if (plusOnTop !== isPlusOnTop) wantOpamp[id] = plusOnTop ? { rot: 180, flip: true } : { rot: 0, flip: false };
       }
     }
-    if (Object.keys(want).length) {
-      const again = layout(project, { ...opts, pinOrder: want });
+    if (Object.keys(want).length || Object.keys(wantOpamp).length) {
+      const again = layout(project, {
+        ...opts,
+        ...(Object.keys(want).length ? { pinOrder: want } : {}),
+        ...(Object.keys(wantOpamp).length ? { opampOrient: wantOpamp } : {}),
+      });
       if (again.status === result.status && again.render) {
         const a = checkDrawing(circuit, defs, render).metrics, b = checkDrawing(circuit, again.pinDefs, again.render).metrics;
         if (b.crossings < a.crossings || (b.crossings === a.crossings && (b.bends < a.bends || (b.bends === a.bends && b.wireLength < a.wireLength)))) {
-          again.notes.push(`pin order: ${Object.keys(want).sort(cmpStr).join(", ")} drawn with pins in the order of their connections`);
+          if (Object.keys(want).length) again.notes.push(`pin order: ${Object.keys(want).sort(cmpStr).join(", ")} drawn with pins in the order of their connections`);
+          if (Object.keys(wantOpamp).length) again.notes.push(`opamp orient: ${Object.keys(wantOpamp).sort(cmpStr).join(", ")} flipped vertically to match input heights`);
           return again;
         }
       }
@@ -1049,7 +1197,7 @@ function shift(b: Box, o: Pt): Box { return { x: b.x + o[0], y: b.y + o[1], w: b
 /** SPEC 9.2 step 3b for two-pin parts. */
 function twoPinOrient(
   sym: SymbolDef, id: string, drawnNet: Map<string, string>, netById: Map<string, Net>, portNet: Set<string>,
-  netCol: (net: string, self: string) => number | undefined,
+  col: number, netCol: (net: string, self: string) => number | undefined,
 ): Orient {
   const [p1, p2] = sym.pins as [SymbolDef["pins"][0], SymbolDef["pins"][0]];
   const n1 = drawnNet.get(`${id}[${p1.number}]`), n2 = drawnNet.get(`${id}[${p2.number}]`);
@@ -1057,6 +1205,8 @@ function twoPinOrient(
   const lower = lowerRailEnd(netById.get(n1 ?? ""), netById.get(n2 ?? ""), portNet);
   if (lower) return { rot: lower === 2 ? 90 : 270, flip: false };
   const c1 = n1 ? netCol(n1, id) : undefined, c2 = n2 ? netCol(n2, id) : undefined;
+  // A two-pin part whose both ends connect within its own column bridges vertically stacked blocks.
+  if (c1 !== undefined && c2 !== undefined && c1 === col && c2 === col) return { rot: 90, flip: false };
   if (c1 !== undefined && c2 !== undefined && c2 < c1) return { rot: 180, flip: false };
   return { rot: 0, flip: false };
 }
@@ -1125,21 +1275,60 @@ function displayValue(type: string, raw: string): string {
   return `${n} ${p}${sym}`;
 }
 
+const WRAP_IC_LABEL_AT = 16; // G; wrap long IC/module titles so one banner does not widen a whole column
+const WRAP_IC_LABEL_W = 11;  // G; target line width once wrapping triggers
+
+function wrapLine(text: string, triggerW: number, maxW: number): string[] {
+  const width = (s: string) => measure(s, LABEL_SIZE).width / 10;
+  if (width(text) <= triggerW) return [text];
+  const words = text.trim().split(/\s+/);
+  if (words.length <= 1) return [text];
+  // Balance lines across the minimum line count that fits within maxW (greedily with balanced target).
+  const greedy = (limit: number): string[] => {
+    const out: string[] = [];
+    let cur = words[0]!;
+    for (let i = 1; i < words.length; i++) {
+      const next = `${cur} ${words[i]}`;
+      if (width(next) <= limit) cur = next;
+      else { out.push(cur); cur = words[i]!; }
+    }
+    out.push(cur);
+    return out;
+  };
+  const base = greedy(maxW);
+  const target = Math.min(maxW, Math.max(width(text) / base.length * 1.15, Math.max(...words.map(width))));
+  const balanced = greedy(target);
+  return balanced.length <= base.length ? balanced : base;
+}
+
 function labelLines(part: Circuit["parts"][0], sym: SymbolDef): string[] {
   const lines = [part.id];
   const value = part.props?.value ?? part.props?.label ?? part.props?.color ?? part.props?.partNumber ?? part.title;
-  if (value) lines.push(sym.kind === "ic" ? value : displayValue(part.type, value));
+  if (value) {
+    if (sym.kind === "ic") lines.push(...wrapLine(value, WRAP_IC_LABEL_AT, WRAP_IC_LABEL_W));
+    else lines.push(displayValue(part.type, value));
+  }
   return lines;
 }
 
-function labelFor(part: Circuit["parts"][0], sym: SymbolDef, o: Orient, ko: Box, avoid: Box[], side?: string): Placed["labels"] {
+function labelFor(part: Circuit["parts"][0], sym: SymbolDef, o: Orient, ko: Box, avoid: Box[], side?: string, freeSide = false, belowPrefer?: "below-left" | "below-right" | "above-right"): Placed["labels"] {
   if (sym.kind === "port") return [];
   const lines = labelLines(part, sym);
   const w = Math.max(...lines.map((l) => measure(l, LABEL_SIZE).width / 10));
   const h = lines.length * LINE;
   const vertical = (sym.kind === "two-pin" || sym.kind === "source") && (o.rot === 90 || o.rot === 270);
+  const wrappedIc = sym.kind === "ic" && lines.length > 2;
+  const hasRightPin = sym.pins.some((p) => xformDir(p.dir, o) === "right");
   const prefer = sym.kind === "ic"
-    ? ["above-left", "above-right", "below-left", "below-right", "above-left-out", "above-right-out", "below-left-out", "below-right-out", "left", "right"]
+    ? (belowPrefer === "below-right"
+      ? ["below-left", "below-right", "below-right-out", "below-left-out", "right", "left", "above-left", "above-right", "above-left-out", "above-right-out"]
+      : belowPrefer === "below-left"
+        ? ["below-left", "below-right", "below-left-out", "below-right-out", "left", "right", "above-left", "above-right", "above-left-out", "above-right-out"]
+        : belowPrefer === "above-right"
+          ? ["above-right", "above-left", "below-right", "below-left", "above-right-out", "below-right-out", "above-left-out", "below-left-out", "right", "left"]
+          : freeSide && wrappedIc && !hasRightPin
+          ? ["right", "above-right", "above-left", "below-right", "below-left", "above-right-out", "below-right-out", "above-left-out", "below-left-out", "left"]
+          : ["above-left", "above-right", "below-left", "below-right", "above-left-out", "above-right-out", "below-left-out", "below-right-out", "left", "right"])
     : vertical ? (sym.kind === "source" ? ["left", "right"] : ["right", "left"]) : sym.labelPrefer;
   const order = side ? [side, ...prefer.filter((x) => x !== side)] : prefer; // label-side override first (SPEC 6.4)
   const gap = 0.4;

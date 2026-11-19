@@ -24,6 +24,8 @@ export interface NetPred {
   /** Number of drawn endpoints on the net. */
   endpoints?: number;
   minEndpoints?: number;
+  /** Reject the net if any endpoint belongs to one of these (part type, pin number) pairs. */
+  forbidPin?: Array<{ type: string; pin: string }>;
 }
 
 export interface SlotPin {
@@ -82,6 +84,10 @@ export type Ref =
  * which members: all of them (default), the first or last, or consecutive pairs (`chain`: `a` is
  * member i + 1, `b` member i). `when` applies the constraint only for some member counts.
  */
+export type When =
+  | { slot: string; min?: number; max?: number }
+  | { net: string; minEndpoints?: number; maxEndpoints?: number };
+
 export interface Rel {
   axis: "x" | "y";
   a: Ref;
@@ -89,7 +95,7 @@ export interface Rel {
   b: Ref;
   c: number;
   each?: "all" | "first" | "last" | "chain";
-  when?: { slot: string; min?: number; max?: number };
+  when?: When;
   /** The constraint keeps the two parts apart sideways, so they need not be stacked in their column. */
   apart?: boolean;
   why: string;
@@ -101,6 +107,7 @@ export interface Trunk {
   points: Array<{ x: Ref | Ref[]; y: Ref | Ref[]; dx?: number; dy?: number; agg?: "min" | "max" }>;
   /** Draw the trunk only if these pins face these ways (an edit may have moved them). */
   require?: Array<{ pin: [string, PinSel]; dir: Dir }>;
+  when?: When;
   why: string;
 }
 
