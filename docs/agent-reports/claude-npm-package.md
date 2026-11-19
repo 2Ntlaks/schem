@@ -2,14 +2,17 @@
 
 Branch `claude/npm-package`, made from `main` at `3fa8f8e`. Work was done in a separate git worktree (`.claude/worktrees/npm-package`), because the main checkout had another agent's uncommitted change to `src/layout/layout.ts`. Nothing was pushed, merged, tagged or published.
 
-## Read this first: the name `schem` is taken on npm
+## Read this first: the package is `schem-cli`, the command is `schem`
 
-`npm view schem` shows a package `schem@1.0.0-preview2` owned by `uneco`, published in 2022: 545 bytes, "Proprietary", no dependencies, no executable. So today:
+`npm view schem` shows a package `schem@1.0.0-preview2` owned by `uneco`, published in 2022: 545 bytes, "Proprietary", no dependencies, no executable. So `npx schem` does not run this project, and publishing as `schem` would be refused.
 
-- `npx schem ...` downloads that package and fails (it has no command). It does not run this project.
-- `npm publish` under the name `schem` would be refused, because the owner of the name is someone else.
+After the first version of this report, the owner chose **`schem-cli`** as the npm name (commit `cb60660`). It was still free on the day of the change, as were `schemcli`, `schem_cli` and `schem.cli`. The `bin` is unchanged, so:
 
-I kept the name `schem` everywhere as the brief asked. `docs/install.md` and the README say plainly that the package is not on npm yet and lead with the install-from-clone path, which works today and is tested. The name report below lists free alternatives. Whatever name is chosen, the command can stay `schem` (see open question 1).
+- `npx schem-cli draw circuit.json` runs the `schem` command (npx runs a package's only bin; `pack:smoke` step 9 checks this);
+- `npm install -g schem-cli` puts `schem` on the PATH;
+- MCP clients use `npx -y schem-cli mcp --root <folder>`.
+
+`docs/install.md` and the README say the package is not on npm yet, lead with the install-from-clone path (works today, tested), and warn not to type `npx schem`. The MCP server still calls itself `schem` in `serverInfo`.
 
 ## Milestones
 
@@ -20,6 +23,7 @@ I kept the name `schem` everywhere as the brief asked. `docs/install.md` and the
 | M3 | `npm run pack:smoke` and a CI job on Windows and Linux | `cef1711` | yes (Linux run only in CI, see below) |
 | M4 | `docs/install.md` and a README Install section | `4de74e4` | yes |
 | M5 | `release.yml` (manual only) and the name report | `cad0705` | yes |
+| Rename | npm name `schem-cli`, chosen by the owner after the name report | `cb60660` | yes |
 
 ## What I did
 
@@ -77,7 +81,7 @@ No existing test, `phase0/`, `tests/fixtures/`, `bench/` or `SPEC.md` file was t
 
 Baseline on `main` (`3fa8f8e`) before any change, in the fresh worktree after `npm ci`: typecheck exit 0; `npm test` 25 files, 585 tests passed; `npm run phase0` 8 of 8 validation cases `valid`.
 
-Every milestone commit was checked with typecheck, test and phase0 (and pack:smoke from M3 on); all passed each time. Output on the final code commit `cad0705` (Windows 11, Node 24.14.0, npm 11.9.0):
+Every milestone commit was checked with typecheck, test and phase0 (and pack:smoke from M3 on); all passed each time. Output on the final code commit `cb60660` (after the rename) (Windows 11, Node 24.14.0, npm 11.9.0):
 
 `npm run typecheck`
 ```
@@ -94,20 +98,20 @@ Every milestone commit was checked with typecheck, test and phase0 (and pack:smo
 
 `npm run phase0` (validation cases)
 ```
-case01-led                     valid                              valid     0        0    0    156
-case02-divider-buffer          valid                              valid     0        0    0    30
-case03-summing                 valid                              valid     0        0    0    26
-case04-hbridge                 valid                              valid     0        0    0    204
-case05-i2c                     valid                              valid     0        0    0    12
-case06-esp32-relay             valid                              valid     0        0    0    18
-case07-two-ic-decoupling       valid                              valid     0        0    0    18
-case08-diffpair                valid                              valid     0        0    0    10
+case01-led                     valid                              valid     0        0    0    136
+case02-divider-buffer          valid                              valid     0        0    0    27
+case03-summing                 valid                              valid     0        0    0    17
+case04-hbridge                 valid                              valid     0        0    0    175
+case05-i2c                     valid                              valid     0        0    0    15
+case06-esp32-relay             valid                              valid     0        0    0    17
+case07-two-ic-decoupling       valid                              valid     0        0    0    17
+case08-diffpair                valid                              valid     0        0    0    8
 ```
 
 `npm run pack:smoke`
 ```
-pack:smoke in C:\Users\ntlak\AppData\Local\Temp\schem-smoke-5L8qpv
-  ok 1  npm pack: schem-0.0.1.tgz, 498.4 kB packed, 1197.0 kB unpacked, 19 files
+pack:smoke in C:\Users\ntlak\AppData\Local\Temp\schem-smoke-16qg2H
+  ok 1  npm pack: schem-cli-0.0.1.tgz, 498.4 kB packed, 1197.1 kB unpacked, 19 files
   ok 2  npm install <tarball> into an empty project: node_modules/.bin/schem exists
   ok 3  schem --version: 0.0.1
   ok 4  installed: draw led, esp32-relay, summing-amp: SVG and PNG byte-identical to the repo's
@@ -115,13 +119,14 @@ pack:smoke in C:\Users\ntlak\AppData\Local\Temp\schem-smoke-5L8qpv
   ok 6  installed: mcp tools/list: schem_create, schem_edit, schem_check, schem_preview, schem_query, schem_render, identical to the repo
   ok 7  installed: mcp schem_create (status valid, same revision and layoutToken) then schem_render: SVG byte-identical to the repo's server
   ok 8  npx --package <tarball> schem --version in an empty folder: 0.0.1
-  ok 9  npx: draw led, esp32-relay, summing-amp: SVG and PNG byte-identical to the repo's
-  ok 10  npx: mcp initialize: serverInfo schem 0.0.1, same instructions as the repo
-  ok 11  npx: mcp tools/list: schem_create, schem_edit, schem_check, schem_preview, schem_query, schem_render, identical to the repo
-  ok 12  npx: mcp schem_create (status valid, same revision and layoutToken) then schem_render: SVG byte-identical to the repo's server
-  ok 13  npm install -g . from the clone (temporary prefix): schem --version 0.0.1
-  ok 14  clone install (npm install -g .): draw led, esp32-relay, summing-amp: SVG and PNG byte-identical to the repo's
-pack:smoke passed: schem-0.0.1.tgz, 498.4 kB, 19 files
+  ok 9  npx <package> --version, without naming the command: 0.0.1 (npx runs the one bin, schem)
+  ok 10  npx: draw led, esp32-relay, summing-amp: SVG and PNG byte-identical to the repo's
+  ok 11  npx: mcp initialize: serverInfo schem 0.0.1, same instructions as the repo
+  ok 12  npx: mcp tools/list: schem_create, schem_edit, schem_check, schem_preview, schem_query, schem_render, identical to the repo
+  ok 13  npx: mcp schem_create (status valid, same revision and layoutToken) then schem_render: SVG byte-identical to the repo's server
+  ok 14  npm install -g . from the clone (temporary prefix): schem --version 0.0.1
+  ok 15  clone install (npm install -g .): draw led, esp32-relay, summing-amp: SVG and PNG byte-identical to the repo's
+pack:smoke passed: schem-cli-0.0.1.tgz, 498.4 kB, 19 files
 ```
 
 Other checks I ran by hand:
@@ -130,16 +135,16 @@ Other checks I ran by hand:
 - **Node 22**: CI uses Node 22, my machine has 24. I ran `dist/schem.js` with Node 22.23.5 (downloaded into the scratch folder, not the repo): `summing-amp` SVG and PNG were byte-identical to the source run on Node 24, and `schem mcp` answered `initialize` and `tools/list`.
 - **`npm link`**: with `NPM_CONFIG_PREFIX` set to a temporary folder, `npm link` in the repo made a working `schem` command; `led` was byte-identical; removed afterwards with `npm uninstall -g`.
 
-### Tarball: 498.4 kB packed, 1197.0 kB unpacked, 19 files
+### Tarball: schem-cli-0.0.1.tgz, 498.4 kB packed, 1197.1 kB unpacked, 19 files
 
 ```
     1068  LICENSE
-   12421  README.md
+   12477  README.md
   757076  dist/fonts/DejaVuSans.ttf
     8816  dist/fonts/LICENSE-DejaVu.txt
   399533  dist/schem.js
     7338  docs/editing.md
-    5808  docs/install.md
+    5905  docs/install.md
     6186  docs/netlist-format.md
     4772  docs/parts.md
     2383  examples/esp32-relay.schem.json
@@ -151,16 +156,16 @@ Other checks I ran by hand:
     2603  examples/sallen-key-filter.schem.json
     2003  examples/summing-amp.schem.json
     1997  examples/wien-bridge.schem.json
-    2024  package.json
+    2028  package.json
 ```
 
-An install into an empty project adds 5 packages: `schem`, `@resvg/resvg-js` with the one prebuilt binary for the system (about 4.4 MB on Windows x64), `opentype.js` and its two small dependencies.
+An install into an empty project adds 5 packages: `schem-cli`, `@resvg/resvg-js` with the one prebuilt binary for the system (about 4.4 MB on Windows x64), `opentype.js` and its two small dependencies.
 
 ## Not done or not verified
 
 - **Linux was not run locally.** This machine has no WSL distribution and no Docker. The `pack-smoke` CI job covers Linux, but it runs only after a push, which I may not do. The script handles both systems (on Windows, `.cmd` shims run through the shell with quoted arguments; on Linux the bins run directly).
 - **The MCP client snippets were not tried inside each client.** Doing so would change the owner's Claude Code, Claude Desktop, Cursor, VS Code or Codex settings. What is tested is the server those snippets start: `schem mcp --root` over stdio, from the tarball, from npx and from the clone. I checked `claude mcp add --help` on this machine to confirm the `claude mcp add <name> -- <command> [args...]` form and the `--scope` option. Codex CLI is not installed here, so its `config.toml` table and `codex mcp add` line come from its documentation, not from a run. The Windows `cmd /c npx` advice for Claude Code and Claude Desktop is a known need for those clients on native Windows; I did not run it.
-- **`npx schem` from the registry** cannot be tested before publishing (and the name is taken). The npx test uses the tarball instead.
+- **`npx schem-cli` from the registry** cannot be tested before publishing. The npx steps use the tarball instead, both naming the `schem` command and naming only the package.
 
 ## Name report
 
@@ -176,11 +181,11 @@ Free names, each checked with `npm view <name>` (404), and also with the dots an
 | `schemwright` | | Distinct and brandable, no clash found on npm; the "-wright" echoes Playwright, which may or may not be wanted. |
 | `@2ntlaks/schem` | | A scoped name keeps `schem` exactly. It needs an npm user or organisation called `2ntlaks` (I could not check who owns that scope; `npm view @2ntlaks/schem` is 404). Scoped packages publish with `--access public`, which `release.yml` already passes. |
 
-For all of these, the `bin` can stay `schem`. With one bin, `npx <package-name> draw x.json` runs it directly, and `npm install -g <package-name>` gives the `schem` command. Nothing was renamed.
+**Chosen: `schem-cli`.** For all of these, the `bin` can stay `schem`. With one bin, `npx <package-name> draw x.json` runs it directly, and `npm install -g <package-name>` gives the `schem` command. Nothing was renamed.
 
 ## Open questions
 
-1. **The npm name** (above). When it is chosen, update `name` in `package.json`, the `npx`/`npm install -g` lines and the warning box in `docs/install.md`, and the README Install section. If the name differs from `schem`, the MCP snippets become `npx -y <package-name> mcp ...`.
+1. **The npm name** is settled as `schem-cli`. Before the first publish, check once more that it is still free (`npm view schem-cli` should give 404).
 2. **Help text from `src/cli.ts` and `src/mcp/server.ts`** still says `npm run schem -- draw ...` and `npm run mcp`, which is wrong for an installed command. That text is in files another agent is changing, so I did not edit it. Suggested change for that agent: say `schem draw ...` and `schem mcp ...` in USAGE and HELP. The bin adds the `schem mcp` lines to `--help` until then. If the CLI later gets its own `mcp` command, `src/bin.ts` can shrink to the CLI alone.
 3. **The build rewrites three source files' text** (`isEntryPoint` in `src/cli.ts` and `src/mcp/main.ts`, the package.json path in `src/mcp/server.ts`). The build fails loudly if they stop matching, but a cleaner fix for the owners of those files would be: export `main`/`run` from a module that does not start itself, and read the version from a single shared helper. Then `scripts/build.ts` needs no rewrites.
 4. **The README ships in the package.** Its Install section says "not on npm yet"; reword it when publishing. Its images use relative links (`docs/assets/...`), and `docs/assets/` is not in the package; check after publishing that they show on npmjs.com, or switch them to absolute GitHub URLs.
