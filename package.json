@@ -9,6 +9,7 @@
     "node": ">=22"
   },
   "scripts": {
+    "build": "tsx scripts/build.ts",
     "test": "vitest run",
     "typecheck": "tsc --noEmit && tsc --noEmit -p web",
     "draw": "tsx scripts/draw.ts",
@@ -28,6 +29,7 @@
   "devDependencies": {
     "@types/node": "22.10.2",
     "@types/opentype.js": "1.3.8",
+    "dejavu-fonts-ttf": "2.37.3",
     "esbuild": "0.25.0",
     "marked": "12.0.2",
     "tsx": "4.19.2",
@@ -36,7 +38,6 @@
   },
   "dependencies": {
     "@resvg/resvg-js": "2.6.2",
-    "dejavu-fonts-ttf": "2.37.3",
     "opentype.js": "1.3.4"
   }
 }
