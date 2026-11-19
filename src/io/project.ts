@@ -18,6 +18,7 @@ import { checkModuleDef, checkPinList, MODULE_LIBRARY, modulePins, type ModuleDe
 
 /** The schema this engine writes. Readers accept any 1.x and refuse a newer major (SPEC 6.6). */
 export const SCHEMA = "schem/1.0";
+export const NEAR_HINT_SCHEMA = "schem/1.1";
 /** `assets.library` written for files that do not name one. */
 export const LIBRARY = "schem-symbols@0.0.1";
 
@@ -73,6 +74,7 @@ const ASSETS = new Set(["library", "definitions"]);
 const LOCK = new Set(["part", "x", "y", "rot", "flip"]);
 const HINT_KEYS: Record<Hint["type"], string[]> = {
   relative: ["part", "rel", "of"],
+  near: ["part", "of"],
   align: ["axis", "parts"],
   orient: ["part", "rot", "flip"],
   pinSides: ["part", "sides"],
@@ -118,6 +120,7 @@ export function loadProject(input: string | unknown, opts: LoadOptions = {}): Lo
   // Schema and shape (SPEC 6.6).
   let shape: LoadedProject["shape"] = "phase0a";
   let schema = SCHEMA;
+  let hintTypes: readonly Hint["type"][] = HINT_TYPES.filter((type) => type !== "near");
   if (doc.schema !== undefined) {
     const m = isStr(doc.schema) ? /^schem\/(\d+)\.(\d+)$/.exec(doc.schema) : null;
     if (!m) return fail("E101", `schema "${String(doc.schema)}" is not of the form "schem/MAJOR.MINOR".`);
@@ -125,6 +128,7 @@ export function loadProject(input: string | unknown, opts: LoadOptions = {}): Lo
     if (Number(m[1]) < 1) return fail("E101", `schema ${doc.schema} is not supported (this engine reads schem/1.x).`);
     shape = "schem";
     schema = doc.schema as string;
+    if (Number(m[2]) >= 1) hintTypes = HINT_TYPES;
   }
 
   // meta
@@ -225,7 +229,7 @@ export function loadProject(input: string | unknown, opts: LoadOptions = {}): Lo
     unknown("intent", it, INTENT);
     if (it.hints !== undefined) {
       if (!Array.isArray(it.hints)) err("E102", "intent.hints must be a list.", "intent.hints");
-      else intent.hints = it.hints.flatMap((h, i) => { const r = parseHint(h, i, unknownFields); if ("error" in r) { errors.push(r.error); return []; } return [r.hint]; });
+      else intent.hints = it.hints.flatMap((h, i) => { const r = parseHint(h, i, unknownFields, hintTypes); if ("error" in r) { errors.push(r.error); return []; } return [r.hint]; });
     }
     if (it.locks !== undefined) {
       if (!Array.isArray(it.locks)) err("E102", "intent.locks must be a list.", "intent.locks");
@@ -287,17 +291,20 @@ export function loadProject(input: string | unknown, opts: LoadOptions = {}): Lo
   return { ok: true, project, pinDefs, errors, warnings, missingTypes };
 }
 
-function parseHint(h: unknown, i: number, unknownFields: string[]): { hint: Hint } | { error: Issue } {
+function parseHint(h: unknown, i: number, unknownFields: string[], types: readonly Hint["type"][]): { hint: Hint } | { error: Issue } {
   const bad = (message: string): { error: Issue } => ({ error: { code: "E260", message: `hint ${i + 1}: ${message}`, at: "intent.hints" } });
   if (!isObj(h)) return bad("not an object.");
   if (!isStr(h.id) || !/^[A-Za-z][A-Za-z0-9_]*$/.test(h.id)) return bad("id is missing.");
   const type = h.type as Hint["type"];
-  if (!HINT_TYPES.includes(type)) return bad(`type "${String(h.type)}" is not supported (supported: ${HINT_TYPES.join(", ")}).`);
+  if (!types.includes(type)) return bad(`type "${String(h.type)}" is not supported (supported: ${types.join(", ")}).`);
   const priority = (h.priority ?? "normal") as HintPriority;
   if (priority !== "strict" && priority !== "high" && priority !== "normal") return bad(`priority must be strict, high or normal.`);
   for (const k of Object.keys(h)) if (k !== "id" && k !== "type" && k !== "priority" && !HINT_KEYS[type].includes(k)) unknownFields.push(`intent.hints[${h.id}].${k}`);
   const id = h.id;
   switch (type) {
+    case "near":
+      if (!isStr(h.part) || !isStr(h.of)) return bad("near needs part and of.");
+      return { hint: { id, type, part: h.part, of: h.of, priority } };
     case "relative":
       if (!isStr(h.part) || !isStr(h.of) || !["right-of", "left-of", "above", "below"].includes(h.rel as string)) return bad("relative needs part, rel (right-of, left-of, above, below) and of.");
       return { hint: { id, type, part: h.part, rel: h.rel as "above", of: h.of, priority } };
