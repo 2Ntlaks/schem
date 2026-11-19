@@ -4,8 +4,8 @@
 
 - **Branch:** `neon/bench-15` (branched from `main` at `3fa8f8e`)
 - **Starting total ("before"):** `1075.4` across 18 circuits (18 of 18 valid)
-- **Final total ("after"):** `910.0` across 18 circuits (18 of 18 valid)
-- **Reduction:** `-165.4` points (**15.38%** cut; target was at least 15%, or at most `914.0`)
+- **Final total ("after", including Fix round):** `908.1` across 18 circuits (18 of 18 valid; `910.0` after Rounds 1-9)
+- **Reduction:** `-167.3` points (**15.56%** cut; target was at least 15%, or at most `914.0`)
 - **Per-circuit regressions:** 0 (13 circuits improved, 5 kept the same score, 0 scored worse)
 - **Stale checked-in baseline (`bench/baseline.json`):** `1167.1` (not modified, per instructions)
 
@@ -45,8 +45,8 @@ The benchmark runner (`npm run bench`, which executes `scripts/bench.ts`) draws 
 | `regulator` | 40.3 | 38.9 | -1.4 | yes |
 | `schmitt` | 41.7 | 32.6 | -9.1 | yes |
 | `sensor-node` | 142.8 | 92.1 | -50.7 | yes |
-| `shift` | 75.0 | 55.7 | -19.3 | yes |
-| **Total** | **1075.4** | **910.0** | **-165.4 (-15.38%)** | **14 changed** |
+| `shift` | 75.0 | 53.8 | -21.2 | yes |
+| **Total** | **1075.4** | **908.1** | **-167.3 (-15.56%)** | **14 changed** |
 
 Note on `ne555`: its score stayed `41.3`, and its SVG changed slightly in Round 8 because the horizontal-first 3+-pin net ordering shifted one bend on the `DIS` net slightly to the right (same bend count and wire length).
 
@@ -306,6 +306,136 @@ EXIT: 0
 
 1. **Snapshot lock on `generated-30-16` (`tests/findings-snapshot.test.ts`):** Adding `reserve: ["T"]` to `OPAMP_INVERTING` cleanly removes the `squeezedRuns` finding on both `differentiator` (`63.0 -> 58.7`) and `generated-30-16`, and relaxing same-direction vertical pin leveling beyond transistors could help other circuits. Both were left out because `tests/findings-snapshot.test.ts` pins the old layout hash and findings array for `generated-30-16` and `tests/` could not be edited. Question for maintainers: should `OPAMP_INVERTING` reserve `"T"` and have the snapshot refreshed in a follow-up?
 2. **Voltage regulators with wired rails (Open Job 1 in `docs/general-layout.md`):** Turning `IN` and `OUT` on a 3-terminal regulator (`regulator`) into a left-to-right wired rail instead of named power ports requires coordinated changes in `ports.ts` (deciding which rail nets stay wired vs. become ports) and `decoupling.ts`. Simply moving `power_in` and `power_out` pins to the left and right sides in `icFor` while keeping ports regressed `sensor-node` (`92.1 -> 103.9`). Left for a dedicated follow-up issue.
-3. **Convention finding `C13-C1` on `shift`:** `C1` sits on `5V` alongside two ICs (`U1`, `U2`) without a `decouples` hint. `tests/decoupling.test.ts` explicitly requires the decoupling matcher not to guess a host IC when multiple ICs share a rail without hints, so `C1` stays a standalone floating bypass capacitor in column 0 rather than attaching as a decoupling child slot.
+3. **Convention finding `C13-C1` on `shift` (resolved in Fix round):** In Rounds 1-9, `C1` stayed far from `U1` (`conv = 1`). The Fix round below moves left-side floating bypass capacitors directly beside their column-0 IC with outward labels, placing `C1` within `8 G` of `U1[VCC]` and clearing `C13-C1` (`conv = 0`) without guessing a `decoupling@1:` slot.
 4. **Voltage-divider stagger direction on `sensor-node`:** On `sensor-node`, `R1`/`R2` has 4 tap endpoints (`R1`, `R2`, `C1`, and `U1`), so Round 2 staggers `R2` 2 G right even though all downstream parts sit on the right. Visually and score-wise it is neutral, and could later be refined to trigger only when the tap has endpoints on both left and right sides.
 5. **Held-out test set:** Per `AGENTS.md`, nothing under `phase0/cases/test/`, `phase0/cases/edits/case11-*`, `baselines/LOG-test.md`, `baselines/out/*/test/`, or `baselines/out/_netlist/test/` was read or executed, and neither `npm run gates -- --test` nor `npm run phase0 -- --test` was run. `bench/baseline.json` was not updated (`npm run bench -- --update` was not run).
+
+---
+
+## Fix round
+
+Follow-up commit `f863731` addressed both drawings flagged in review using general rules in `src/layout/layout.ts` and `src/layout/flow.ts`.
+
+### Changes made (`f863731`)
+
+1. **Keep tucked port-only blocks out of wire paths (`src/layout/layout.ts`):**
+   - In the Round 6 rule that tucks standalone port-only headers and ICs into a shorter column, skip any candidate column `c` crossed by a wired net whose endpoints lie strictly on both sides of `c` (`min(cols) < c && max(cols) > c`).
+   - Also require the target column to have enough vertical slack to absorb the block without exceeding the home column's height (`colH(c) + idH <= curH`), so a block does not jump across the sheet for a negligible height difference.
+   - Effect on `case07-two-ic-decoupling`: connector `J1` (`5V IN`) stays alone at the top-left instead of moving between `U1` and `U2`, and both `SDA` and `SCL` bus wires run straight with zero detours. Benchmark `mcu` (`72.0`) and `sensor-node` (`92.1`) keep their exact Round 6 gains.
+
+2. **Place floating bypass capacitors beside their column-0 IC (`src/layout/flow.ts`, `src/layout/layout.ts`):**
+   - Replaced Round 7's bottom-of-column stacking rule (`col = base` plus post-sweep bottom-push) with placing floating bypass capacitors immediately to the left of column `base` (`col = base - k/64`) when no rail driver feeds the rail and column `base` already hosts an IC on that rail.
+   - When a port-only bypass capacitor sits in the column directly to the left of an IC on its supply rail, prefer `"left"` for the capacitor's label (outward, matching `decoupling@1` left-side convention) and prefer right-side label slots for the IC so the IC's label does not push the capacitor away from its supply pin.
+   - In incremental edits (`opts.previous`), clamp a newly added unattached part's column to at least `minOld` so adding a new floating capacitor (as in `case05-add-part`) does not insert a column left of the existing schematic and slide untouched parts right.
+   - Effect on `shift`: `C1` sits directly beside `U1` at the top-left, completely outside the `U1`-to-`U2` bus channel, within 8 G of `U1[VCC]`. This clears the `C13-C1` convention warning (`conv: 1 -> 0`) and lowers `shift` from `55.7` to **`53.8`** (updated image in `docs/agent-reports/img/neon-bench-15/shift-after.png` and `sheet-after.png`). Total benchmark score drops from `910.0` to **`908.1`** (**-167.3** points, **15.56%** cut from `1075.4`), with every other benchmark circuit unchanged.
+
+### Comparison of all 8 validation drawings against `main`
+
+Built `main` (`d3fe269`) in a separate detached git worktree (`out/main-wt`, removed after comparison) and ran `npm run phase0` in both worktrees. Every changed validation PNG was opened and compared side by side with `main`.
+
+| Validation case | Diff vs `main` | One-line verdict |
+|---|---|---|
+| `case01-led` | identical | Unchanged from `main` (byte-identical SVG). |
+| `case02-divider-buffer` | changed | Better: `R2` staggers 2 G right and `U1` flips `IN+` to the top so the divider tap runs straight through `C1` into `U1` with no jog. |
+| `case03-summing` | identical | Unchanged from `main` (byte-identical SVG). |
+| `case04-hbridge` | identical | Unchanged from `main` (byte-identical SVG). |
+| `case05-i2c` | identical | Unchanged from `main` (byte-identical SVG). |
+| `case06-esp32-relay` | identical | Unchanged from `main` (byte-identical SVG). |
+| `case07-two-ic-decoupling` | changed | Better/neutral: `J1` stays at top-left and both `SDA`/`SCL` bus wires run straight as on `main`; only `U2`'s label moves to bottom-right under `C3`/`C4`, trimming 30 px of width. |
+| `case08-diffpair` | changed | Neutral/slightly cleaner: identical topology and routing, with `V2` shifted 1 G down to give `V3`'s bottom wire 3 G clearance above `V2`'s `+12V` port. |
+
+### Verification output on Fix round commit (`f863731`)
+
+#### 1. `npm run typecheck`
+
+```text
+> schem@0.0.1 typecheck
+> tsc --noEmit && tsc --noEmit -p web
+
+EXIT: 0
+```
+
+#### 2. `npm test`
+
+```text
+> schem@0.0.1 test
+> vitest run
+
+ Test Files  25 passed (25)
+      Tests  585 passed (585)
+   Start at  16:49:40
+   Duration  7.33s (transform 3.51s, setup 0ms, collect 14.58s, tests 34.01s, environment 7ms, prepare 6.17s)
+
+EXIT: 0
+```
+
+#### 3. `npm run phase0`
+
+```text
+> schem@0.0.1 phase0
+> tsx scripts/phase0.ts
+
+case                           status                             verifier  overlaps conv read ms
+case01-led                     valid                              valid     0        0    0    69
+case02-divider-buffer          valid                              valid     0        0    0    29
+case03-summing                 valid                              valid     0        0    0    7
+case04-hbridge                 valid                              valid     0        0    0    100
+case05-i2c                     valid                              valid     0        0    0    7
+case06-esp32-relay             valid                              valid     0        0    0    10
+case07-two-ic-decoupling       valid                              valid     0        0    0    10
+case08-diffpair                valid                              valid     0        0    0    6
+
+edit script                status                             expect as exp affected mode                gate 4
+case03-longer-value        saved                              true   true   same     incremental         pass (untouched 8, mean 0 G, max 0 G, other routes 0)
+case03-add-part            saved                              true   true   same     incremental         pass (untouched 3, mean 0 G, max 0 G, other routes 0)
+case03-remove-part         saved                              true   true   differs  incremental         pass (untouched 6, mean 0 G, max 0 G, other routes 0)
+    affected: frozen expect (rev C.2 table) Rf U1 V1 V2 V3; recomputed (rev C.3, used by gate 4) Rf U1
+case03-pin-sides           rejected (invalid_input)           either true   -        -                   -
+    E270 setPinSides: U1 is the fixed "opamp" symbol; only generated boxes (ic, header, modules) have pin sides. The same arrangement is setOrientation { part: "U1", rot: 180, flip: true }.
+case05-longer-value        saved                              true   true   same     incremental         pass (untouched 4, mean 1 G, max 4 G, other routes 1)
+case05-add-part            saved                              true   true   differs  incremental         pass (untouched 5, mean 0 G, max 0 G, other routes 0)
+    affected: frozen expect (rev C.2 table) C1 R1 R2 U1 U2 U3; recomputed (rev C.3, used by gate 4) C1
+case05-remove-part         saved                              true   true   same     incremental         pass (untouched 0, mean 0 G, max 0 G, other routes 0)
+case05-pin-sides           saved                              true   true   same     incremental         pass (untouched 4, mean 0 G, max 0 G, other routes 0)
+case07-longer-value        saved                              true   true   same     incremental         pass (untouched 9, mean 0 G, max 0 G, other routes 0)
+case07-add-part            saved                              true   true   differs  incremental         pass (untouched 8, mean 0 G, max 0 G, other routes 0)
+    affected: frozen expect (rev C.2 table) C1 C2 C3 C4 C5 J1 R1 U1 U2; recomputed (rev C.3, used by gate 4) C5 R1 U1
+case07-remove-part         saved                              true   true   differs  incremental         pass (untouched 8, mean 0.5 G, max 4 G, other routes 0)
+    affected: frozen expect (rev C.2 table) C1 C2 C3 J1 R1 R2 R3 U1 U2; recomputed (rev C.3, used by gate 4) U2
+case07-pin-sides           saved                              true   true   same     incremental         pass (untouched 9, mean 0 G, max 0 G, other routes 0)
+
+wrote out/phase0/ (validation, edits)
+EXIT: 0
+```
+
+#### 4. `npm run bench` (and `npm run bench -- --check`)
+
+```text
+> schem@0.0.1 bench
+> tsx scripts/bench.ts
+
+circuit           status                   score     was  cross  bends  wire  conv  limit  back  upstr
+ce-amp            valid                     39.9      47      0      3    66     0      0     0      0 better
+current-sink      valid                     28.7    36.3      0      2    49     0      0     0      0 better
+darlington        valid                     36.3    41.6      0      5    59     0      0     0      0 better
+debounce          valid                     25.9    25.9      0      1    49     0      0     0      0
+differentiator    valid                       63      63      0      7    87     0      1     0      0
+follower          valid                       31    38.1      0      2    45     0      0     0      0 better
+highside          valid                     28.4    28.4      0      2    37     0      0     0      0
+inamp             valid                     75.3    89.4      0     10   191     0      0     0      0 better
+levelshift        valid                     67.9    77.5      0     12   147     0      0     0      0 better
+mcu               valid                       72    86.8      0     10   140     0      0     0      0 better
+mixer-ce          valid                     56.4    63.5      0      8    93     0      0     0      0 better
+multivibrator     valid                     63.3    68.7      2      2    74     0      0     1      0 better
+ne555             valid                     41.3    41.3      0      5    78     0      0     0      0
+pushpull          valid                     61.3   134.2      0      7   139     0      0     0      0 better
+regulator         valid                     38.9    40.3      0      5    35     0      0     0      0 better
+schmitt           valid                     32.6    41.7      0      3    58     0      0     0      0 better
+sensor-node       valid                     92.1   142.8      0      8   152     0      0     0      0 better
+shift             valid                     53.8   100.6      0      4   122     0      0     0      0 better
+
+18 circuits, 18 valid. Total score 908.1 (baseline 1167.1). Images: out/bench/index.html
+EXIT: 0
+```
+
+`npm run bench -- --check` produced the identical table and exited with code `0`.
