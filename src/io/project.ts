@@ -45,6 +45,8 @@ export interface LoadedProject extends Project {
   layoutCache?: unknown;
   /** Fields outside `ext` this version does not know (SPEC 6.6): the file renders, edits are refused. */
   unknownFields: string[];
+  /** Empty unknown fields can be dropped by text conversion (SPEC 8.3). */
+  emptyUnknownFields?: string[];
 }
 
 export interface LoadResult {
@@ -105,10 +107,18 @@ export function readProject(path: string, opts: LoadOptions = {}): LoadResult {
 
 /** Load a project from JSON text or an already parsed object. Never throws on bad input. */
 export function loadProject(input: string | unknown, opts: LoadOptions = {}): LoadResult {
-  const errors: Issue[] = [], warnings: Issue[] = [], unknownFields: string[] = [];
+  const errors: Issue[] = [], warnings: Issue[] = [], unknownFields: string[] = [], emptyUnknownFields: string[] = [];
   const fail = (code: string, message: string, at?: string): LoadResult => ({ ok: false, errors: [...errors, { code, message, ...(at ? { at } : {}) }], warnings, missingTypes: [] });
   const err = (code: string, message: string, at?: string) => errors.push({ code, message, ...(at ? { at } : {}) });
-  const unknown = (where: string, o: Obj, known: ReadonlySet<string>) => { for (const k of Object.keys(o)) if (!known.has(k)) unknownFields.push(`${where}${where ? "." : ""}${k}`); };
+  const unknown = (where: string, o: Obj, known: ReadonlySet<string>) => {
+    for (const [key, value] of Object.entries(o)) {
+      if (known.has(key)) continue;
+      const field = `${where}${where ? "." : ""}${key}`;
+      unknownFields.push(field);
+      if (value == null || value === "" || (isObj(value) || Array.isArray(value)) && !Object.keys(value).length)
+        emptyUnknownFields.push(field);
+    }
+  };
 
   let doc: unknown = input;
   if (isStr(input)) {
@@ -172,6 +182,11 @@ export function loadProject(input: string | unknown, opts: LoadOptions = {}): Lo
     const id = raw.id, type = raw.type;
     if (!isStr(id) || !PART_ID.test(id)) { err("E102", `part ${i + 1}: id ${JSON.stringify(id)} must match ^[A-Za-z][A-Za-z0-9_]*$.`); continue; }
     if (!isStr(type) || !type) { err("E102", `part ${id}: type is missing.`, id); continue; }
+    if (type in BUILTIN && !Object.hasOwn(BUILTIN, type)) {
+      missing.add(type);
+      err("E201", `unknown part type "${type}" (${id}).`, id);
+      continue;
+    }
     unknown(`circuit.parts[${id}]`, raw, PART);
     const part: Part = { id, type };
     if (raw.props !== undefined) {
@@ -229,7 +244,7 @@ export function loadProject(input: string | unknown, opts: LoadOptions = {}): Lo
     unknown("intent", it, INTENT);
     if (it.hints !== undefined) {
       if (!Array.isArray(it.hints)) err("E102", "intent.hints must be a list.", "intent.hints");
-      else intent.hints = it.hints.flatMap((h, i) => { const r = parseHint(h, i, unknownFields, hintTypes); if ("error" in r) { errors.push(r.error); return []; } return [r.hint]; });
+      else intent.hints = it.hints.flatMap((h, i) => { const r = parseHint(h, i, unknown, hintTypes); if ("error" in r) { errors.push(r.error); return []; } return [r.hint]; });
     }
     if (it.locks !== undefined) {
       if (!Array.isArray(it.locks)) err("E102", "intent.locks must be a list.", "intent.locks");
@@ -285,13 +300,14 @@ export function loadProject(input: string | unknown, opts: LoadOptions = {}): Lo
   if (errors.length) return { ok: false, errors, warnings, missingTypes };
   const project: LoadedProject = {
     schema, shape, meta, circuit, intent, assets, ext, unknownFields,
+    ...(emptyUnknownFields.length ? { emptyUnknownFields } : {}),
     ...(doc.layout !== undefined ? { layoutCache: structuredClone(doc.layout) } : {}),
   };
   if (unknownFields.length) warnings.push({ code: "W105", message: `the file uses fields this engine does not know (${unknownFields.join(", ")}). It can be drawn, but edits are refused (SPEC 6.6).` });
   return { ok: true, project, pinDefs, errors, warnings, missingTypes };
 }
 
-function parseHint(h: unknown, i: number, unknownFields: string[], types: readonly Hint["type"][]): { hint: Hint } | { error: Issue } {
+function parseHint(h: unknown, i: number, unknown: (where: string, value: Obj, known: ReadonlySet<string>) => void, types: readonly Hint["type"][]): { hint: Hint } | { error: Issue } {
   const bad = (message: string): { error: Issue } => ({ error: { code: "E260", message: `hint ${i + 1}: ${message}`, at: "intent.hints" } });
   if (!isObj(h)) return bad("not an object.");
   if (!isStr(h.id) || !/^[A-Za-z][A-Za-z0-9_]*$/.test(h.id)) return bad("id is missing.");
@@ -299,7 +315,7 @@ function parseHint(h: unknown, i: number, unknownFields: string[], types: readon
   if (!types.includes(type)) return bad(`type "${String(h.type)}" is not supported (supported: ${types.join(", ")}).`);
   const priority = (h.priority ?? "normal") as HintPriority;
   if (priority !== "strict" && priority !== "high" && priority !== "normal") return bad(`priority must be strict, high or normal.`);
-  for (const k of Object.keys(h)) if (k !== "id" && k !== "type" && k !== "priority" && !HINT_KEYS[type].includes(k)) unknownFields.push(`intent.hints[${h.id}].${k}`);
+  unknown(`intent.hints[${h.id}]`, h, new Set(["id", "type", "priority", ...HINT_KEYS[type]]));
   const id = h.id;
   switch (type) {
     case "near":

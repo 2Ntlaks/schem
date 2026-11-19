@@ -94,7 +94,8 @@ function netLine(net: Net, fail: (field: string) => void): string {
 }
 
 export function formatDsl(project: LoadedProject): DslFormatResult {
-  const fields = new Set(project.unknownFields);
+  const emptyUnknown = new Set(project.emptyUnknownFields);
+  const fields = new Set(project.unknownFields.filter((field) => !emptyUnknown.has(field)));
   const fail = (field: string) => { fields.add(field); };
   if (project.schema !== SCHEMA && project.schema !== NEAR_HINT_SCHEMA) fail("schema");
   if (project.meta.created) fail("meta.created");

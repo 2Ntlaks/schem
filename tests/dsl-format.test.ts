@@ -56,6 +56,16 @@ describe("JSON to text DSL", () => {
     expect(compiled.project!.circuit.nets[0]?.id).toBe("n1");
   });
 
+  it("allows empty unknown JSON fields to be dropped in text conversion", () => {
+    const loaded = loadProject({
+      meta: { customDate: "" },
+      future: {},
+      circuit: { parts: [{ id: "R1", type: "resistor" }], nets: [] },
+    });
+    expect(loaded.errors).toEqual([]);
+    expect(formatDsl(loaded.project!)).toEqual({ ok: true, source: "part R1 resistor\n" });
+  });
+
   it("lists every lossy field instead of printing partial text", () => {
     const loaded = loadProject({
       schema: "schem/1.0",

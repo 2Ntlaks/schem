@@ -50,6 +50,8 @@ esp32-relay: valid. Wrote out/esp32-relay.svg and out/esp32-relay.png (190 ms)
 
 Eight circuits to try are in [`examples/`](examples/). Add `-o <folder>` to write somewhere else. The exit code is `0` for a valid drawing, `1` when the drawing has problems (the files are still written and the problems listed), and `2` when the file could not be drawn, with a message saying what is wrong and where.
 
+For a short text netlist, try `npm run schem -- check examples/led.schem`. [Text schematic guide](docs/dsl.md).
+
 To change a circuit without reshuffling its drawing, list the changes in a small JSON file and run `npm run schem -- edit <file> --ops <changes.json>`. [`docs/editing.md`](docs/editing.md) shows how.
 
 ## How it works

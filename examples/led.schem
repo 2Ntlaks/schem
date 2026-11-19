@@ -1,0 +1,10 @@
+circuit "LED with a current-limiting resistor"
+style theme=clean
+
+part B1 battery 9V
+part R1 resistor 470
+part D1 led color=red
+
+net PWR = B1.+ R1.1
+connect R1.2 D1.anode
+net GND = D1.cathode B1.-

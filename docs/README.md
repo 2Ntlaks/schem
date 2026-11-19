@@ -2,6 +2,7 @@
 
 ## Using schem
 
+- [Text schematic guide](dsl.md) covers `.schem` files, CLI commands and diagnostics.
 - [`netlist-format.md`](netlist-format.md): how to write a circuit file by hand.
 - [`editing.md`](editing.md): how to change a circuit with `schem edit` without reshuffling its drawing.
 - The playground (`web/`): the engine in a web page, a circuit file on the left and the verified drawing on the right. `npm run web:serve` runs it on http://localhost:8080; it is published to GitHub Pages once the repository is public.

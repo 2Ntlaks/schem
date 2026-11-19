@@ -118,6 +118,8 @@ describe("text DSL", () => {
     ["part R1 resistor 470\nnet A = R1.3", "E104", "2:9-2:13", "R1 (resistor) has pins 1, 2"],
     ["part U1 ic pins: 14:GND 29:GND 38:GND\nnet G = U1.GND", "E106", "2:9-2:15", "Use U1[14] or U1[29] or U1[38]"],
     ["part R1 resister 470", "E201", "1:9-1:17", 'Did you mean "resistor"?'],
+    ["part R1 constructor", "E201", "1:9-1:20", 'unknown part type "constructor"'],
+    ["net X = constructor.a", "E251", "1:9-1:22", 'unknown part "constructor"'],
     ["part D1 led\nnet PWR = D1.a\nnet ABC = D1.anode", "E220", "3:1-3:19", "PWR (line 2)"],
     ["part U1 ic pins: 14:GND@gnd 29:GND@gnd\nnet G = U1{gnd}\nnet SIG = U1[14]", "E222", "3:1-3:17", "would short them"],
     ["part R1 resistor 4,7k", "E310", "1:18-1:22", 'Did you mean "4.7k"?'],
