@@ -77,6 +77,8 @@ export interface LayoutOptions {
   staggerBranches?: boolean;
   /** Pin order for generated IC boxes, from a first layout (set by the layout itself, see "Pin order"). */
   pinOrder?: Record<string, Partial<Record<Side, string[]>>>;
+  /** Vertical flip for non-template op-amps, from a first layout so IN+ / IN- match connected heights. */
+  opampOrient?: Record<string, Orient>;
 }
 
 const LABEL_SIZE = 12;   // SVG units (1.2 G)
@@ -305,6 +307,7 @@ export function layout(project: Project, opts: LayoutOptions = {}): LayoutResult
     else if (oh) orient = { rot: oh.rot, flip: oh.flip };
     else if (prev) orient = prev.orient;
     else if (to) orient = to;
+    else if (opts.opampOrient?.[id]) orient = opts.opampOrient[id]!;
     const ko = xformBox(keepOut(sym), [0, 0], orient);
     const pins = sym.pins
       .filter((p) => drawnNet.has(`${id}[${p.number}]`) || ncSet.has(`${id}[${p.number}]`) || sym.kind !== "ic")
@@ -961,32 +964,53 @@ export function layout(project: Project, opts: LayoutOptions = {}): LayoutResult
     ...(regionOf.has(b) ? { template: regionOf.get(b)!.key, links: regionOf.get(b)!.links } : {}) }));
   const result: LayoutResult = { status: failed.length ? "budget_exhausted" : lowConfidence ? "valid_low_confidence" : "valid", render, pinDefs: defs, issues: failed.map((f) => `could not route ${f}`), notes, state: stateOf(), blocks };
   // Pin order: on the left and right of a generated IC box, the pins follow the height of what they
-  // connect to. The first layout shows where that is; a second layout with the pins in that order
-  // is kept only if it has fewer crossings, then fewer bends, then less wire.
-  if (!failed.length && !opts.previous && !place && !opts.pinOrder) {
+  // connect to; on a free op-amp, IN+ and IN- follow the height of what they connect to (keeping
+  // OUT facing right). The first layout shows where that is; a second layout with that order is
+  // kept only if it has fewer crossings, then fewer bends, then less wire.
+  if (!failed.length && !opts.previous && !place && !opts.pinOrder && !opts.opampOrient) {
     const want: NonNullable<LayoutOptions["pinOrder"]> = {};
+    const wantOpamp: Record<string, Orient> = {};
+    const pinHeight = (id: string, num: string, o: Pt): number | undefined => {
+      const net = drawnNet.get(`${id}[${num}]`);
+      if (net === undefined) return undefined;
+      if (portNet.has(net)) {
+        const lvl = railLevel(netById.get(net)!);
+        return lvl === 1 ? o[1] - 100 : lvl === 0 || lvl === -1 ? o[1] + 100 : undefined;
+      }
+      const others = el.pins.filter((q) => q.part !== id && drawnNet.get(`${q.part}[${q.number}]`) === net);
+      return others.length ? others.reduce((sum, q) => sum + q.at[1], 0) / others.length : undefined;
+    };
     for (const id of ids) {
       const P = placed.get(id)!;
-      if (P.sym.kind !== "ic" || sidesHint.has(id) || regionOf.has(id) || linkOf.has(id)) continue;
+      if (regionOf.has(id) || linkOf.has(id)) continue;
       const o = at(id);
-      const heightOf = (num: string): number | undefined => {
-        const net = drawnNet.get(`${id}[${num}]`);
-        if (net === undefined || portNet.has(net)) return undefined;
-        const others = el.pins.filter((q) => q.part !== id && drawnNet.get(`${q.part}[${q.number}]`) === net);
-        return others.length ? others.reduce((sum, q) => sum + q.at[1], 0) / others.length : undefined;
-      };
-      for (const side of ["left", "right"] as const) {
-        const now = P.pins.filter((q) => q.dir === side).sort((a, b) => a.at[1] - b.at[1]).map((q, i) => ({ n: q.number, y: heightOf(q.number) ?? o[1] + q.at[1], i }));
-        const sorted = [...now].sort((a, b) => a.y - b.y || a.i - b.i);
-        if (sorted.some((k, i) => k.n !== now[i]!.n)) (want[id] ??= {})[side] = sorted.map((k) => k.n);
+      if (P.sym.kind === "ic" && !sidesHint.has(id)) {
+        for (const side of ["left", "right"] as const) {
+          const now = P.pins.filter((q) => q.dir === side).sort((a, b) => a.at[1] - b.at[1]).map((q, i) => ({ n: q.number, y: pinHeight(id, q.number, o) ?? o[1] + q.at[1], i }));
+          const sorted = [...now].sort((a, b) => a.y - b.y || a.i - b.i);
+          if (sorted.some((k, i) => k.n !== now[i]!.n)) (want[id] ??= {})[side] = sorted.map((k) => k.n);
+        }
+      } else if (partOf.get(id)!.type === "opamp" && !locks.has(id) && !orientHint.has(id)) {
+        const inMinus = P.pins.find((q) => q.number === "2"), inPlus = P.pins.find((q) => q.number === "3");
+        if (!inMinus || !inPlus || inMinus.dir !== "left" || inPlus.dir !== "left") continue;
+        const ym = pinHeight(id, "2", o), yp = pinHeight(id, "3", o);
+        if (ym === undefined || yp === undefined || ym === yp) continue;
+        const plusOnTop = yp < ym;
+        const isPlusOnTop = inPlus.at[1] < inMinus.at[1];
+        if (plusOnTop !== isPlusOnTop) wantOpamp[id] = plusOnTop ? { rot: 180, flip: true } : { rot: 0, flip: false };
       }
     }
-    if (Object.keys(want).length) {
-      const again = layout(project, { ...opts, pinOrder: want });
+    if (Object.keys(want).length || Object.keys(wantOpamp).length) {
+      const again = layout(project, {
+        ...opts,
+        ...(Object.keys(want).length ? { pinOrder: want } : {}),
+        ...(Object.keys(wantOpamp).length ? { opampOrient: wantOpamp } : {}),
+      });
       if (again.status === result.status && again.render) {
         const a = checkDrawing(circuit, defs, render).metrics, b = checkDrawing(circuit, again.pinDefs, again.render).metrics;
         if (b.crossings < a.crossings || (b.crossings === a.crossings && (b.bends < a.bends || (b.bends === a.bends && b.wireLength < a.wireLength)))) {
-          again.notes.push(`pin order: ${Object.keys(want).sort(cmpStr).join(", ")} drawn with pins in the order of their connections`);
+          if (Object.keys(want).length) again.notes.push(`pin order: ${Object.keys(want).sort(cmpStr).join(", ")} drawn with pins in the order of their connections`);
+          if (Object.keys(wantOpamp).length) again.notes.push(`opamp orient: ${Object.keys(wantOpamp).sort(cmpStr).join(", ")} flipped vertically to match input heights`);
           return again;
         }
       }
