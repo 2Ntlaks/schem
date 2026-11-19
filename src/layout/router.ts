@@ -4,7 +4,14 @@ import { cmpStr, DIRS, step, type Box, type Dir, type Pt } from "../geom/geom.js
 import { edgeForbidden, pointBlocked, type Obstacle } from "../geom/forbidden.js";
 
 export interface Terminal { id: string; at: Pt; dir: Dir }
-export interface NetRequest { net: string; terminals: Terminal[]; prewired?: Array<[Pt, Pt]>; noRoute?: boolean }
+export interface NetRequest {
+  net: string;
+  terminals: Terminal[];
+  prewired?: Array<[Pt, Pt]>;
+  noRoute?: boolean;
+  /** Prewired points that already hold a supply symbol. The search must not join them (a port needs exactly one wire). */
+  seal?: Pt[];
+}
 export interface RoutedNet { net: string; edges: Array<[Pt, Pt]>; failed: string[] }
 
 // hug: a unit step alongside another net's wire on the adjacent track (a squeezed run);
@@ -87,13 +94,15 @@ export function route(requests: NetRequest[], obstacles: Obstacle[], bounds: Box
     const failed: string[] = [];
     const tree = new Set<number>(); // points that may be joined
     const treeDeg = new Map<number, number>();
+    const sealed = new Set((r.seal ?? []).map(pid));
+    const joinable = (k: number) => !pinPoint.has(k) && !sealed.has(k);
     const addTreeEdge = (a: Pt, b: Pt) => {
       markEdge(r.net, a, b);
       edges.push([a, b]);
       for (const p of [a, b]) { const k = pid(p); treeDeg.set(k, (treeDeg.get(k) ?? 0) + 1); }
-      for (const p of [a, b]) { const k = pid(p); if (!pinPoint.has(k) && (treeDeg.get(k) ?? 0) < 3) tree.add(k); else tree.delete(k); }
+      for (const p of [a, b]) { const k = pid(p); if (joinable(k) && (treeDeg.get(k) ?? 0) < 3) tree.add(k); else tree.delete(k); }
     };
-    for (const [a, b] of r.prewired ?? []) for (const p of [a, b]) { const k = pid(p); treeDeg.set(k, (treeDeg.get(k) ?? 0) + 1); if (!pinPoint.has(k)) tree.add(k); }
+    for (const [a, b] of r.prewired ?? []) for (const p of [a, b]) { const k = pid(p); treeDeg.set(k, (treeDeg.get(k) ?? 0) + 1); if (joinable(k)) tree.add(k); }
 
     const terms = [...r.terminals];
     if (r.noRoute) return { net: r.net, edges, failed };
