@@ -547,6 +547,63 @@ export function layout(project: Project, opts: LayoutOptions = {}): LayoutResult
   const withoutStagger = (reason: string) => retry(`chip branch staggering dropped: ${reason}`, { ...opts, staggerBranches: false });
   // Ordering candidate B: barycentre sweeps (fixed count) within each column.
   const columns: string[][] = colVals.map((_, c) => reps.filter((id) => colOf.get(id) === c && !childOffsets.has(id) && !rigid.has(id)));
+  // Standalone port-only blocks (batteries, power headers, port-only regulators) have no wires to
+  // any column. Tuck each into the shortest main column within its valid rail-flow range so it
+  // does not inflate an already tall column or widen a signal column beside it.
+  if (!opts.previous && !opts.place) {
+    const railFeeders = new Map<string, string[]>();
+    for (const id of ids) {
+      const p = partOf.get(id)!;
+      for (const pin of placed.get(id)!.pins) {
+        const netId = drawnNet.get(`${id}[${pin.number}]`);
+        if (!netId || !portNet.has(netId) || netKind(netById.get(netId)!) !== "power") continue;
+        const role = defs[id]?.find((d) => d.number === pin.number)?.role;
+        const isPathFeeder = (p.type === "diode" || p.type === "schottky" || p.type === "fuse" || p.type === "spst")
+          && ((p.type !== "diode" && p.type !== "schottky") || pin.number === "K");
+        if ((BUILTIN[p.type]?.kind !== "source" && role === "power_out") || isPathFeeder) {
+          railFeeders.set(netId, [...(railFeeders.get(netId) ?? []), blockOf(id)]);
+        }
+      }
+    }
+    const portOnly = reps.filter((id) => !childOffsets.has(id) && !rigid.has(id) && !regionOf.has(id) && !heldByIntent(id)
+      && blockNeighbours.get(id)!.size === 0 && (placed.get(id)!.sym.kind === "header" || placed.get(id)!.sym.kind === "ic"));
+    for (const id of portOnly) {
+      const curC = colOf.get(id)!;
+      if (columns[curC]!.length <= 1) continue; // already in its own column
+      let minC = 0, maxC = columns.length - 1;
+      const myRails = placed.get(id)!.pins
+        .map((p) => ({ num: p.number, net: drawnNet.get(`${id}[${p.number}]`) }))
+        .filter((p): p is { num: string; net: string } => p.net !== undefined && portNet.has(p.net) && netKind(netById.get(p.net)!) === "power");
+      for (const { num, net } of myRails) {
+        const role = defs[id]?.find((d) => d.number === num)?.role;
+        const isOut = BUILTIN[partOf.get(id)!.type]?.kind !== "source" && role === "power_out";
+        if (isOut) {
+          for (const other of partsOfNet.get(net) ?? []) {
+            const ob = blockOf(other);
+            if (ob !== id && colOf.get(ob)! > curC) maxC = Math.min(maxC, colOf.get(ob)! - 1);
+          }
+        } else {
+          for (const f of railFeeders.get(net) ?? []) {
+            if (f !== id) minC = Math.max(minC, colOf.get(f)! + (placed.get(id)!.sym.kind === "header" ? 1 : 0));
+          }
+        }
+      }
+      const colH = (c: number) => columns[c]!.filter((x) => x !== id).reduce((s, x) => s + blockEnv(x).h + 2, 0);
+      let bestC = curC, bestH = colH(curC);
+      for (let c = minC; c <= maxC; c++) {
+        if (!Number.isInteger(colVals[c]!) || !columns[c]!.length) continue;
+        const h = colH(c);
+        if (h < bestH || (h === bestH && Math.abs(c - curC) < Math.abs(bestC - curC))) { bestC = c; bestH = h; }
+      }
+      if (bestC !== curC) {
+        columns[curC] = columns[curC]!.filter((x) => x !== id);
+        if (placed.get(id)!.sym.kind === "source") columns[bestC]!.unshift(id);
+        else columns[bestC]!.push(id);
+        colOf.set(id, bestC);
+        colValue.set(id, colVals[bestC]!);
+      }
+    }
+  }
   for (let sweep = 0; sweep < 4; sweep++) {
     const forward = sweep % 2 === 0;
     const order = forward ? columns.map((_, i) => i) : columns.map((_, i) => columns.length - 1 - i);
