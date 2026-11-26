@@ -10,9 +10,13 @@
 // next draw or edit starts from the drawing the user has seen.
 
 import { existsSync, mkdirSync, readFileSync, realpathSync, watch as fsWatch } from "node:fs";
-import { basename, dirname, extname, join, resolve } from "node:path";
+import { basename, dirname, extname, isAbsolute, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { getInitTemplate, INIT_TEMPLATE_NAMES } from "./cli-templates.js";
+import {
+  closest, colorWanted, COMMAND_NAMES, commandHelp, createStyle, fitList, mainHelp, num, pairs, plural, point, bytes, table, usageLine,
+  type Style,
+} from "./cli-ui.js";
 import type { LayoutState } from "./core/intent.js";
 import { revision } from "./edit/edit.js";
 import { stabilityBreaks } from "./edit/report.js";
@@ -28,56 +32,38 @@ import { toPng } from "./render/png.js";
 import { resolveTheme } from "./render/themes.js";
 import { executeCommand, type CommandResult } from "./mcp/commands.js";
 import { commitProject, formatOf, issueText, loadWithin, projectText, readWithin } from "./mcp/project-files.js";
+import { main as mcpMain } from "./mcp/main.js";
 import { insideRoot, openRoots, resolvePath, showPath, type Roots } from "./mcp/roots.js";
+import { HELP as MCP_HELP } from "./mcp/server.js";
 import { replaceWithHistory, withLock, writeOutput, WriteConflict } from "./mcp/store.js";
 import { MAX_FILE, guardProject } from "./mcp/sheet.js";
 
 export interface Io {
   out: (s: string) => void;
   err: (s: string) => void;
+  /** Style text written to `out` with ANSI codes. Off unless set; src/bin.ts sets it for a terminal. */
+  color?: boolean;
+  /** Style text written to `err`. Defaults to `color`. */
+  errColor?: boolean;
+  /** Terminal width used to fit long lists. Defaults to 80. */
+  columns?: number;
 }
 
-const USAGE = `schem - draw a circuit from JSON or text
+/** Styles for text written to `out`. */
+function outStyle(io: Io): Style {
+  return createStyle(io.color === true);
+}
 
-Usage:
-  npm run schem -- init [name] [--template <name>]
-  npm run schem -- render <file> -o <output.svg|png> [--scale N | --dpi N] [--theme <name>] [--transparent] [--draft] [--overwrite]
-  npm run schem -- check <file> [--detail brief|normal|full] [--cursor N]
-  npm run schem -- preview <file> -o <output.png> [--max N] [--focus R1,U2 | --finding ID]
-  npm run schem -- query <file> part|net ID
-  npm run schem -- describe <file> [--table] [--alt-text]
-  npm run schem -- components [query] [--limit 20]
-  npm run schem -- component <type>
-  npm run schem -- fmt <file> [--to dsl|json]
-  npm run schem -- undo <file>
-  npm run schem -- import <file.cir> [-o <output.schem>] [--overwrite] [--json]
-  npm run schem -- draw <file> [-o <dir>] [--theme <name>] [--transparent]
-  npm run schem -- watch <file> [-o <dir>] [--theme <name>] [--transparent]
-  npm run schem -- edit <file> --ops <ops.json> [-o <dir>] [--strict] [--dry-run]
-                   [--expect-revision <R>] [--expect-layout <L>] [--json]
-  npm run schem -- --help
-  npm run schem -- --version
+/** Styles for text written to `err`. */
+function errStyle(io: Io): Style {
+  return createStyle((io.errColor ?? io.color) === true);
+}
 
-File commands accept .schem text or .json. Use --json for machine output.
-
-Example:
-  npm run schem -- draw examples/led.schem.json
-
-init creates a starter .schem file (templates: ${INIT_TEMPLATE_NAMES.join(", ")}; default: led).
-
-draw writes <dir>/<name>.svg and <dir>/<name>.png. <dir> defaults to out.
-watch draws once, then redraws SVG and PNG whenever <file> changes.
-
-edit applies the operations in <ops.json> as one change, keeps the rest of the
-drawing where it was, saves the file (the old one goes to .schem-history/) and
-writes the drawing like draw. An edit that would move untouched parts more than
-the limit is saved with a warning; --strict refuses it instead. --dry-run writes
-nothing. Exit codes: 0 valid, 1 invalid or input error, 2 usage, 3 internal
-error, 4 conflict. The legacy plain-text JSON draw and edit forms report
-unreadable input as 2.
-
-The circuit file formats are described in docs/dsl.md and docs/netlist-format.md, and edit
-operations in docs/editing.md.`;
+/** A path for people: relative to the current folder when inside it, else as given. */
+function displayPath(p: string): string {
+  const rel = relative(process.cwd(), p);
+  return rel !== "" && !rel.startsWith("..") && !isAbsolute(rel) ? showPath(rel) : showPath(p);
+}
 
 /** A file's base name without `.schem.json` or `.json`. */
 function drawingName(file: string): string {
@@ -113,13 +99,21 @@ function withLegacyOutput(roots: Roots, dir: string): Roots {
 
 // ---------------------------------------------------------------------------
 
-function issueLine(prefix: string, message: string): string {
-  return `  ${prefix}: ${message}`;
+const ISSUE_PAINT: Record<string, keyof Omit<Style, "on">> = {
+  error: "red", verifier: "red", overlap: "red", issue: "red", layout: "dim",
+  warning: "yellow", "would move": "yellow",
+  note: "cyan", hint: "cyan",
+};
+
+/** "  prefix: message", with the prefix coloured by kind when `style` is on. */
+function issueLine(prefix: string, message: string, style?: Style): string {
+  const paint = style?.on ? style[ISSUE_PAINT[prefix] ?? "dim"] : (t: string) => t;
+  return `  ${paint(prefix)}: ${message}`;
 }
 
 function printLoadErrors(result: LoadResult, io: Io): void {
-  for (const e of result.errors) io.err(issueLine("error", "span" in e ? issueText(e) : e.message));
-  for (const w of result.warnings) io.err(issueLine("warning", "span" in w ? issueText(w) : w.message));
+  for (const e of result.errors) io.err(issueLine("error", "span" in e ? issueText(e) : e.message, errStyle(io)));
+  for (const w of result.warnings) io.err(issueLine("warning", "span" in w ? issueText(w) : w.message, errStyle(io)));
   if (result.missingTypes.length > 0) {
     io.err(`  Known part types and their pins are listed in docs/parts.md.`);
   }
@@ -157,7 +151,7 @@ function readProjectFile(file: string, verb: string, roots: Roots, io: Io): Load
   }
   const guards = guardProject(loaded.project);
   if (guards.length) { for (const guard of guards) io.err(guard); return undefined; }
-  for (const w of loaded.warnings) io.err(issueLine("warning", "span" in w ? issueText(w) : w.message));
+  for (const w of loaded.warnings) io.err(issueLine("warning", "span" in w ? issueText(w) : w.message, errStyle(io)));
   return loaded.project;
 }
 
@@ -183,7 +177,7 @@ function legacyFailure(json: boolean, file: string, message: string, io: Io): nu
 /** The layout a file was saved with (written by edit), if it still matches the file. */
 function savedLayout(project: LoadedProject, io: Io): LayoutState | undefined {
   const saved = fromLayoutCache(project.layoutCache, revision(project));
-  if (saved.note) io.err(issueLine("note", saved.note));
+  if (saved.note) io.err(issueLine("note", saved.note, errStyle(io)));
   return saved.state;
 }
 
@@ -208,11 +202,11 @@ function writeDrawing(result: LayoutResult, dir: string, name: string, file: str
 
 function draw(file: string | undefined, dir: string, json: boolean, io: Io, svgOpts?: SvgOptions): number {
   if (file === undefined) {
-    return usageError("draw: no file given.", json, io);
+    return usageError("draw: no file given.", json, io, "draw");
   }
   if (svgOpts?.theme !== undefined) {
     try { resolveTheme(svgOpts.theme); }
-    catch (e) { return usageError((e as Error).message, json, io); }
+    catch (e) { return usageError((e as Error).message, json, io, "draw"); }
   }
   const input = openProjectForCli(file, "draw", json, io);
   if (!input.ok) return input.code;
@@ -225,14 +219,14 @@ function draw(file: string | undefined, dir: string, json: boolean, io: Io, svgO
   const previous = savedLayout(project, io);
   let result = previous ? layout(project, { previous, affected: [] }) : layout(project);
   if (previous && (result.render === undefined || result.status !== "valid")) {
-    io.err(issueLine("note", "the saved layout no longer draws cleanly with this version of schem, so it is drawn afresh."));
+    io.err(issueLine("note", "the saved layout no longer draws cleanly with this version of schem, so it is drawn afresh.", errStyle(io)));
     result = layout(project);
   }
   if (result.render === undefined) {
     if (json) return emit({ isError: true, body: { error: "The circuit could not be drawn.", status: result.status, issues: result.issues } }, true, io);
-    io.err(`${name}: could not draw it (${result.status}).`);
-    for (const issue of result.issues) io.err(issueLine("issue", issue));
-    for (const note of result.notes) io.err(issueLine("note", note));
+    io.err(`${name}: ${errStyle(io).red("could not draw it")} (${result.status}).`);
+    for (const issue of result.issues) io.err(issueLine("issue", issue, errStyle(io)));
+    for (const note of result.notes) io.err(issueLine("note", note, errStyle(io)));
     return formatOf(file) === "dsl" ? 1 : 2;
   }
 
@@ -243,14 +237,15 @@ function draw(file: string | undefined, dir: string, json: boolean, io: Io, svgO
 
   const valid = quality.valid && result.status === "valid";
   if (json) return emit({ isError: !valid, body: { status: result.status, verified: quality.valid, svg: showPath(written.svgPath), png: showPath(written.pngPath), metrics: quality.metrics } }, true, io);
+  const s = outStyle(io);
   io.out(
-    `${name}: ${valid ? "valid" : "NOT valid"}. Wrote ${showPath(written.svgPath)} and ${showPath(written.pngPath)} (${Math.round(ms)} ms)`,
+    `${s.bold(name)}: ${valid ? s.green("valid") : s.bold(s.red("NOT valid"))}. Wrote ${s.cyan(showPath(written.svgPath))} and ${s.cyan(showPath(written.pngPath))} ${s.dim(`(${Math.round(ms)} ms)`)}`,
   );
   if (!valid) {
-    for (const e of quality.connections.errors) io.out(issueLine("verifier", `${e.code} ${e.message}`));
-    for (const o of quality.overlaps) io.out(issueLine("overlap", `${o.code} ${o.message}`));
-    for (const issue of result.issues) io.out(issueLine("issue", issue));
-    if (result.status !== "valid") io.out(issueLine("layout", result.status));
+    for (const e of quality.connections.errors) io.out(issueLine("verifier", `${e.code} ${e.message}`, outStyle(io)));
+    for (const o of quality.overlaps) io.out(issueLine("overlap", `${o.code} ${o.message}`, outStyle(io)));
+    for (const issue of result.issues) io.out(issueLine("issue", issue, outStyle(io)));
+    if (result.status !== "valid") io.out(issueLine("layout", result.status, outStyle(io)));
   }
   return valid ? 0 : 1;
 }
@@ -273,10 +268,10 @@ interface Args {
 
 function edit(a: Args, io: Io): number {
   if (a.file === undefined) {
-    return usageError("edit: no file given.", a.json, io);
+    return usageError("edit: no file given.", a.json, io, "edit");
   }
   if (a.ops === undefined) {
-    return usageError("edit: no operations given. Add --ops <ops.json>.", a.json, io);
+    return usageError("edit: no operations given. Add --ops <ops.json>.", a.json, io, "edit");
   }
   const roots = rootsFor(a.file), target = resolvePath(roots, a.file, "overwrite");
   if (!target.ok) return legacyFailure(a.json, a.file, target.message, io);
@@ -301,7 +296,7 @@ function editLocked(a: Args & { file: string; ops: string }, real: string, roots
   if (!parsed.ok) {
     if (a.json) return emit({ isError: true, body: { error: "Invalid edit operations.", issues: parsed.issues } }, true, io);
     io.err(`Cannot use ${showPath(a.ops)}:`);
-    for (const i of parsed.issues) io.err(issueLine("error", `${i.code} ${i.message}`));
+    for (const i of parsed.issues) io.err(issueLine("error", `${i.code} ${i.message}`, errStyle(io)));
     return formatOf(a.file) === "dsl" ? 1 : 2;
   }
   const script = { ...parsed.script };
@@ -328,12 +323,13 @@ function editLocked(a: Args & { file: string; ops: string }, real: string, roots
       }, null, 2));
       return code;
     }
-    io.out(`${name}: edit refused (${r.status}). Nothing was written.`);
+    const s = outStyle(io);
+    io.out(`${s.bold(name)}: edit ${s.red("refused")} (${r.status}). Nothing was written.`);
     if (unstable.length) {
-      for (const b of unstable) io.out(issueLine("would move", b));
-      io.out(issueLine("hint", 'without --strict it is saved with this report; or add { "op": "relayout", "mode": "canonical" } to redraw the whole sheet.'));
+      for (const b of unstable) io.out(issueLine("would move", b, outStyle(io)));
+      io.out(issueLine("hint", 'without --strict it is saved with this report; or add { "op": "relayout", "mode": "canonical" } to redraw the whole sheet.', outStyle(io)));
     } else {
-      for (const i of r.issues) io.out(issueLine("issue", i));
+      for (const i of r.issues) io.out(issueLine("issue", i, outStyle(io)));
     }
     return code;
   }
@@ -364,23 +360,24 @@ function editLocked(a: Args & { file: string; ops: string }, real: string, roots
     }, null, 2));
     return 0;
   }
-  const files = written ? `Wrote ${showPath(a.file)}, ${showPath(written.svgPath)} and ${showPath(written.pngPath)}` : "Dry run, nothing written";
+  const s = outStyle(io);
+  const files = written ? `Wrote ${s.cyan(showPath(a.file))}, ${s.cyan(showPath(written.svgPath))} and ${s.cyan(showPath(written.pngPath))}` : "Dry run, nothing written";
   const how = r.mode === "canonical" ? "whole sheet redrawn" : "drawing kept";
-  io.out(`${name}: edit ${a.dryRun ? "checked" : "saved"} (${how}). ${files} (${Math.round(ms)} ms)`);
+  io.out(`${s.bold(name)}: edit ${s.green(a.dryRun ? "checked" : "saved")} (${how}). ${files} ${s.dim(`(${Math.round(ms)} ms)`)}`);
   const list = (xs: string[]) => (xs.length ? xs.join(", ") : "none");
-  io.out(issueLine("changed", `parts ${list(r.affected.parts)}; nets ${list(r.affected.nets)}`));
-  if (run.removedHints.length) io.out(issueLine("removed hints", run.removedHints.join(", ")));
+  io.out(issueLine("changed", `parts ${list(r.affected.parts)}; nets ${list(r.affected.nets)}`, outStyle(io)));
+  if (run.removedHints.length) io.out(issueLine("removed hints", run.removedHints.join(", "), outStyle(io)));
   if (rep && r.mode !== "canonical") {
-    io.out(issueLine("untouched", `${rep.untouched.count} parts moved ${rep.untouched.meanMove} G on average and ${rep.untouched.maxMove} G at most; other nets rerouted: ${list(rep.routesChanged.other)}`));
+    io.out(issueLine("untouched", `${rep.untouched.count} parts moved ${rep.untouched.meanMove} G on average and ${rep.untouched.maxMove} G at most; other nets rerouted: ${list(rep.routesChanged.other)}`, outStyle(io)));
   }
   if (breaks.length) {
-    io.out(issueLine("warning", `this edit moves untouched parts more than the limit (${breaks.join("; ")}). It is saved anyway; --strict refuses such edits.`));
+    io.out(issueLine("warning", `this edit moves untouched parts more than the limit (${breaks.join("; ")}). It is saved anyway; --strict refuses such edits.`, outStyle(io)));
   }
   if (r.mode === "canonical" && previous && !script.ops.some((o) => o.op === "setSpacing" || (o.op === "relayout" && o.mode === "canonical"))) {
-    io.out(issueLine("note", "no layout could keep the drawing, so the whole sheet was redrawn."));
+    io.out(issueLine("note", "no layout could keep the drawing, so the whole sheet was redrawn.", outStyle(io)));
   }
-  io.out(issueLine("revision", basis));
-  io.out(issueLine("layout", token));
+  io.out(issueLine("revision", basis, outStyle(io)));
+  io.out(issueLine("layout", token, outStyle(io)));
   return 0;
 }
 
@@ -400,9 +397,32 @@ const SHARED = {
 
 type SharedVerb = keyof typeof SHARED;
 
-function usageError(message: string, json: boolean, io: Io): number {
-  if (json) io.out(JSON.stringify({ error: message, status: "usage" }, null, 2));
-  else { io.err(message); io.err(USAGE); }
+/** Options a command accepts, written as on the command line, for typo suggestions. */
+function optionNames(verb: SharedVerb): string[] {
+  const spec: { values: readonly string[]; flags: readonly string[] } = SHARED[verb];
+  return [...spec.values, ...spec.flags].map((o) => `--${o}`).concat(spec.values.includes("out") ? ["-o"] : [], ["--json", "--help"]);
+}
+
+/** `Unknown option "--them". Did you mean "--theme"?` */
+function unknownOption(arg: string, known: readonly string[]): string {
+  const near = closest(arg, known);
+  return `Unknown option "${arg}".${near ? ` Did you mean "${near}"?` : ""}`;
+}
+
+/**
+ * Report a usage mistake and return exit code 2. People get the message, the command's usage
+ * line and where to find more; --json gets one JSON object.
+ */
+function usageError(message: string, json: boolean, io: Io, verb?: string): number {
+  if (json) {
+    io.out(JSON.stringify({ error: message, status: "usage" }, null, 2));
+    return 2;
+  }
+  const e = errStyle(io);
+  io.err(`${e.red("error:")} ${message}`);
+  const line = verb === undefined ? undefined : usageLine(verb);
+  if (line !== undefined) io.err(line);
+  io.err(e.dim(verb !== undefined && line !== undefined ? `Run "schem ${verb} --help" for options and examples.` : `Run "schem --help" for commands.`));
   return 2;
 }
 
@@ -410,7 +430,7 @@ function shared(verb: SharedVerb, argv: string[], io: Io): number {
   const json = argv.includes("--json");
   const spec: { values: readonly string[]; flags: readonly string[] } = SHARED[verb];
   const positional: string[] = [], options = new Map<string, string | true>();
-  const usage = (message: string) => usageError(message, json, io);
+  const usage = (message: string) => usageError(message, json, io, verb);
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i]!;
     if (arg === "--json") continue;
@@ -423,7 +443,7 @@ function shared(verb: SharedVerb, argv: string[], io: Io): number {
       if (!value || value.startsWith("--") || value === "-o") return usage(`${arg} needs a value.`);
       options.set(opt, value);
       i++;
-    } else return usage(`Unknown option "${arg}".`);
+    } else return usage(unknownOption(arg, optionNames(verb)));
   }
 
   const [file, subject, id] = positional;
@@ -480,46 +500,316 @@ function shared(verb: SharedVerb, argv: string[], io: Io): number {
   if (altTextOnly) delete args["alt-text"];
   const roots = rootsFor(typeof args.path === "string" ? args.path : undefined);
   const name = verb === "init" ? "schem_create" : `schem_${verb}`;
-  return emit(executeCommand(roots, name, args), json, io, altTextOnly);
+  return emit(executeCommand(roots, name, args), json, io, { verb, altTextOnly, args: { ...args, ...(typeof file === "string" ? { typed: file } : {}) } });
 }
 
-function emit(result: CommandResult, json: boolean, io: Io, altTextOnly = false): number {
+interface EmitContext {
+  /** The CLI command, which picks the human format. */
+  verb?: string;
+  /** describe --alt-text: print the alt text line and nothing else. */
+  altTextOnly?: boolean;
+  /** The arguments the command ran with, for hints such as the next-page command. */
+  args?: Record<string, unknown>;
+}
+
+function emit(result: CommandResult, json: boolean, io: Io, ctx: EmitContext = {}): number {
   const { body } = result;
   if (json) io.out(JSON.stringify(body, null, 2));
-  else if (result.isError) io.err(String(body.error ?? body.status ?? "The command failed."));
-  else if (altTextOnly && typeof body.altText === "string") io.out(body.altText);
-  else if (typeof body.description === "string") {
-    io.out(body.description);
-    if (typeof body.altText === "string") io.out(`\nAlt text: ${body.altText}`);
-    if (Array.isArray(body.table)) {
-      io.out("\nNet | Presentation | Pins\n--- | --- | ---");
-      for (const row of body.table) io.out(`${row.name} | ${row.presentation} | ${row.pins.join(", ")}`);
-    }
-  } else if (typeof body.out === "string") io.out(`Wrote ${body.out}.`);
-  else if (Array.isArray(body.components)) {
-    for (const entry of body.components) io.out(`${entry.id}  ${entry.pins.map((pin: { name: string }) => pin.name).join(", ")}`.trimEnd());
-  } else if (typeof body.id === "string" && Array.isArray(body.pins)) {
-    const header = [body.id, body.kind, body.refPrefix ? `ref=${body.refPrefix}` : ""].filter(Boolean).join("  ");
-    io.out(header);
-    if (typeof body.name === "string") io.out(`Name: ${body.name}`);
-    if (typeof body.note === "string") io.out(body.note);
-    for (const pin of body.pins as Array<{ number: string; name: string; role: string; aliases?: string[]; group?: string; iface?: string[] }>) {
-      const extras = [
-        pin.aliases?.length ? `aliases=${pin.aliases.join(",")}` : "",
-        pin.group ? `group=${pin.group}` : "",
-        pin.iface?.length ? `iface=${pin.iface.join(",")}` : "",
-      ].filter(Boolean).join(" ");
-      io.out(`  [${pin.number}] ${pin.name} (${pin.role})${extras ? ` ${extras}` : ""}`);
-    }
-  } else if (body.part || body.net) io.out(JSON.stringify(body.part ?? body.net, null, 2));
-  else {
-    io.out([body.path, body.status].filter(Boolean).join("  "));
-    if (body.metrics) io.out(JSON.stringify(body.metrics));
-    if (Array.isArray(body.findings)) for (const finding of body.findings) io.out(`${finding.id}  ${finding.message}`);
-    if (Array.isArray(body.warnings)) for (const warning of body.warnings) io.out(`Warning: ${warning}`);
-  }
+  else if (result.isError) printFailure(body, io);
+  else if (ctx.altTextOnly && typeof body.altText === "string") io.out(body.altText);
+  else for (const line of humanLines(body, ctx, outStyle(io), io.columns ?? 80)) io.out(line);
   if (body.status === "conflict") return 4;
   return result.isError || (typeof body.status === "string" && body.status !== "valid") || body.verified === false ? 1 : 0;
+}
+
+/** A failed command: its message, then any further issues it carries. */
+function printFailure(body: Record<string, unknown>, io: Io): void {
+  const e = errStyle(io);
+  const message = String(body.error ?? body.status ?? "The command failed.");
+  io.err(e.on ? `${e.red("error:")} ${message}` : message);
+  if (Array.isArray(body.issues)) {
+    for (const issue of body.issues.slice(1) as Array<{ code?: string; at?: string; message?: string } | string>) {
+      const text = typeof issue === "string" ? issue : [issue.code, issue.at, issue.message].filter(Boolean).join(" ");
+      io.err(issueLine("error", text, e));
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Human output, one formatter per command. --json output never comes through here.
+
+type Body = Record<string, unknown>;
+
+function isValid(body: Body): boolean {
+  return body.status === "valid" && body.verified !== false;
+}
+
+/** "valid" in green, or "NOT valid (why)" in red. */
+function badge(body: Body, s: Style): string {
+  if (isValid(body)) return s.bold(s.green("valid"));
+  const why = typeof body.status === "string" && body.status !== "valid" ? body.status : "not verified";
+  return s.bold(s.red(`NOT valid (${why})`));
+}
+
+/** The path the user typed when there is one, else the path the command reports. */
+function pathOf(body: Body, ctx: EmitContext): string {
+  const typed = ctx.args?.typed;
+  if (typeof body.path === "string") return displayPath(body.path);
+  return typeof typed === "string" ? showPath(typed) : "";
+}
+
+/** "6 parts, 6 nets. 0 errors, 0 warnings, 0 notes." with non-zero problems coloured. */
+function countsLine(body: Body, s: Style): string | undefined {
+  const c = body.counts as Record<string, number> | undefined;
+  if (c === undefined) return undefined;
+  const count = (n: number | undefined, word: string, paint: (t: string) => string) =>
+    (n ?? 0) > 0 ? paint(plural(n!, word)) : plural(n ?? 0, word);
+  return `  ${plural(c.parts ?? 0, "part")}, ${plural(c.nets ?? 0, "net")}. ` +
+    `${count(c.errors, "error", s.red)}, ${count(c.warnings, "warning", s.yellow)}, ${count(c.notes, "note", s.cyan)}.`;
+}
+
+/** Notes, load warnings and layout issues the engine attached to a sheet. */
+function sheetNotes(body: Body, s: Style): string[] {
+  const lines: string[] = [];
+  if (typeof body.note === "string") lines.push(issueLine("note", body.note, s));
+  for (const w of (Array.isArray(body.warnings) ? body.warnings : []) as unknown[]) lines.push(issueLine("warning", String(w), s));
+  for (const i of (Array.isArray(body.issues) ? body.issues : []) as unknown[]) lines.push(issueLine("issue", String(i), s));
+  for (const n of (Array.isArray(body.layoutNotes) ? body.layoutNotes : []) as unknown[]) lines.push(issueLine("note", String(n), s));
+  return lines;
+}
+
+function section(title: string, s: Style): string {
+  return s.bold(s.cyan(title));
+}
+
+/** Labels, units and rounding for the drawing metrics of check. Unknown metrics are shown too. */
+const METRICS: Array<[key: string, label: string, show: (v: unknown) => string]> = [
+  ["sheet", "Sheet", (v) => (Array.isArray(v) ? `${num(v[0])} x ${num(v[1])} G` : num(v))],
+  ["wireLength", "Wire length", (v) => `${num(v)} G`],
+  ["crossings", "Crossings", (v) => num(v)],
+  ["bends", "Bends", (v) => num(v)],
+  ["dots", "Dots", (v) => num(v)],
+  ["jogs", "Jogs", (v) => num(v)],
+  ["squeezedRuns", "Squeezed runs", (v) => num(v)],
+  ["farLabels", "Far labels", (v) => num(v)],
+  ["minDotSpacing", "Min dot spacing", (v) => (typeof v === "number" ? `${num(v, 1)} G` : "none")],
+  ["minCrossingToDot", "Min crossing to dot", (v) => (typeof v === "number" ? `${num(v, 1)} G` : "none")],
+  ["aspectError", "Aspect error", (v) => num(v, 2)],
+  ["marginImbalance", "Margin imbalance", (v) => num(v, 2)],
+];
+
+function metricLines(metrics: Body, s: Style): string[] {
+  const known = new Set(METRICS.map(([k]) => k).concat("where"));
+  const cells: Array<[string, string]> = METRICS.filter(([k]) => k in metrics).map(([k, label, show]) => [label, show(metrics[k])]);
+  for (const [k, v] of Object.entries(metrics)) {
+    if (known.has(k) || (typeof v === "object" && v !== null && !Array.isArray(v))) continue;
+    const label = k.replace(/([A-Z])/g, " $1").toLowerCase();
+    cells.push([label.charAt(0).toUpperCase() + label.slice(1), Array.isArray(v) ? v.map((x) => num(x, 2)).join(" x ") : num(v, 2)]);
+  }
+  // Two label and value pairs per row: twelve metrics in six lines.
+  const half = Math.ceil(cells.length / 2);
+  const rows = cells.slice(0, half).map((left, i) => {
+    const right = cells[half + i];
+    // The empty cell widens the gap between the two pairs.
+    return right ? [s.dim(left[0]), left[1], "", s.dim(right[0]), right[1]] : [s.dim(left[0]), left[1]];
+  });
+  return table(rows, { style: s });
+}
+
+const SEVERITY: Record<string, (s: Style) => (t: string) => string> = {
+  error: (s) => s.red, warn: (s) => s.yellow, info: (s) => s.cyan,
+};
+
+function findingLines(body: Body, ctx: EmitContext, s: Style): string[] {
+  if (!Array.isArray(body.findings)) return [];
+  const findings = body.findings as Array<{ id: string; severity: string; message: string; fix?: { ops?: Array<{ op?: string }> } | null }>;
+  const total = typeof body.findingsTotal === "number" ? body.findingsTotal : findings.length;
+  if (total === 0) return ["", `${section("Findings", s)}  none`];
+  const lines = ["", section(findings.length < total ? `Findings (${findings.length} of ${total})` : `Findings (${total})`, s)];
+  const width = Math.max(...findings.map((f) => f.severity.length));
+  const pad = " ".repeat(2 + width + 2);
+  for (const f of findings) {
+    const paint = (SEVERITY[f.severity] ?? (() => s.dim))(s);
+    lines.push(`  ${paint(f.severity.padEnd(width))}  ${s.bold(f.id)}`);
+    lines.push(`${pad}${f.message}`);
+    const ops = f.fix?.ops?.map((o) => o.op).filter((o): o is string => typeof o === "string") ?? [];
+    if (ops.length) lines.push(`${pad}${s.dim("fix:")} ${ops.join(", ")} ${s.dim("(--json shows the edit; apply it with schem edit)")}`);
+  }
+  if (typeof body.cursor === "string") {
+    lines.push("", s.dim(`More findings: schem check ${pathOf(body, ctx)} --cursor ${body.cursor}`));
+  }
+  return lines;
+}
+
+function checkLines(body: Body, ctx: EmitContext, s: Style): string[] {
+  const lines = [`${s.bold(pathOf(body, ctx))}  ${badge(body, s)}`];
+  const counts = countsLine(body, s);
+  if (counts) lines.push(counts);
+  lines.push(...sheetNotes(body, s));
+  if (body.metrics && typeof body.metrics === "object") lines.push("", section("Drawing", s), ...metricLines(body.metrics as Body, s));
+  lines.push(...findingLines(body, ctx, s));
+  return lines;
+}
+
+/** init and undo: what happened to the file, then the same summary as check. */
+function savedSheetLines(verb: "init" | "undo", body: Body, ctx: EmitContext, s: Style): string[] {
+  const path = pathOf(body, ctx);
+  const head = verb === "init" ? `Created ${s.bold(path)}` : `Restored the previous version of ${s.bold(path)}`;
+  const lines = [`${head}  ${badge(body, s)}`];
+  const counts = countsLine(body, s);
+  if (counts) lines.push(counts);
+  lines.push(...sheetNotes(body, s));
+  if (Array.isArray(body.findings) && body.findings.length) lines.push(...findingLines(body, ctx, s));
+  if (verb === "init") lines.push("", s.dim(`Next: schem draw ${path}`));
+  return lines;
+}
+
+function writtenLines(verb: "render" | "preview", body: Body, ctx: EmitContext, s: Style): string[] {
+  const out = typeof body.out === "string" ? displayPath(body.out) : "";
+  const details: string[] = [];
+  const png = body.png as { width?: number; height?: number; pxPerGrid?: number; dpi?: number } | undefined;
+  if (png) {
+    details.push(`PNG ${png.width} x ${png.height} px`);
+    if (verb === "render" && png.pxPerGrid !== undefined) details.push(`${num(png.pxPerGrid, 2)} px per G`);
+    if (png.dpi !== undefined) details.push(`${num(png.dpi)} dpi`);
+  } else if (body.format === "svg") {
+    const grid = body.grid as number[] | undefined;
+    details.push(grid ? `SVG ${num(grid[0])} x ${num(grid[1])} G` : "SVG");
+  }
+  if (typeof body.bytes === "number") details.push(bytes(body.bytes));
+  if (Array.isArray(body.focus)) details.push(`focus ${body.focus.join(", ")}`);
+  if (typeof body.finding === "string") details.push(`finding ${body.finding}`);
+  const lines = [`Wrote ${s.cyan(out)}${details.length ? `  ${s.dim(details.join(", "))}` : ""}`];
+  if (!isValid(body)) lines.push(`  ${badge(body, s)}${ctx.args?.requireValid === false ? ". Written because of --draft." : ""}`);
+  lines.push(...sheetNotes(body, s));
+  return lines;
+}
+
+function fmtLines(body: Body, ctx: EmitContext, s: Style): string[] {
+  const path = pathOf(body, ctx);
+  const kind = body.format === "json" ? ".schem.json" : ".schem text";
+  if (typeof body.out === "string") return [`Converted ${s.bold(path)} to ${s.cyan(displayPath(body.out))} ${s.dim(`(${kind})`)}`];
+  if (body.saved === false) return [`${s.bold(path)} is already formatted ${s.dim(`(${kind})`)}`];
+  return [`Formatted ${s.bold(path)} ${s.dim(`(${kind}; the old copy is in .schem-history/)`)}`];
+}
+
+function describeLines(body: Body, s: Style): string[] {
+  const lines = [section("Description", s), ...String(body.description).split("\n").map((l) => `  ${l}`)];
+  if (!isValid(body) && typeof body.status === "string") lines.push(`  ${badge(body, s)}`);
+  if (typeof body.altText === "string") lines.push("", `${s.bold("Alt text:")} ${body.altText}`);
+  if (Array.isArray(body.table)) {
+    const rows = body.table as Array<{ name: string; presentation: string; pins: string[] }>;
+    lines.push("", section(`Nets (${rows.length})`, s));
+    lines.push(...table(rows.map((r) => [s.bold(r.name), r.presentation, r.pins.join(", ")]), { header: ["Net", "Drawn as", "Pins"], style: s }));
+  }
+  return lines;
+}
+
+interface ComponentEntry { id: string; kind: string; name?: string; inlinePins?: boolean; pins: Array<{ name: string }> }
+
+function componentsLines(body: Body, ctx: EmitContext, s: Style, columns: number): string[] {
+  const entries = body.components as ComponentEntry[];
+  const query = typeof ctx.args?.query === "string" ? ctx.args.query : undefined;
+  if (entries.length === 0) return [query ? `No part types match "${query}". Try a shorter query, or schem components.` : "No part types."];
+  const idWidth = Math.max(4, ...entries.map((e) => e.id.length));
+  const kindWidth = Math.max(4, ...entries.map((e) => e.kind.length));
+  const room = Math.max(20, columns - 2 - idWidth - 2 - kindWidth - 2);
+  const details = (e: ComponentEntry): string => {
+    if (e.inlinePins) return s.dim("pins declared on the part");
+    if (e.kind === "module") return fitList([`${e.name ?? e.id} (${plural(e.pins.length, "pin")})`], room);
+    return fitList(e.pins.map((p) => p.name), room);
+  };
+  const lines = table(entries.map((e) => [s.bold(e.id), e.kind, details(e)]), { header: ["Type", "Kind", "Pins / Details"], style: s });
+  const total = typeof body.total === "number" ? body.total : entries.length;
+  const start = Number(ctx.args?.cursor ?? 0) || 0;
+  if (typeof body.cursor === "string") {
+    const parts = ["schem components", ...(query ? [query] : []), ...(typeof ctx.args?.limit === "number" ? ["--limit", String(ctx.args.limit)] : []), "--cursor", body.cursor];
+    lines.push("", s.dim(`Showing ${start + 1} to ${start + entries.length} of ${total}. More: ${parts.join(" ")}`));
+  } else if (start > 0 || entries.length < total) {
+    lines.push("", s.dim(`Showing ${start + 1} to ${start + entries.length} of ${total}.`));
+  }
+  if (typeof body.cursor !== "string" && start === 0 && entries.length >= total) lines.push("");
+  lines.push(s.dim("Details of one type: schem component <type>"));
+  return lines;
+}
+
+interface ComponentPin { number: string; name: string; role: string; aliases?: string[]; group?: string; iface?: string[]; chain?: string; representative?: boolean }
+
+function componentLines(body: Body, s: Style): string[] {
+  const lines = [`${s.bold(String(body.id))}${typeof body.name === "string" ? `  ${body.name}` : ""}`];
+  const facts: Array<[string, string]> = [["Kind", String(body.kind)]];
+  if (typeof body.refPrefix === "string") facts.push(["Ref prefix", body.refPrefix]);
+  if (typeof body.controller === "boolean") facts.push(["Controller", body.controller ? "yes" : "no"]);
+  const doc = body.doc as { url?: string; title?: string } | undefined;
+  if (doc?.url) facts.push(["Docs", doc.url]);
+  if (Array.isArray(body.interfaces) && body.interfaces.length) facts.push(["Interfaces", body.interfaces.join(", ")]);
+  if (Array.isArray(body.groups) && body.groups.length) facts.push(["Groups", body.groups.join(", ")]);
+  lines.push(...pairs(facts, s));
+  if (typeof body.note === "string") lines.push("", `  ${body.note}`);
+  const pins = body.pins as ComponentPin[];
+  if (pins.length) {
+    lines.push("", section(`Pins (${pins.length})`, s));
+    const extra = (p: ComponentPin): string => [
+      p.aliases?.length ? `aliases ${p.aliases.join(", ")}` : "",
+      p.group ? `group ${p.group}` : "",
+      p.iface?.length ? `iface ${p.iface.join(", ")}` : "",
+      p.chain ? `chain ${p.chain}` : "",
+      p.representative ? "representative" : "",
+    ].filter(Boolean).join("; ");
+    lines.push(...table(pins.map((p) => [p.number, s.bold(p.name), p.role, extra(p)]), { header: ["Pin", "Name", "Role", "Aliases / Group / Interface"], style: s }));
+  }
+  return lines;
+}
+
+interface PartPin { number: string; name: string; role: string; at?: number[]; dir?: string; net: { id: string; name?: string } | null }
+
+function netLabel(net: { id: string; name?: string } | null, s: Style): string {
+  if (net === null) return s.dim("not connected");
+  return net.name !== undefined && net.name !== net.id ? `${net.name} ${s.dim(`(${net.id})`)}` : net.id;
+}
+
+function queryLines(body: Body, s: Style): string[] {
+  const lines: string[] = [];
+  if (body.part) {
+    const part = body.part as { id: string; type: string; at?: number[]; rot?: number; flip?: boolean; props?: Record<string, unknown>; pins: PartPin[] };
+    const head = [`${s.dim("type:")} ${part.type}`];
+    if (part.at) head.push(`${s.dim("at:")} ${point(part.at)}`);
+    if (part.rot !== undefined) head.push(`${s.dim("rot:")} ${part.rot}`);
+    if (part.flip) head.push(`${s.dim("flip:")} yes`);
+    lines.push(`${s.bold(`Part ${part.id}`)}  ${head.join("  ")}`);
+    if (part.props && Object.keys(part.props).length) {
+      lines.push(`  ${s.dim("props:")} ${Object.entries(part.props).map(([k, v]) => `${k}=${typeof v === "string" ? v : JSON.stringify(v)}`).join(", ")}`);
+    }
+    if (!isValid(body)) lines.push(`  ${badge(body, s)}`);
+    lines.push("", section(`Pins (${part.pins.length})`, s));
+    lines.push(...table(part.pins.map((p) => [p.number, s.bold(p.name), p.role, point(p.at), p.dir ?? "", netLabel(p.net, s)]), { header: ["Pin", "Name", "Role", "At", "Dir", "Net"], style: s }));
+    return lines;
+  }
+  const net = body.net as { id: string; name?: string; kind: string; domain?: string; endpoints: string[]; drawn: string; pins: Array<{ part: string; number: string; at?: number[]; dir?: string }> };
+  const head = [`${s.dim("id:")} ${net.id}`, `${s.dim("kind:")} ${net.kind}`, `${s.dim("drawn:")} ${net.drawn}`];
+  if (net.domain !== undefined) head.splice(2, 0, `${s.dim("domain:")} ${net.domain}`);
+  lines.push(`${s.bold(`Net ${net.name ?? net.id}`)}  ${head.join("  ")}`);
+  lines.push(`  ${s.dim("endpoints:")} ${net.endpoints.join(", ")}`);
+  if (!isValid(body)) lines.push(`  ${badge(body, s)}`);
+  lines.push("", section(`Pins (${net.pins.length})`, s));
+  lines.push(...table(net.pins.map((p) => [s.bold(p.part), p.number, point(p.at), p.dir ?? ""]), { header: ["Part", "Pin", "At", "Dir"], style: s }));
+  return lines;
+}
+
+/** The human text of a successful command. */
+function humanLines(body: Body, ctx: EmitContext, s: Style, columns: number): string[] {
+  switch (ctx.verb) {
+    case "check": return checkLines(body, ctx, s);
+    case "init": case "undo": return savedSheetLines(ctx.verb, body, ctx, s);
+    case "render": case "preview": return writtenLines(ctx.verb, body, ctx, s);
+    case "fmt": return fmtLines(body, ctx, s);
+    case "describe": if (typeof body.description === "string") return describeLines(body, s); break;
+    case "components": if (Array.isArray(body.components)) return componentsLines(body, ctx, s, columns); break;
+    case "component": if (Array.isArray(body.pins)) return componentLines(body, s); break;
+    case "query": if (body.part || body.net) return queryLines(body, s); break;
+  }
+  // Anything else: the path and status.
+  return [[typeof body.path === "string" ? displayPath(body.path) : "", typeof body.status === "string" ? body.status : ""].filter(Boolean).join("  ")];
 }
 
 function importCommand(rest: string[], io: Io): number {
@@ -531,16 +821,16 @@ function importCommand(rest: string[], io: Io): number {
     if (arg === "--overwrite") { overwrite = true; continue; }
     if (arg === "-o" || arg === "--out") {
       const next = rest[i + 1];
-      if (next === undefined || next.startsWith("--")) return usageError(`${arg}: no output file given.`, json, io);
+      if (next === undefined || next.startsWith("--")) return usageError(`${arg}: no output file given.`, json, io, "import");
       outPath = next;
       i++;
       continue;
     }
-    if (arg.startsWith("-") && arg !== "-") return usageError(`Unknown option "${arg}".`, json, io);
+    if (arg.startsWith("-") && arg !== "-") return usageError(unknownOption(arg, ["-o", "--out", "--overwrite", "--json", "--help"]), json, io, "import");
     if (file === undefined) file = arg;
-    else return usageError(`import: more than one file given ("${file}" and "${arg}").`, json, io);
+    else return usageError(`import: more than one file given ("${file}" and "${arg}").`, json, io, "import");
   }
-  if (file === undefined) return usageError("import: no SPICE file given.", json, io);
+  if (file === undefined) return usageError("import: no SPICE file given.", json, io, "import");
   const readRoots = rootsFor(file);
   const opened = readWithin(readRoots, file);
   if (!opened.ok) {
@@ -553,9 +843,9 @@ function importCommand(rest: string[], io: Io): number {
     if (json) {
       io.out(JSON.stringify({ ok: false, error: imported.errors[0] ?? "Could not import SPICE netlist.", errors: imported.errors, warnings: imported.warnings }, null, 2));
     } else {
-      io.err(`Cannot import ${showPath(file)}:`);
-      for (const e of imported.errors) io.err(issueLine("error", e));
-      for (const w of imported.warnings) io.err(issueLine("warning", w));
+      io.err(`${errStyle(io).red("Cannot import")} ${showPath(file)}:`);
+      for (const e of imported.errors) io.err(issueLine("error", e, errStyle(io)));
+      for (const w of imported.warnings) io.err(issueLine("warning", w, errStyle(io)));
     }
     return 1;
   }
@@ -584,9 +874,12 @@ function importCommand(rest: string[], io: Io): number {
     }, null, 2));
     return 0;
   }
-  for (const w of imported.warnings) io.err(issueLine("warning", w));
-  if (written !== undefined) io.out(`Wrote ${showPath(written)} (${parts} parts, ${nets} nets).`);
-  else io.out(imported.dsl.trimEnd());
+  for (const w of imported.warnings) io.err(issueLine("warning", w, errStyle(io)));
+  if (written !== undefined) {
+    const s = outStyle(io);
+    io.out(`Wrote ${s.cyan(showPath(written))} (${plural(parts, "part")}, ${plural(nets, "net")}).`);
+    io.out(s.dim(`Next: schem draw ${showPath(written)}`));
+  } else io.out(imported.dsl.trimEnd());
   return 0;
 }
 
@@ -684,35 +977,36 @@ function watchCommand(rest: string[], io: Io): number {
     const arg = rest[i]!;
     if (arg === "-o" || arg === "--out") {
       const next = rest[i + 1];
-      if (next === undefined || next.startsWith("--")) return usageError(`${arg}: no folder given.`, false, io);
+      if (next === undefined || next.startsWith("--")) return usageError(`${arg}: no folder given.`, false, io, "watch");
       dir = next;
       i++;
     } else if (arg === "--theme") {
       const next = rest[i + 1];
-      if (next === undefined || next.startsWith("--")) return usageError(`${arg}: no value given.`, false, io);
+      if (next === undefined || next.startsWith("--")) return usageError(`${arg}: no value given.`, false, io, "watch");
       theme = next;
       i++;
     } else if (arg === "--transparent") {
       transparent = true;
     } else if (arg.startsWith("-") && arg !== "-") {
-      return usageError(`Unknown option "${arg}".`, false, io);
+      return usageError(unknownOption(arg, ["-o", "--out", "--theme", "--transparent", "--help"]), false, io, "watch");
     } else if (file === undefined) {
       file = arg;
     } else {
-      return usageError(`watch: more than one file given ("${file}" and "${arg}").`, false, io);
+      return usageError(`watch: more than one file given ("${file}" and "${arg}").`, false, io, "watch");
     }
   }
-  if (file === undefined) return usageError("watch: no file given.", false, io);
+  if (file === undefined) return usageError("watch: no file given.", false, io, "watch");
   if (theme !== undefined) {
     try { resolveTheme(theme); }
-    catch (e) { return usageError((e as Error).message, false, io); }
+    catch (e) { return usageError((e as Error).message, false, io, "watch"); }
   }
   if (!existsSync(resolve(file))) {
     io.err(`Cannot read ${showPath(file)}. no such file`);
     return formatOf(file) === "dsl" ? 1 : 2;
   }
+  const s = outStyle(io);
+  io.out(`${s.bold("Watching")} ${s.cyan(showPath(file))} -> ${s.cyan(showPath(dir))} ${s.dim("(Ctrl+C to stop)")}`);
   const handle = watchFile(file, { dir, theme, transparent, io });
-  io.out(`Watching ${showPath(file)} (Ctrl+C to stop).`);
   const stop = () => {
     process.off("SIGINT", stop);
     process.off("SIGTERM", stop);
@@ -723,22 +1017,53 @@ function watchCommand(rest: string[], io: Io): number {
   return 0;
 }
 
+const HELP_FLAGS = ["--help", "-h"];
+
+/** Help as text, or as one JSON object when --json asks for machine output. */
+function printHelp(text: string, json: boolean, io: Io, command?: string): number {
+  if (json) io.out(JSON.stringify({ status: "help", ...(command ? { command } : {}), help: text }, null, 2));
+  else io.out(text);
+  return 0;
+}
+
+function unknownCommand(command: string, json: boolean, io: Io): number {
+  const near = closest(command, COMMAND_NAMES);
+  const message = `Unknown command "${command}".${near ? ` Did you mean "${near}"?` : ""}`;
+  if (json) return usageError(message, true, io);
+  const e = errStyle(io);
+  io.err(`${e.red("error:")} ${message}`);
+  io.err(e.dim(`Run "schem --help" for commands.`));
+  return 2;
+}
+
 function dispatch(argv: string[], io: Io): number {
   const [command, ...rest] = argv;
-  if (command === undefined || command === "--help" || command === "-h" || command === "help") {
-    io.out(USAGE);
-    return 0;
+  const json = rest.includes("--json");
+  const style = json ? createStyle(false) : outStyle(io);
+  if (command === undefined || command === "--help" || command === "-h") {
+    return printHelp(mainHelp(packageVersion(), style), json, io);
   }
   if (command === "--version" || command === "-v") {
     io.out(packageVersion());
     return 0;
   }
+  if (command === "help") {
+    const topic = rest.find((a) => a !== "--json");
+    if (topic === undefined) return printHelp(mainHelp(packageVersion(), style), json, io);
+    if (topic === "mcp") return printHelp(MCP_HELP.trimEnd(), json, io, "mcp");
+    const text = commandHelp(topic, style);
+    return text === undefined ? unknownCommand(topic, json, io) : printHelp(text, json, io, topic);
+  }
+  if (command === "mcp") {
+    if (rest.some((a) => HELP_FLAGS.includes(a))) return printHelp(MCP_HELP.trimEnd(), json, io, "mcp");
+    return mcpMain(rest);
+  }
+  const help = commandHelp(command, style);
+  if (help === undefined) return unknownCommand(command, json, io);
+  if (rest.some((a) => HELP_FLAGS.includes(a))) return printHelp(help, json, io, command);
   if (Object.hasOwn(SHARED, command)) return shared(command as SharedVerb, rest, io);
   if (command === "import") return importCommand(rest, io);
   if (command === "watch") return watchCommand(rest, io);
-  if (command !== "draw" && command !== "edit") {
-    return usageError(`Unknown command "${command}".`, rest.includes("--json"), io);
-  }
 
   const a: Args = { dir: "out", strict: false, dryRun: false, json: rest.includes("--json"), transparent: false };
   // Options that take a value, and flags, per command.
@@ -760,17 +1085,17 @@ function dispatch(argv: string[], io: Io): number {
     if (valued[arg]) {
       const next = rest[i + 1];
       if (next === undefined || next.startsWith("--"))
-        return usageError(`${arg}: no ${arg === "-o" || arg === "--out" ? "folder" : "value"} given.`, a.json, io);
+        return usageError(`${arg}: no ${arg === "-o" || arg === "--out" ? "folder" : "value"} given.`, a.json, io, command);
       valued[arg]!(next);
       i++;
     } else if (flags[arg]) {
       flags[arg]!();
     } else if (arg.startsWith("-") && arg !== "-") {
-      return usageError(`Unknown option "${arg}".`, a.json, io);
+      return usageError(unknownOption(arg, [...Object.keys(valued), ...Object.keys(flags), "--help"]), a.json, io, command);
     } else if (a.file === undefined) {
       a.file = arg;
     } else {
-      return usageError(`${command}: more than one file given ("${a.file}" and "${arg}").`, a.json, io);
+      return usageError(`${command}: more than one file given ("${a.file}" and "${arg}").`, a.json, io, command);
     }
   }
   const svgOpts: SvgOptions | undefined = a.theme !== undefined || a.transparent
@@ -796,9 +1121,20 @@ function isEntryPoint(): boolean {
   return resolve(fileURLToPath(import.meta.url)) === resolve(arg);
 }
 
-if (isEntryPoint()) {
-  process.exitCode = run(process.argv.slice(2), {
+/**
+ * Output sinks for a real process: stdout and stderr, each styled only when it is a terminal,
+ * NO_COLOR is not set, TERM is not "dumb" and the arguments do not ask for exact output.
+ */
+export function processIo(argv: readonly string[]): Io {
+  return {
     out: (s) => process.stdout.write(`${s}\n`),
     err: (s) => process.stderr.write(`${s}\n`),
-  });
+    color: colorWanted(process.stdout, argv),
+    errColor: colorWanted(process.stderr, argv),
+    ...(process.stdout.columns ? { columns: process.stdout.columns } : {}),
+  };
+}
+
+if (isEntryPoint()) {
+  process.exitCode = run(process.argv.slice(2), processIo(process.argv.slice(2)));
 }
