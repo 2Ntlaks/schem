@@ -1,23 +1,39 @@
 # Importing SPICE netlists
 
-`schem` can import standard SPICE netlists (`.cir`, `.sp`, `.net`) into validated `LoadedProject` objects and canonical `.schem` text via `importSpice()` in `src/io/spice.ts`.
+`schem` imports standard SPICE netlists (`.cir`, `.sp`, `.net`) into validated `.schem` text schematics and `LoadedProject` objects.
 
-SPICE (Simulation Program with Integrated Circuit Emphasis) is a plain-text circuit format used by simulators such as ngspice and LTspice. The importer maps SPICE cards to `schem` built-in symbols and generic integrated circuit (IC) boxes, checks every net through `validate()`, and formats `.schem` output with `formatDsl()`.
+SPICE (Simulation Program with Integrated Circuit Emphasis) is a plain-text circuit format used by simulators such as ngspice and LTspice. The importer maps SPICE cards to `schem` built-in symbols and generic integrated circuit (IC) boxes, checks every net through `validate()`, and formats canonical `.schem` output with `formatDsl()`.
 
-## API
+## CLI and MCP usage
 
-```ts
-import { importSpice } from "./src/io/spice.js";
+### CLI
 
-const result = importSpice(spiceText);
-if (result.ok) {
-  // result.project is a validated LoadedProject ready for layout() or saveProject()
-  // result.dsl is the canonical .schem text from formatDsl()
-  // result.warnings lists informational notes and fallback warnings
+Use `schem import` to convert a SPICE file into `.schem` text (or `npm run schem -- import` from a repo clone; see [Installation and MCP setup](install.md)):
+
+```sh
+# Print canonical .schem text to stdout
+schem import filter.cir
+
+# Write a .schem file (add --overwrite to replace an existing file)
+schem import filter.cir -o filter.schem
+schem draw filter.schem
+```
+
+Add `--json` for machine-readable output (`{ ok, out?, dsl, warnings, parts, nets }`). Warnings about skipped directives or fallbacks are printed to stderr in plain-text mode.
+
+### MCP
+
+In MCP (Model Context Protocol), call `schem_import` with the destination `path` (`.schem` or `.schem.json`; must not exist yet) and the SPICE netlist text in `spice`:
+
+```json
+{
+  "path": "/path/to/your/circuits/filter.schem",
+  "spice": "RC Low-Pass Filter\nV1 in 0 SIN(0 1 1k)\nR1 in out 1k\nC1 out 0 100n\n.end",
+  "detail": "normal"
 }
 ```
 
-`SpiceImportResult` has the shape `{ ok: boolean; project?: LoadedProject; dsl?: string; warnings: string[]; errors: string[] }`.
+`schem_import` parses the SPICE text, validates and lays out the circuit, saves the new project file, and returns `status`, `verified`, `revision`, `layoutToken`, `warnings`, counts and (unless `detail` is `"brief"`) the first findings.
 
 ## Syntax rules
 
@@ -29,14 +45,16 @@ if (result.ok) {
 
 ## Supported elements
 
+See [Part types](parts.md) for the full pin list of every built-in symbol.
+
 | SPICE card | `schem` type | Pin mapping | Notes |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | `R<id> n1 n2 <val>` | `resistor` | `1`, `2` | Sets `value`. |
 | `C<id> n1 n2 <val>` | `capacitor` | `1`, `2` | Sets `value`. |
 | `L<id> n1 n2 <val>` | `inductor` | `1`, `2` | Sets `value`. |
-| `D<id> a k [model]` | `diode`, `zener`, `schottky`, `led` | `A`, `K` | Keeps `partNumber: model`. Detects Schottky (`1N58xx`, `SB*`, `SCHOTTKY`), Zener (`BZX*`, `1N47xx`, `ZENER`), and LED (`*LED*`). |
+| `D<id> a k [model]` | `diode`, `zener`, `schottky`, `led` | `A`, `K` | Keeps `partNumber: model`. Detects Schottky (`1N58xx`, `SB*`, `SCHOTTKY`), Zener (`BZX*`, `1N47xx`, `ZENER`) and LED (`*LED*`). |
 | `V<id> pos neg [spec]` | `ac-source`, `vsource`, `battery` | `1`/`2` (`ac-source`), `+`/`-` (`vsource`, `battery`) | Uses `ac-source` for `AC` or `SIN`/`SINE`, `battery` for DC sources with battery-style names (`VBAT`, `BAT*`), and `vsource` otherwise. |
-| `I<id> pos neg <val>` | `current-source` (when present in `BUILTIN`) or 2-pin `ic` | Symbol pins or `1`/`2` | Checks `BUILTIN["current-source"]` at runtime; falls back to a 2-pin `ic` box with a warning if absent. |
+| `I<id> pos neg <val>` | `current-source` | `-` (`pos`), `+` (`neg`) | Sets `value`. Maps to the built-in `current-source` symbol so the arrow points from `pos` towards `neg` (matching SPICE current direction). |
 | `Q<id> c b e [sub] <model>` | `npn`, `pnp` | `C`, `B`, `E` | Sets `partNumber: model`. Optional 4th substrate node is omitted with a warning. |
 | `M<id> d g s [b] <model>` | `nmos`, `pmos` | `D`, `G`, `S` | Sets `partNumber: model`. Optional 4th bulk node is silently dropped when tied to source, or warned when different. |
 | `X<id> n1..nN <subckt>` | `opamp` or `ic` | `3` (`IN+`), `2` (`IN-`), `1` (`OUT`) or `1..N` | See `.subckt` rules below. |
@@ -56,14 +74,14 @@ Unsupported elements (such as behavioural or controlled sources `E`, `F`, `G`, `
 - Internal cards between `.subckt <name> <pins...>` and `.ends` are not added to the top-level circuit. Nested `.subckt` blocks are tracked safely.
 - When `X<id> n1..nN <subckt>` references a `.subckt` defined in the same file, pin names are copied from the `.subckt` header and roles (`power_in`, `power_out`, `ground`, `input`, `output`, `bidir`) are inferred from pin names.
 - A 3-pin subcircuit maps to the built-in `opamp` symbol if its `.subckt` pins match `(in+, in-, out)` or its model name is a known op-amp (such as `LM741`, `TL072`, `OP07`, `LM358`).
-- A 5-pin known op-amp without a local `.subckt` maps to a 5-pin `ic` box with pins `IN+`, `IN-`, `V+`, `V-`, and `OUT`, keeping the power rail connections intact.
+- A 5-pin known op-amp without a local `.subckt` maps to a 5-pin `ic` box with pins `IN+`, `IN-`, `V+`, `V-` and `OUT`, keeping the power rail connections intact.
 
 ## Nets and directives
 
 - Node `0` and `GND` (any case) map to net `GND` with `kind: "ground"`.
-- Supply-named nodes (`VCC`, `VDD`, `5V`, `3V3`, `12V`, `-12V`, `VEE`, `VSS`, and similar) keep their name and inferred `kind` (`power` or `ground`).
+- Supply-named nodes (`VCC`, `VDD`, `5V`, `3V3`, `12V`, `-12V`, `VEE`, `VSS` and similar) keep their name and inferred `kind` (`power` or `ground`).
 - Node matching is case-insensitive, following SPICE convention. Nets are emitted in deterministic canonical order: power nets first, then ground nets (`GND` first), then signal nets, with endpoints sorted naturally.
-- Simulation directives (`.tran`, `.ac`, `.dc`, `.op`, `.param`, `.options`, `.plot`, `.print`, `.probe`, `.save`, `.ic`, `.nodeset`, `.include`, `.lib`, `.backanno`, and `.control`..`.endc` blocks) are ignored with informational notes in `warnings`.
+- Simulation directives (`.tran`, `.ac`, `.dc`, `.op`, `.param`, `.options`, `.plot`, `.print`, `.probe`, `.save`, `.ic`, `.nodeset`, `.include`, `.lib`, `.backanno` and `.control`..`.endc` blocks) are ignored with informational notes in `warnings`.
 
 ## Example
 
@@ -79,7 +97,7 @@ C1 out 0 100n
 .end
 ```
 
-Canonical `.schem` output produced by `importSpice()`:
+Canonical `.schem` output (see [Text schematics](dsl.md)):
 
 ```text
 circuit "RC Low-Pass Filter"
@@ -92,3 +110,20 @@ net GND kind=ground = C1[2] V1[2]
 net in = R1[1] V1[1]
 net out = C1[1] R1[2]
 ```
+
+## Programmatic TypeScript API (advanced)
+
+When calling the importer directly from TypeScript (`src/io/spice.ts`):
+
+```ts
+import { importSpice } from "../src/io/spice.js";
+
+const result = importSpice(spiceText);
+if (result.ok) {
+  // result.project is a validated LoadedProject ready for layout() or saveProject()
+  // result.dsl is the canonical .schem text from formatDsl()
+  // result.warnings lists informational notes and fallback warnings
+}
+```
+
+`SpiceImportResult` has the shape `{ ok: boolean; project?: LoadedProject; dsl?: string; warnings: string[]; errors: string[] }`.

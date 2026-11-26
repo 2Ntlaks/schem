@@ -55,7 +55,7 @@ net GND = RL[2] U1[3] V1[-] V2[-] V3[-]
 - Write one statement per line. A backslash at the end of the line continues the statement. Blank lines are allowed.
 - Outside a quoted string, `#` at the start of a line or after whitespace starts a comment. Inside a string, `#` is text. Use `\"` for a quote and `\\` for a backslash. Write options as `key=value` and quote a value that contains spaces.
 - Keywords and identifiers are case-sensitive. A part ID starts with a letter and can contain letters, digits and underscores. Part types include `resistor`, `ic`, `header` and shipped module names such as `module:esp32-devkitc-v4`.
-- Use `U1[21]` for a numbered pin, `U1.GPIO21` for a pin name or alias, and `U1{gnd}` for an internal group. A name that matches several pins can select the group if every match is in that group. Use pin numbers to resolve other ambiguous names. List available types and pins with `npm run schem -- components`. [Part and pin reference](parts.md).
+- Use `U1[21]` for a numbered pin, `U1.GPIO21` for a pin name or alias, and `U1{gnd}` for an internal group. A name that matches several pins can select the group if every match is in that group. Use pin numbers to resolve other ambiguous names. List available types with `npm run schem -- components` and inspect one type's pins with `npm run schem -- component <type>`. [Part and pin reference](parts.md).
 - Put inline pins on an IC or header after `pins:`. Each pin uses `[NUMBER:]NAME[/ROLE][@GROUP]`. For example, `part U1 ic "Controller" pins: 14:GND/ground@gnd 21:SDA/bidir`. Defaults are sequence numbers starting at 1 and a role inferred from the name. Common supply names become `power_in`, common ground names become `ground`, and the rest become `bidir`. Other roles are `power_out`, `input`, `output`, `passive` and `nc`.
 
 ## Statements
@@ -63,7 +63,7 @@ net GND = RL[2] U1[3] V1[-] V2[-] V3[-]
 | Statement | Effect |
 | --- | --- |
 | `circuit "LED indicator"` | Set the circuit title. |
-| `style theme=clean symbols=ieee` | Store sheet style options. |
+| `style theme=clean symbols=ieee` | Store sheet style options. See [Rendering themes](themes.md). |
 | `part R1 resistor 4.7k` | Declare a part. The first bare or quoted value is its `value`. Other properties use options such as `color=red` or `label="Front panel"`. |
 | `net GND kind=ground domain=analog = U1{gnd} C1[2]` | Declare or extend a named net. `kind` accepts `signal`, `power` or `ground`. With no kind, the name supplies the default. |
 | `connect R1[2] D1.anode` | Join two or more endpoints. If they touch existing nets, the usual merge rules apply. |
@@ -86,27 +86,32 @@ A terminal belongs to only one net. `connect` and `chain` refuse merges that joi
 
 `hint input J1` and `hint output SPK1` are flow hints. `group "Power supply" U1 C1 C2` is a group hint. The compiler recognises these statements and returns `E260`.
 
-## Formatting, edits and exports
+## CLI commands, formatting, edits and exports
+
+Run commands with `schem <command>` after installing (see [Installation and MCP setup](install.md)), or with `npm run schem -- <command>` from a repo clone.
 
 | Command | Result |
 | --- | --- |
-| `init [name]` | Create a valid starter circuit. The default is `circuit.schem`. End the name in `.json` for a JSON starter. |
-| `check <file>` | Report drawing status, metrics and findings. Use `--detail brief` for counts and tokens only, or `--cursor` for the next page of findings. |
-| `render <file> -o <file.svg>` | Export a verified drawing. For PNG use `--scale N` in pixels per grid unit or `--dpi N`, which also records the resolution. `--draft` allows an available low-confidence drawing. `--overwrite` replaces an existing export. |
-| `preview <file> -o <file.png>` | Export a PNG up to 1024 pixels on its longest side by default. Use `--max N` to change the cap. Use `--focus R1,U2` to crop to parts or `--finding ID` to focus on a finding from `check`. |
-| `query <file> part R1` or `query <file> net GND` | Show locations, pins and connections. A net can be selected by ID or name. |
-| `describe <file> --table` | Read the sheet size, parts, neighbours and connections. `--table` adds a net table. |
-| `components [query] --limit 20` | Search the symbol and module catalogue. Use the returned cursor to fetch another page. |
-| `edit <file> --ops <ops.json>` | Apply an edit script transactionally. `--dry-run` checks without saving. `--strict` refuses edits that move untouched parts beyond the stability limit. [Edit operations](editing.md). |
+| `init [name] [--template <name>]` | Create a valid starter circuit. Templates: `led` (default), `divider`, `opamp`, `regulator`, `i2c`, `bjt-amp`. The default file is `circuit.schem`. End the name in `.json` for a JSON starter. |
+| `check <file> [--detail brief\|normal\|full] [--cursor N]` | Report drawing status, metrics and findings. `--detail brief` prints counts and tokens only; `--cursor N` fetches the next page of findings. |
+| `render <file> -o <output.svg\|png> [--scale N \| --dpi N] [--theme <name>] [--transparent] [--draft] [--overwrite]` | Export a verified drawing. `--theme <name>` (`clean`, `dark`, `blueprint`, `textbook`, `mono-print`) sets the palette and `--transparent` omits the background ([Rendering themes](themes.md)). For PNG use `--scale N` in pixels per grid unit or `--dpi N`. `--draft` allows an available low-confidence drawing. `--overwrite` replaces an existing export. |
+| `preview <file> -o <output.png> [--max N] [--focus R1,U2 \| --finding ID]` | Export a PNG up to 1024 pixels on its longest side by default. Use `--max N` to change the cap. Use `--focus R1,U2` to crop to parts or `--finding ID` to focus on a finding from `check`. |
+| `query <file> part\|net ID` | Show locations, pins and connections. A net can be selected by ID or name. |
+| `describe <file> [--table] [--alt-text]` | Read the sheet size, parts, neighbours, connections and verified alt text. `--table` adds a net table. `--alt-text` prints only the verified alt-text line. |
+| `components [query] [--limit 20] [--cursor N]` | Search the symbol and module catalogue. Use the returned cursor to fetch another page. |
+| `component <type>` | Show full pin numbers, names, aliases, roles, groups, interfaces and module metadata for one symbol, `ic`, `header` or `module:*` type. |
+| `import <file.cir> [-o <output.schem>] [--overwrite]` | Import a SPICE netlist (`.cir`, `.sp`, `.net`) into canonical `.schem` text. Prints to stdout unless `-o` is given. See [SPICE import](spice-import.md). |
+| `edit <file> --ops <ops.json> [-o <dir>] [--strict] [--dry-run] [--expect-revision <R>] [--expect-layout <L>]` | Apply an edit script transactionally. `--dry-run` checks without saving. `--strict` refuses edits that move untouched parts beyond the stability limit. [Edit operations](editing.md). |
 | `undo <file>` | Restore the latest saved version from the project's history. |
-| `fmt <file>` | Format a file in place. `--to dsl` and `--to json` write a new sibling when changing formats. Existing siblings are protected. |
-| `draw <file> [-o <dir>]` | Write both SVG and PNG using the original drawing shortcut. |
+| `fmt <file> [--to dsl\|json]` | Format a file in place. `--to dsl` and `--to json` write a new sibling when changing formats. Existing siblings are protected. |
+| `draw <file> [-o <dir>] [--theme <name>] [--transparent]` | Write both SVG and PNG to `<dir>` (default `out`). Supports `--theme <name>` and `--transparent`. |
+| `watch <file> [-o <dir>] [--theme <name>] [--transparent]` | Draw once, then redraw SVG and PNG whenever `<file>` changes. |
 
 The commands with a circuit path accept `.schem` or JSON. Use `npm run --silent schem -- <command> --json` for a JSON response without the npm banner. Exit status `0` means success, `1` means invalid input or drawing, `2` means usage, `3` means an internal error, and `4` means a write lock or revision conflict. The older plain-text `draw` and `edit` forms retain exit `2` for unreadable JSON input.
 
 A text edit may reformat declarations and remove ordinary comments. The previous file is kept in `.schem-history`. A saved text file may end with a `# schem-layout:` comment. That comment lets the CLI reuse the verified placement and routing while the circuit and hints still match. It can be removed to draw afresh. Use the returned `revision` and `layoutToken` with `--expect-revision` and `--expect-layout` when applying edits based on a previous result.
 
-Conversion to text reports the fields it would lose. Unsupported fields include creation dates, extension metadata, nonstandard asset definitions, saved JSON layout caches, inline pin aliases or interface roles, and overrides on unnamed nets. The compiler regenerates the net and hint counters. A text file can also be passed directly as the `source` to the MCP `schem_create` tool.
+Conversion to text reports the fields it would lose. Unsupported fields include creation dates, extension metadata, nonstandard asset definitions, saved JSON layout caches, inline pin aliases or interface roles, and overrides on unnamed nets. The compiler regenerates the net and hint counters. Through MCP (Model Context Protocol; see [Installation and MCP setup](install.md)), pass `.schem` text directly as `source` to `schem_create`, or pass SPICE netlist text to `schem_import` to create a laid-out `.schem` or `.schem.json` file in one step.
 
 ## Diagnostics
 
