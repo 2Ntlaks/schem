@@ -110,6 +110,11 @@ export function defaultOrient(sym: SymbolDef, id: string, ctx: OrientContext): O
 
   if (sym.kind === "relay") return ROT0; // coil A1 at the top, contacts to the right of the coil
 
+  if (sym.kind === "switch") {
+    // Common pin on the left, throws on the right; mirror when used as a 2-to-1 selector.
+    return toRight(["COM"]) && fromLeft(["NO", "NC"]) ? MIRROR_X : ROT0;
+  }
+
   if (sym.kind === "header") {
     // Pins leave to the right; mirror when the circuit they feed lies to the left.
     return fromLeft(sym.pins.map((p) => p.number)) ? MIRROR_X : ROT0;
