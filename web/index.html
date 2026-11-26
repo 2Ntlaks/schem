@@ -26,6 +26,7 @@
         <div class="menu-list" role="menu" id="dl-menu" hidden>
           <button type="button" role="menuitem" data-dl="svg">Drawing, SVG</button>
           <button type="button" role="menuitem" data-dl="png">Drawing, PNG</button>
+          <button type="button" role="menuitem" data-dl="schem">Circuit file, .schem</button>
           <button type="button" role="menuitem" data-dl="json">Circuit file, JSON</button>
           <button type="button" role="menuitem" data-dl="share">Copy a share link</button>
         </div>
@@ -46,6 +47,7 @@
       <div class="pane-head">
         <span class="file" id="file-name">circuit.schem.json</span>
         <span class="hint">Ctrl+Enter draws now</span>
+        <button type="button" id="convert-btn" class="chip" title="Convert between .schem text and JSON">To .schem</button>
         <button type="button" id="tidy-btn" class="chip" title="One part and one net per line">Tidy</button>
       </div>
       <div class="coach" id="coach" hidden>

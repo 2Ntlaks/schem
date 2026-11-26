@@ -30,6 +30,8 @@
   --code-str: #e9c07f;
   --code-num: #9fd3a8;
   --code-lit: #e9805f;
+  --code-ep: #87d3d8;
+  --code-com: #6e7d96;
   --code-punct: #76829a;
   --code-line-err: rgba(233, 128, 95, 0.16);
 
@@ -138,8 +140,9 @@ code { font-family: var(--mono); font-size: 0.92em; }
   border-bottom: 1px solid var(--code-rule);
   font: 12px/1 var(--mono);
 }
-.file { color: var(--code-plain); }
+.file { color: var(--code-plain); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .file::before { content: ""; display: inline-block; width: 8px; height: 8px; border-radius: 2px; background: var(--code-str); margin-right: 9px; vertical-align: 0; }
+.file[data-format="dsl"]::before { background: var(--code-ep); }
 .hint { color: #8d99ae; margin-left: auto; }
 .coach { flex: none; display: flex; align-items: flex-start; gap: 12px; padding: 11px 12px 11px 16px; background: #222c3d; border-bottom: 1px solid var(--code-rule); box-shadow: inset 3px 0 var(--code-lit); }
 .coach[hidden] { display: none; }
@@ -185,6 +188,8 @@ code { font-family: var(--mono); font-size: 0.92em; }
 .t-str { color: var(--code-str); }
 .t-num { color: var(--code-num); }
 .t-lit { color: var(--code-lit); }
+.t-ep { color: var(--code-ep); }
+.t-com { color: var(--code-com); }
 .t-pun { color: var(--code-punct); }
 
 /* ---- parts panel (over the code) ---------------------------------------------------------- */
@@ -341,6 +346,7 @@ code { font-family: var(--mono); font-size: 0.92em; }
   .desk { height: calc(100dvh - var(--bar-h) - 42px); grid-template-columns: 1fr; }
   .desk[data-view="code"] .pane-sheet, .desk[data-view="sheet"] .pane-code { display: none; }
   .hint { display: none; }
+  #convert-btn { margin-left: auto; }
   .titleblock { right: 12px; bottom: 12px; width: calc(100% - 24px); }
   .zoom { left: 12px; bottom: auto; top: 12px; }
 }
