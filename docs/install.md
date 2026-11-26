@@ -2,7 +2,7 @@
 
 schem is one command, `schem`, with two jobs:
 
-- `schem draw`, `schem edit`, `schem check`, `schem render` and the other CLI commands work with `.schem` text DSL and `.schem.json` circuit files in a terminal (the CLI, command line interface).
+- `schem draw`, `schem edit`, `schem check`, `schem render`, `schem import`, `schem describe` and the other CLI commands work with `.schem` text DSL, `.schem.json` circuit files and SPICE netlists in a terminal (the CLI, command line interface).
 - `schem mcp` starts an MCP server: a program an AI agent (Claude Code, Claude Desktop, Cursor, VS Code, Codex CLI) talks to over stdin and stdout to get the schem tools. MCP is the Model Context Protocol, the common way these agents load tools.
 
 You need [Node.js](https://nodejs.org/) 22 or newer on Windows, macOS or Linux.
@@ -59,7 +59,7 @@ npm install -g schem-cli
 schem draw circuit.json -o drawings
 ```
 
-`schem --help` lists the commands and options. The `.schem` text DSL (domain-specific language) is in [dsl.md](dsl.md), the JSON netlist format in [netlist-format.md](netlist-format.md), the part types in [parts.md](parts.md), edit operations in [editing.md](editing.md) and recognised circuit templates in [templates.md](templates.md). These docs, the agent skill and the examples also ship inside the package, in `node_modules/schem-cli/docs/`, `node_modules/schem-cli/skills/schem/SKILL.md` and `node_modules/schem-cli/examples/`.
+`schem --help` lists the commands and options. Useful flags include `--theme <name>` (`clean`, `dark`, `blueprint`, `textbook`, `mono-print`) and `--transparent` on `schem render` and `schem draw`, `schem import <file.cir> [-o <output.schem>]` to convert SPICE netlists, and `schem describe <file> --alt-text` to print only the verified alt-text line. The `.schem` text DSL (domain-specific language) is in [dsl.md](dsl.md), the JSON netlist format in [netlist-format.md](netlist-format.md), the part types in [parts.md](parts.md), rendering themes in [themes.md](themes.md), SPICE import in [spice-import.md](spice-import.md), edit operations in [editing.md](editing.md) and recognised circuit templates in [templates.md](templates.md). These docs, the agent skill and the examples also ship inside the package, in `node_modules/schem-cli/docs/`, `node_modules/schem-cli/skills/schem/SKILL.md` and `node_modules/schem-cli/examples/`.
 
 ## The MCP server's options
 
@@ -74,7 +74,7 @@ schem mcp [--root <folder>]...
 
 There are no other options. The server reads and writes only inside its roots. Which folder a client starts the server in differs between clients, so give `--root` explicitly. Agents should pass absolute file paths in tool calls: a relative path is resolved against the folder the server was started in, not against the root.
 
-The 11 MCP tools are `schem_create`, `schem_edit`, `schem_check`, `schem_preview`, `schem_query`, `schem_render`, `schem_undo`, `schem_describe`, `schem_fmt`, `schem_components` and `schem_component`. `schem_create` accepts `.schem` text DSL (preferred for brevity), JSON text or a JSON object.
+The 12 MCP tools are `schem_create`, `schem_edit`, `schem_check`, `schem_preview`, `schem_query`, `schem_render`, `schem_undo`, `schem_describe`, `schem_fmt`, `schem_components`, `schem_component` and `schem_import`. `schem_create` accepts `.schem` text DSL (preferred for brevity), JSON text or a JSON object. `schem_import` converts a SPICE netlist string into a laid-out `.schem` or `.schem.json` file. `schem_render` accepts `theme` (`clean`, `dark`, `blueprint`, `textbook`, `mono-print`) and `transparent: true`, and `schem_describe` returns verified `altText` alongside the sheet summary.
 
 In the snippets below, replace `/path/to/your/circuits` with your folder. `npx -y` lets npx download the package without asking.
 
@@ -156,7 +156,7 @@ Or run `codex mcp add schem -- npx -y schem-cli mcp --root /path/to/your/circuit
 
 ## Agent skill
 
-schem ships a short instruction file for AI coding agents in [`skills/schem/SKILL.md`](../skills/schem/SKILL.md) (inside the npm package at `node_modules/schem-cli/skills/schem/SKILL.md`). It covers the 11 MCP tools, the CLI workflow, the `.schem` text DSL syntax and the check-edit-preview-render stopping rules.
+schem ships a short instruction file for AI coding agents in [`skills/schem/SKILL.md`](../skills/schem/SKILL.md) (inside the npm package at `node_modules/schem-cli/skills/schem/SKILL.md`). It covers all 12 MCP tools (including `schem_import`), rendering themes, `describe --alt-text`, the CLI workflow, the `.schem` text DSL syntax and the check-edit-preview-render stopping rules.
 
 Copy or link that folder into your agent's skills directory:
 
@@ -166,4 +166,4 @@ Copy or link that folder into your agent's skills directory:
 
 ## What the package contains
 
-The bundle `dist/schem.js`, the DejaVu Sans font it measures and outlines text with (with its licence), the docs (`dsl.md`, `netlist-format.md`, `parts.md`, `editing.md`, `templates.md` and `install.md`), the agent skill (`skills/schem/SKILL.md`) and the examples. Two dependencies are installed with it: `@resvg/resvg-js`, which turns the SVG into a PNG and comes with a prebuilt binary for your system, and `opentype.js`, which reads the font. `npm run pack:smoke` in the repo checks that a clean install draws exactly what the repo draws.
+The bundle `dist/schem.js`, the DejaVu Sans font it measures and outlines text with (with its licence), the docs (`dsl.md`, `netlist-format.md`, `parts.md`, `editing.md`, `templates.md`, `themes.md`, `spice-import.md` and `install.md`), the agent skill (`skills/schem/SKILL.md`) and the examples. Two dependencies are installed with it: `@resvg/resvg-js`, which turns the SVG into a PNG and comes with a prebuilt binary for your system, and `opentype.js`, which reads the font. `npm run pack:smoke` in the repo checks that a clean install draws exactly what the repo draws.

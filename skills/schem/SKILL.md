@@ -15,17 +15,17 @@ description: Draw and edit verified electronic schematics from text DSL (.schem)
 - **Prefer `.schem` text DSL over JSON** when creating a new circuit. It is shorter and easier to review.
 - **Stay inside configured roots.** Pass absolute paths when calling MCP tools.
 
-## MCP workflow (11 tools)
+## MCP workflow (12 tools)
 
 Follow this loop in order:
 
 1. **Discover parts:** Call `schem_components` (with optional `query`, `limit`, `cursor`) to search built-in symbols and modules. Call `schem_component` with `type` to read full pin numbers, names, aliases, roles, groups, interfaces, `refPrefix` and module docs before wiring pins.
-2. **Create:** Call `schem_create` with `path` (ending in `.schem` or `.schem.json`) and `source` (`.schem` text DSL preferred, or JSON text/object). The file must not exist yet.
+2. **Create or import:** Call `schem_create` with `path` (ending in `.schem` or `.schem.json`) and `source` (`.schem` text DSL preferred, or JSON text/object). Or call `schem_import` with `path` and `spice` (SPICE `.cir`/`.sp`/`.net` text) to convert, lay out and save a new project file. In both cases the target file must not exist yet.
 3. **Check:** Call `schem_check` to read `status`, `revision`, `layoutToken`, `counts` and findings (5 per page; pass `cursor` for more). A finding may carry a checked `fix`.
 4. **Edit:** Call `schem_edit` with `ops` from a checked fix or a visual adjustment (`place`, `setOrientation`, `align`, `setPinSides`, `setLabelSide`, `setNetStyle`, `setSpacing`, `lock`, `relayout`). Always pass `expectedLayout` from a finding's fix, and `expectedRevision` when you have it. Use `dryRun: true` to test without saving.
 5. **Undo if needed:** Call `schem_undo` to restore the latest snapshot from `.schem-history` if an edit makes the sheet worse.
-6. **Inspect:** Call `schem_preview` once at the end to check the PNG visually. If labels would be under 9 px, the tool returns an overview and a note: call `schem_preview` again with `focus` (part ids) or `finding` (finding id) to crop in. Use `schem_query` for exact part/pin/net coordinates, and `schem_describe` (optionally `table: true`) for a plain-text sheet summary and net table.
-7. **Render and format:** Call `schem_render` with `format: "svg"` or `"png"` and `out` (`scale` or `dpi` for PNG, never both; `overwrite: true` to replace). Use `schem_fmt` to format in place or convert (`to: "dsl"` or `"json"`).
+6. **Inspect:** Call `schem_preview` once at the end to check the PNG visually. If labels would be under 9 px, the tool returns an overview and a note: call `schem_preview` again with `focus` (part ids) or `finding` (finding id) to crop in. Use `schem_query` for exact part/pin/net coordinates, and `schem_describe` (optionally `table: true`) for a plain-text sheet summary, verified `altText` and net table.
+7. **Render and format:** Call `schem_render` with `format: "svg"` or `"png"` and `out` (`scale` or `dpi` for PNG, never both; `theme`: `clean`, `dark`, `blueprint`, `textbook`, `mono-print`; `transparent: true` to omit the background; `overwrite: true` to replace). Use `schem_fmt` to format in place or convert (`to: "dsl"` or `"json"`).
 
 ## Stopping rule
 
@@ -45,19 +45,21 @@ All commands accept `.schem` or `.schem.json` and `--json` for machine output:
 schem components [query] [--limit 20]
 schem component <type>
 schem init [name]
+schem import <file.cir> [-o <output.schem>] [--overwrite]
 schem check <file> [--detail brief|normal|full] [--cursor N]
 schem edit <file> --ops ops.json [--expect-revision R] [--expect-layout L] [--dry-run] [--strict]
 schem undo <file>
 schem preview <file> -o preview.png [--max 1024] [--focus R1,U2 | --finding ID]
 schem query <file> part R1
 schem query <file> net GND
-schem describe <file> [--table]
+schem describe <file> [--table] [--alt-text]
 schem fmt <file> [--to dsl|json]
-schem render <file> -o out.svg [--overwrite]
-schem render <file> -o out.png --dpi 300 [--overwrite]
+schem render <file> -o out.svg [--theme clean|dark|blueprint|textbook|mono-print] [--transparent] [--overwrite]
+schem render <file> -o out.png --dpi 300 [--theme dark] [--transparent] [--overwrite]
+schem draw <file> [-o out] [--theme <name>] [--transparent]
 ```
 
-Exit codes: `0` valid, `1` invalid or input error, `2` usage, `3` internal error, `4` lock or revision conflict.
+Exit codes: `0` valid, `1` invalid or input error, `2` usage, `3` internal error, `4` lock or revision conflict. Pass `--alt-text` to `schem describe` to print only the verified alt-text line for Markdown or blog posts.
 
 ## `.schem` quick syntax cheat sheet
 

@@ -4,6 +4,8 @@
 //   docs/netlist-format.md  -> "The circuit file"
 //   docs/parts.md           -> "Part types"
 //   docs/templates.md       -> "Recognised circuits"
+//   docs/themes.md          -> "Rendering themes"
+//   docs/spice-import.md    -> "Importing SPICE netlists"
 //   docs/editing.md         -> "Editing from the command line"
 //   docs/install.md         -> "Installing schem"
 // Links between these files become links within the page; other repository links go to GitHub.
@@ -22,6 +24,8 @@ export const SECTIONS = [
   { file: "docs/netlist-format.md", id: "format", title: "The circuit file" },
   { file: "docs/parts.md", id: "parts", title: "Part types" },
   { file: "docs/templates.md", id: "templates", title: "Recognised circuits" },
+  { file: "docs/themes.md", id: "themes", title: "Rendering themes" },
+  { file: "docs/spice-import.md", id: "spice", title: "Importing SPICE netlists" },
   { file: "docs/editing.md", id: "editing", title: "Editing from the command line" },
   { file: "docs/install.md", id: "install", title: "Installing schem" },
 ] as const;
