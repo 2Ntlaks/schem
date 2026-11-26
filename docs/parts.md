@@ -19,10 +19,12 @@ drawn as a box) and `header` (a connector).
 | `buzzer` |  | `+` (also `pos`, `p`), `-` (also `neg`, `n`) |  |
 | `capacitor` |  | `1`, `2` |  |
 | `crystal` |  | `1`, `2` |  |
+| `current-source` |  | `+` (also `pos`, `p`, `1`), `-` (also `neg`, `n`, `2`) |  |
 | `diode` |  | `A` (anode; also `a`, `+`), `K` (cathode; also `k`, `-`) |  |
 | `fuse` |  | `1`, `2` |  |
 | `ground` |  | `1` |  |
 | `inductor` |  | `1`, `2` |  |
+| `lamp` |  | `1`, `2` |  |
 | `led` |  | `A` (anode; also `a`, `+`, `1`), `K` (cathode; also `k`, `-`, `2`) |  |
 | `module:arduino-uno-r3` | Arduino UNO R3 | `JA-1` (NC), `JA-2` (IOREF), `JA-3` (RESET), `JA-4` (+3V3; also `3V3`), `JA-5` (+5V; also `5V`), `JA-6` (GND), `JA-7` (GND), `JA-8` (VIN), `JA-9` (A0; also `D14`), `JA-10` (A1; also `D15`), `JA-11` (A2; also `D16`), `JA-12` (A3; also `D17`), `JA-13` (A4; also `D18`), `JA-14` (A5; also `D19`), `JD-1` (D0; also `RX`), `JD-2` (D1; also `TX`), `JD-3` (D2), `JD-4` (D3), `JD-5` (D4), `JD-6` (D5), `JD-7` (D6), `JD-8` (D7), `JD-9` (D8), `JD-10` (D9), `JD-11` (D10; also `SS`), `JD-12` (D11; also `COPI`, `MOSI`), `JD-13` (D12; also `CIPO`, `MISO`), `JD-14` (D13; also `SCK`, `LED_BUILTIN`), `JD-15` (GND), `JD-16` (AREF), `JD-17` (SDA), `JD-18` (SCL), `ICSP-1` (CIPO), `ICSP-2` (+5V), `ICSP-3` (SCK), `ICSP-4` (COPI), `ICSP-5` (RESET), `ICSP-6` (GND), `ICSP1-1` (CIPO), `ICSP1-2` (+5V), `ICSP1-3` (SCK), `ICSP1-4` (COPI), `ICSP1-5` (RESET), `ICSP1-6` (GND) | `5V` (`JA-2`, `JA-5`, `ICSP-2`, `ICSP1-2`); `RESET` (`JA-3`, `ICSP-5`); `GND` (`JA-6`, `JA-7`, `JD-15`, `ICSP-6`, `ICSP1-6`); `A4_SDA` (`JA-13`, `JD-17`); `A5_SCL` (`JA-14`, `JD-18`); `D11_COPI` (`JD-12`, `ICSP-4`); `D12_CIPO` (`JD-13`, `ICSP-1`); `D13_SCK` (`JD-14`, `ICSP-3`) |
 | `module:esp32-devkitc-v4` | ESP32-DevKitC V4 | `J2-1` (3V3), `J2-2` (EN; also `CHIP_PU`), `J2-3` (VP; also `GPIO36`, `S_VP`), `J2-4` (VN; also `GPIO39`, `S_VN`), `J2-5` (IO34; also `GPIO34`), `J2-6` (IO35; also `GPIO35`), `J2-7` (IO32; also `GPIO32`), `J2-8` (IO33; also `GPIO33`), `J2-9` (IO25; also `GPIO25`, `DAC_1`), `J2-10` (IO26; also `GPIO26`, `DAC_2`), `J2-11` (IO27; also `GPIO27`), `J2-12` (IO14; also `GPIO14`, `MTMS`), `J2-13` (IO12; also `GPIO12`, `MTDI`), `J2-14` (GND), `J2-15` (IO13; also `GPIO13`, `MTCK`), `J2-16` (D2; also `GPIO9`), `J2-17` (D3; also `GPIO10`), `J2-18` (CMD; also `GPIO11`), `J2-19` (5V), `J3-1` (GND), `J3-2` (IO23; also `GPIO23`), `J3-3` (IO22; also `GPIO22`), `J3-4` (TX; also `GPIO1`, `U0TXD`), `J3-5` (RX; also `GPIO3`, `U0RXD`), `J3-6` (IO21; also `GPIO21`), `J3-7` (GND), `J3-8` (IO19; also `GPIO19`), `J3-9` (IO18; also `GPIO18`), `J3-10` (IO5; also `GPIO5`), `J3-11` (IO17; also `GPIO17`), `J3-12` (IO16; also `GPIO16`), `J3-13` (IO4; also `GPIO4`), `J3-14` (IO0; also `GPIO0`, `BOOT`), `J3-15` (IO2; also `GPIO2`), `J3-16` (IO15; also `GPIO15`, `MTDO`), `J3-17` (D1; also `GPIO8`), `J3-18` (D0; also `GPIO7`), `J3-19` (CLK; also `GPIO6`) | `GND` (`J2-14`, `J3-1`, `J3-7`) |
@@ -32,6 +34,7 @@ drawn as a box) and `header` (a connector).
 | `nmos` |  | `G` (gate; also `g`), `D` (drain; also `d`), `S` (source; also `s`) |  |
 | `npn` |  | `B` (base; also `b`), `C` (collector; also `c`), `E` (emitter; also `e`) |  |
 | `opamp` |  | `2` (IN-; also `-`, `inm`, `INM`), `3` (IN+; also `+`, `inp`, `INP`), `1` (OUT; also `out`, `o`) |  |
+| `photodiode` |  | `A` (anode; also `a`, `+`, `1`), `K` (cathode; also `k`, `-`, `2`) |  |
 | `pmos` |  | `G` (gate; also `g`), `D` (drain; also `d`), `S` (source; also `s`) |  |
 | `pnp` |  | `B` (base; also `b`), `C` (collector; also `c`), `E` (emitter; also `e`) |  |
 | `polarised-capacitor` |  | `+` (also `pos`, `p`), `-` (also `neg`, `n`) |  |
@@ -40,6 +43,8 @@ drawn as a box) and `header` (a connector).
 | `relay` |  | `A1`, `A2`, `11` (COM), `12` (NC), `14` (NO) |  |
 | `resistor` |  | `1`, `2` |  |
 | `schottky` |  | `A` (anode; also `a`, `+`), `K` (cathode; also `k`, `-`) |  |
+| `spdt` |  | `COM` (also `com`, `c`, `1`), `NO` (also `no`, `2`), `NC` (also `nc`, `3`) |  |
+| `speaker` |  | `+` (also `pos`, `p`, `1`), `-` (also `neg`, `n`, `2`) |  |
 | `spst` |  | `1`, `2` |  |
 | `supply` |  | `1` |  |
 | `vsource` |  | `+` (also `pos`, `p`), `-` (also `neg`, `n`) |  |
