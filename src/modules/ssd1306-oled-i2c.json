@@ -1,0 +1,49 @@
+{
+  "id": "module:ssd1306-oled-i2c",
+  "version": 1,
+  "kind": "module",
+  "name": "SSD1306 I2C OLED Display (4-pin)",
+  "refPrefix": "OLED",
+  "controller": false,
+  "doc": {
+    "title": "SparkFun Qwiic OLED 1.3in (SSD1306) Schematic (breakout header J3) and Hardware Overview",
+    "url": "https://github.com/sparkfun/SparkFun_Qwiic_OLED_1.3in/blob/main/docs/assets/board_files/SparkFun_Qwiic_OLED_1.3in_Schematic.pdf",
+    "url2": "https://docs.sparkfun.com/SparkFun_Qwiic_OLED_1.3in/hardware_overview/",
+    "revision": "Qwiic_OLED_1.3in rev v10 (schematic date 2023-06-09; controller SSD1306)",
+    "retrieved": "2026-11-26",
+    "pinNumbering": "Pins 1-4 follow breakout header J3 (and Qwiic connectors J1/J2) on the rev v10 schematic: 1 GND, 2 VCC, 3 SDA, 4 SCL.",
+    "notes": "4-pin I2C OLED breakout driven by Solomon Systech SSD1306 (default I2C address 0x3D on this board, 0x3C when ADDR jumper closed; 2.2 kOhm I2C pull-ups on board). VCC is 3.3 V power input (VDD on schematic, silkscreen 3V3)."
+  },
+  "pins": [
+    {
+      "number": "1",
+      "name": "GND",
+      "role": "ground"
+    },
+    {
+      "number": "2",
+      "name": "VCC",
+      "role": "power_in",
+      "aliases": [
+        "3V3",
+        "VDD"
+      ]
+    },
+    {
+      "number": "3",
+      "name": "SDA",
+      "role": "bidir",
+      "iface": [
+        "i2c.sda"
+      ]
+    },
+    {
+      "number": "4",
+      "name": "SCL",
+      "role": "input",
+      "iface": [
+        "i2c.scl"
+      ]
+    }
+  ]
+}
