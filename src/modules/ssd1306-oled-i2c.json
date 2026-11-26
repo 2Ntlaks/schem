@@ -2,7 +2,7 @@
   "id": "module:ssd1306-oled-i2c",
   "version": 1,
   "kind": "module",
-  "name": "SSD1306 I2C OLED Display (4-pin)",
+  "name": "SSD1306 I2C OLED Display",
   "refPrefix": "OLED",
   "controller": false,
   "doc": {

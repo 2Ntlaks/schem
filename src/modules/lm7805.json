@@ -2,7 +2,7 @@
   "id": "module:lm7805",
   "version": 1,
   "kind": "module",
-  "name": "LM7805 5V 1.5A Linear Voltage Regulator (TO-220)",
+  "name": "LM7805 5V Linear Regulator",
   "refPrefix": "U",
   "controller": false,
   "doc": {

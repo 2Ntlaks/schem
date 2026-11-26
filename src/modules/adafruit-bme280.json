@@ -2,7 +2,7 @@
   "id": "module:adafruit-bme280",
   "version": 1,
   "kind": "module",
-  "name": "Adafruit BME280 Temperature Humidity Pressure Sensor",
+  "name": "Adafruit BME280 Breakout",
   "refPrefix": "U",
   "controller": false,
   "doc": {

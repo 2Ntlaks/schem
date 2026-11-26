@@ -1,0 +1,16 @@
+circuit "Raspberry Pi Pico with SSD1306 I2C OLED display"
+style theme=clean
+
+part U1 module:raspberry-pi-pico
+part OLED1 module:ssd1306-oled-i2c
+part R1 resistor 4.7k
+part R2 resistor 4.7k
+part R3 resistor 330
+part D1 led color=green
+
+net 3V3 = U1.3V3 OLED1.VCC R1[1] R2[1]
+net GND = U1{GND} OLED1.GND D1.cathode
+net SDA = U1.GP4 OLED1.SDA R1[2]
+net SCL = U1.GP5 OLED1.SCL R2[2]
+connect U1.GP15 R3[1]
+connect R3[2] D1.anode
