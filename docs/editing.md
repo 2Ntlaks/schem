@@ -1,7 +1,7 @@
 # Editing a circuit file
 
-`schem edit` changes a circuit file and redraws it **without reshuffling the drawing**: the parts
-you did not touch stay where they were. Use it instead of editing the file by hand when the
+`schem edit` changes a `.schem` text file ([`dsl.md`](dsl.md)) or `.schem.json` file ([`netlist-format.md`](netlist-format.md)) and redraws it **without reshuffling the drawing**: the parts
+you did not touch stay where they were. Use it (or the MCP `schem_edit` tool) instead of editing the file by hand when the
 drawing is already in a report, a slide or a conversation and should not jump around.
 
 ```sh
@@ -46,10 +46,13 @@ A bare list of operations (`[ {...}, {...} ]`) works too.
 4. The file is saved, the previous version is copied to `.schem-history/` next to it, and the SVG
    and PNG are written to `out/` (change it with `-o <folder>`).
 
-The saved file is written in full form: endpoints sorted, the default `intent` and `assets`
-fields filled in, and a `layout` section that holds the drawing. That section is how the next
-`draw` or `edit` keeps the same drawing. Do not edit it by hand; if you change the circuit by
-hand, schem notices that the layout no longer matches and draws the file afresh.
+For `.schem.json` files, the saved file is written in full form: endpoints sorted, the default
+`intent` and `assets` fields filled in, and a `layout` section that holds the drawing. For `.schem`
+text files, declarations are formatted cleanly (ordinary comments are dropped) and the drawing is
+stored in a trailing `# schem-layout:` comment. That saved layout is how the next `draw` or `edit`
+keeps the same drawing. Do not edit it by hand; if you change the circuit by hand, schem notices
+that the layout no longer matches and draws the file afresh. Use `schem undo <file>` (or MCP
+`schem_undo`) to restore the latest snapshot from `.schem-history/`.
 
 <!-- checked: src/edit/edit.ts edit() (D4: saved only if valid), src/io/layout-cache.ts (basis check), src/cli.ts snapshot() -->
 
@@ -64,8 +67,8 @@ grid step, 0.1 inch). The limit is:
 - at most one net the edit did not involve is rerouted;
 - a locked part never moves.
 
-On 137 random test edits, 133 stay inside this limit. When an edit goes past it, schem still
-saves it and says so:
+On 137 random test edits, 134 stay inside this limit (97.8%). When an edit goes past it, schem
+still saves it and says so:
 
 ```
   warning: this edit moves untouched parts more than the limit (an untouched part moved 8 G (at most 6)). It is saved anyway; --strict refuses such edits.
@@ -95,15 +98,15 @@ token (the same, plus the drawing). An agent that edits in several steps can pas
 is refused with exit code 4 instead of overwriting their work. The ops file may also carry them
 as `expectedRevision` and `expectedLayout`.
 
-**Exit codes:** `0` saved (or checked, with `--dry-run`), `1` refused and nothing written, `2`
-the file or the operations could not be read, `4` the file changed since the expected revision or
-layout.
+**Exit codes:** `0` saved (or checked, with `--dry-run`), `1` invalid or refused and nothing
+written, `2` usage error (or unreadable JSON input in plain-text mode), `3` internal error, `4`
+conflict (write lock or the file changed since the expected revision or layout).
 
 <!-- checked: src/cli.ts dispatch() and edit() -->
 
 ## Operations
 
-Pins are written as in a circuit file: `R1[2]`, `U1.SDA`, `U1{GND}`. See
+Pins are written as in a circuit file: `R1[2]`, `U1.SDA`, `U1{GND}`. See [`dsl.md`](dsl.md) and
 [`netlist-format.md`](netlist-format.md).
 
 **Circuit operations** change what is connected:

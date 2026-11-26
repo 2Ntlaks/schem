@@ -1,7 +1,10 @@
 # The circuit file format
 
-A circuit file is JSON. It lists the parts and the nets that connect them. The engine lays the
-drawing out from that description, so you do not place anything by hand.
+A circuit file can be written in JSON (`.schem.json`, described here) or in the shorter `.schem`
+text DSL (see [`dsl.md`](dsl.md)). Both compile to the same circuit model, and `schem fmt --to dsl`
+or `--to json` converts between them. You can also import existing SPICE netlists with `schem import`
+(see [`spice-import.md`](spice-import.md)). The engine lays the drawing out from the netlist alone,
+so you do not place anything by hand.
 
 Draw a file with:
 
@@ -34,7 +37,7 @@ A part has:
 
 - `id`: required. It starts with a letter and may then use letters, digits and underscores, for
   example `R1` or `U2`. Two parts may not share an id.
-- `type`: required. One of the part types in `docs/parts.md`, such as `resistor`, `led`, `opamp`
+- `type`: required. One of the part types in [`parts.md`](parts.md), such as `resistor`, `led`, `opamp`
   or `module:esp32-devkitc-v4`.
 - `props`: optional. An object whose values are all strings, for example `"value": "470"`. The
   engine keeps the values as written; what each name means depends on the part type.
@@ -104,8 +107,9 @@ in a net.
 ## Optional layout hints
 
 A file may also have an `intent` object. It can hold hints and locks that guide the layout, plus
-overrides and style settings. It is optional: a file without it draws normally. The fields and
-their rules are described in `SPEC.md`.
+overrides and style settings (such as `intent.style.theme`; see [`themes.md`](themes.md)). It is
+optional: a file without it draws normally. The fields and their rules are described in
+[`SPEC.md`](../SPEC.md).
 
 <!-- checked: src/io/project.ts loadProject() (INTENT keys; intent is optional) -->
 
@@ -116,7 +120,7 @@ next draw or edit keeps it. You never write it yourself. See [`editing.md`](edit
 
 ## Worked example
 
-`examples/led.schem.json` in full:
+[`examples/led.schem.json`](../examples/led.schem.json) in full:
 
 ```json
 {
