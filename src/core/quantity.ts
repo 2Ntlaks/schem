@@ -14,7 +14,7 @@ export function quantityOf(type: string, key: string): Unit | undefined {
   if (/^(capacitor|polarized-capacitor|polarised-capacitor)$/.test(type)) return "farad";
   if (type === "inductor") return "henry";
   if (/^(battery|vsource|dc-source|ac-source)$/.test(type)) return "volt";
-  if (/^(isource|fuse)$/.test(type)) return "amp";
+  if (/^(isource|current-source|fuse)$/.test(type)) return "amp";
   if (type === "crystal") return "hertz";
   return undefined;
 }

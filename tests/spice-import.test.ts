@@ -293,7 +293,7 @@ R999 ignored 0 999k
     expect(layout(p).status).toBe("valid");
   });
 
-  it("handles current source dynamically with warning fallback when symbol is absent", () => {
+  it("handles current source dynamically and maps SPICE current direction to current-source pins", () => {
     const sp = `Current Source Load
 I1 0 out 1mA
 R1 out 0 10k
@@ -302,7 +302,11 @@ R1 out 0 10k
     const res = importSpice(sp);
     expect(res.ok, res.errors.join("; ")).toBe(true);
     const p = res.project!;
-    expect(p.circuit.parts.find((x) => x.id === "I1")).toBeDefined();
+    const srcPart = p.circuit.parts.find((x) => x.id === "I1");
+    expect(srcPart).toBeDefined();
+    expect(srcPart?.type).toBe("current-source");
+    expect(p.circuit.nets.find((n) => n.name === "out")?.endpoints).toContain("I1[+]");
+    expect(p.circuit.nets.find((n) => n.name === "GND")?.endpoints).toContain("I1[-]");
     const laid = layout(p);
     expect(laid.status).toBe("valid");
     expect(checkDrawing(p.circuit, laid.pinDefs, laid.render!).valid).toBe(true);

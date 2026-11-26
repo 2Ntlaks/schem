@@ -713,11 +713,13 @@ export function importSpice(source: string): SpiceImportResult {
 
       const currentSym = BUILTIN["current-source"];
       if (currentSym && currentSym.pins.length >= 2) {
+        // SPICE `Ixxx n+ n- val` drives current from n+ internally to n- (arrow points to n-).
+        // On BUILTIN["current-source"], pins[0] (+) is the arrow tip and pins[1] (-) is the tail.
         const p0 = currentSym.pins[0]!.number;
         const p1 = currentSym.pins[1]!.number;
         parts.push({ id, type: "current-source", props: { value: safePartValue("current-source", cleanVal) } });
-        connect(pos, `${id}[${p0}]`);
-        connect(neg, `${id}[${p1}]`);
+        connect(neg, `${id}[${p0}]`);
+        connect(pos, `${id}[${p1}]`);
       } else {
         warnings.push(`Line ${stmt.line}: "current-source" symbol is not available in BUILTIN; mapped "${id}" to a 2-pin ic block.`);
         parts.push({
