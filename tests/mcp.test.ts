@@ -75,6 +75,7 @@ describe("protocol", () => {
       "schem_fmt",
       "schem_components",
       "schem_component",
+      "schem_import",
     ]);
 
     const unknownTool = JSON.parse(handleMessage(s, rpc(6, "tools/call", { name: "schem_nope", arguments: {} }))!);
@@ -193,10 +194,12 @@ describe("stdio", () => {
       const initResult = init.result as { instructions: string };
       expect(initResult.instructions).toContain(".schem");
       expect(initResult.instructions).toContain("schem_component");
+      expect(initResult.instructions).toContain("schem_import");
+      expect(initResult.instructions).toContain("altText");
       child.stdin.write(`${JSON.stringify({ jsonrpc: "2.0", method: "notifications/initialized" })}\n`);
 
       const list = await send(2, "tools/list", {});
-      expect(((list.result as { tools: Array<{ name: string }> }).tools).map((t) => t.name)).toHaveLength(11);
+      expect(((list.result as { tools: Array<{ name: string }> }).tools).map((t) => t.name)).toHaveLength(12);
 
       const comps = await send(3, "tools/call", { name: "schem_components", arguments: { query: "esp32" } });
       const compsBody = JSON.parse(((comps.result as ToolResult).content[0] as { text: string }).text) as { components: Array<{ id: string }> };
@@ -235,6 +238,39 @@ describe("stdio", () => {
       expect(fmtBody.saved).toBe(true);
       expect(fmtBody.format).toBe("json");
       expect(existsSync(join(dir, "led.schem.json"))).toBe(true);
+
+      const spicePath = join(dir, "rc.schem");
+      const spiceNetlist = [
+        "RC Low-Pass Filter",
+        "V1 in 0 AC 1",
+        "R1 in out 1k",
+        "C1 out 0 100n",
+        ".ac dec 10 10 100k",
+        ".end",
+      ].join("\n");
+      const importRes = await send(10, "tools/call", {
+        name: "schem_import",
+        arguments: { path: spicePath, spice: spiceNetlist, detail: "normal" },
+      });
+      expect((importRes.result as ToolResult).isError).toBe(false);
+      const importBody = JSON.parse(((importRes.result as ToolResult).content[0] as { text: string }).text) as {
+        status: string;
+        verified: boolean;
+        saved: boolean;
+        revision: string;
+        layoutToken: string;
+        warnings: string[];
+        counts: { parts: number; nets: number };
+        findings: unknown[];
+      };
+      expect(importBody.status).toBe("valid");
+      expect(importBody.verified).toBe(true);
+      expect(importBody.saved).toBe(true);
+      expect(importBody.counts.parts).toBe(3);
+      expect(importBody.counts.nets).toBe(3);
+      expect(importBody.warnings.length).toBeGreaterThan(0);
+      expect(Array.isArray(importBody.findings)).toBe(true);
+      expect(existsSync(spicePath)).toBe(true);
     } finally {
       child.stdin.end();
       await new Promise<void>((resolve) => {
@@ -286,6 +322,21 @@ describe("file roots and limits", () => {
       expect(jumpRes.isError, `${tool} junction outside`).toBe(true);
       expect(String(textOf(jumpRes).error)).toContain("outside");
     }
+
+    const spiceText = "RC\nV1 in 0 5\nR1 in 0 1k\n.end\n";
+    const importOutside = callTool(session.roots, "schem_import", {
+      path: join(outside, "imp.schem"), spice: spiceText, detail: "brief",
+    });
+    expect(importOutside.isError).toBe(true);
+    expect(String(textOf(importOutside).error)).toContain("outside");
+    expect(existsSync(join(outside, "imp.schem"))).toBe(false);
+
+    const importJump = callTool(session.roots, "schem_import", {
+      path: join(ROOT_DIR, "jump", "imp-jump.schem"), spice: spiceText, detail: "brief",
+    });
+    expect(importJump.isError).toBe(true);
+    expect(String(textOf(importJump).error)).toContain("outside");
+    expect(existsSync(join(outside, "imp-jump.schem"))).toBe(false);
   });
 
   it("refuses to replace a file symlink when the operating system allows one", () => {
@@ -724,5 +775,121 @@ describe("undo, describe and fmt tools", () => {
     expect(callTool(s.roots, "schem_fmt", { path: dslFile, to: "xml" }).isError).toBe(true);
     expect(callTool(s.roots, "schem_fmt", { path: join(dir, "missing.schem") }).isError).toBe(true);
     expect(callTool(s.roots, "schem_fmt", {}).isError).toBe(true);
+  }, 120_000);
+});
+
+describe("schem_import tool", () => {
+  const RC_SPICE = [
+    "RC Low-Pass Filter",
+    "* First-order filter",
+    "V1 in 0 SIN(0 1 1k)",
+    "R1 in out 1k",
+    "C1 out 0 100n",
+    ".ac dec 20 10 100k",
+    ".end",
+    "",
+  ].join("\n");
+
+  const CLEAN_DIVIDER = [
+    "Voltage Divider",
+    "V1 in 0 5",
+    "R1 in out 10k",
+    "R2 out 0 10k",
+    ".end",
+    "",
+  ].join("\n");
+
+  it("imports SPICE into .schem and .schem.json with matching check tokens and exclusive create", () => {
+    const dir = join(ROOT_DIR, "import-case");
+    mkdirSync(dir);
+    const s = createSession([dir]);
+
+    const dslPath = join(dir, "rc.schem");
+    const dslRes = callTool(s.roots, "schem_import", { path: dslPath, spice: RC_SPICE });
+    expect(dslRes.isError, JSON.stringify(textOf(dslRes))).toBe(false);
+    const dslBody = textOf(dslRes);
+    expect(dslBody).toMatchObject({
+      status: "valid",
+      verified: true,
+      saved: true,
+      counts: { parts: 3, nets: 3, errors: 0 },
+    });
+    expect(typeof dslBody.path).toBe("string");
+    expect(typeof dslBody.revision).toBe("string");
+    expect(typeof dslBody.layoutToken).toBe("string");
+    expect(Array.isArray(dslBody.warnings)).toBe(true);
+    expect((dslBody.warnings as string[]).some((w) => w.includes(".ac"))).toBe(true);
+    expect(Array.isArray(dslBody.findings)).toBe(true);
+
+    const writtenDsl = readFileSync(dslPath, "utf8");
+    expect(writtenDsl).toContain('circuit "RC Low-Pass Filter"');
+    expect(writtenDsl).toContain("# schem-layout: ");
+
+    const checkedDsl = callTool(s.roots, "schem_check", { path: dslPath, detail: "brief" });
+    expect(checkedDsl.isError, JSON.stringify(textOf(checkedDsl))).toBe(false);
+    expect(textOf(checkedDsl).revision).toBe(dslBody.revision);
+    expect(textOf(checkedDsl).layoutToken).toBe(dslBody.layoutToken);
+
+    // Refuses to overwrite existing file
+    const again = callTool(s.roots, "schem_import", { path: dslPath, spice: RC_SPICE, detail: "brief" });
+    expect(again.isError).toBe(true);
+    expect(String(textOf(again).error)).toContain("already exists");
+    expect(readFileSync(dslPath, "utf8")).toBe(writtenDsl);
+
+    // Supports .schem.json and detail=full / detail=brief, with warnings always returned as an array
+    const jsonPath = join(dir, "divider.schem.json");
+    const jsonRes = callTool(s.roots, "schem_import", { path: jsonPath, spice: CLEAN_DIVIDER, detail: "full" });
+    expect(jsonRes.isError, JSON.stringify(textOf(jsonRes))).toBe(false);
+    const jsonBody = textOf(jsonRes);
+    expect(jsonBody).toMatchObject({
+      status: "valid",
+      verified: true,
+      saved: true,
+      warnings: [],
+      counts: { parts: 3, nets: 3, errors: 0 },
+    });
+    expect(jsonBody.metrics).toBeDefined();
+    expect(Array.isArray(jsonBody.findings)).toBe(true);
+    const loadedJson = loadProject(readFileSync(jsonPath, "utf8")).project!;
+    expect(jsonBody.revision).toBe(revision(loadedJson));
+    const state = fromLayoutCache(loadedJson.layoutCache, String(jsonBody.revision)).state;
+    expect(state).toBeDefined();
+    expect(jsonBody.layoutToken).toBe(layoutToken(loadedJson, state!));
+
+    const briefPath = join(dir, "brief.schem");
+    const briefRes = callTool(s.roots, "schem_import", { path: briefPath, spice: CLEAN_DIVIDER, detail: "brief" });
+    expect(briefRes.isError, JSON.stringify(textOf(briefRes))).toBe(false);
+    expect(textOf(briefRes).findings).toBeUndefined();
+    expect(textOf(briefRes).warnings).toEqual([]);
+  }, 120_000);
+
+  it("rejects invalid arguments, bad SPICE netlists, oversized input and circuits over 500 parts", () => {
+    const dir = join(ROOT_DIR, "import-errors");
+    mkdirSync(dir);
+    const s = createSession([dir]);
+
+    expect(callTool(s.roots, "schem_import", { spice: RC_SPICE }).isError).toBe(true);
+    expect(callTool(s.roots, "schem_import", { path: join(dir, "a.schem") }).isError).toBe(true);
+    expect(callTool(s.roots, "schem_import", { path: join(dir, "a.schem"), spice: "   " }).isError).toBe(true);
+    expect(callTool(s.roots, "schem_import", { path: join(dir, "a.schem"), spice: 42 }).isError).toBe(true);
+    expect(callTool(s.roots, "schem_import", { path: join(dir, "a.schem"), spice: RC_SPICE, detail: "verbose" }).isError).toBe(true);
+
+    const emptySpice = callTool(s.roots, "schem_import", { path: join(dir, "empty.schem"), spice: "* comment only\n.end\n" });
+    expect(emptySpice.isError).toBe(true);
+    expect(existsSync(join(dir, "empty.schem"))).toBe(false);
+
+    const huge = callTool(s.roots, "schem_import", {
+      path: join(dir, "huge.schem"),
+      spice: `* ${"x".repeat(2 * 1024 * 1024 + 1)}\n.end\n`,
+    });
+    expect(huge.isError).toBe(true);
+    expect(String(textOf(huge).error)).toContain("2 MB");
+    expect(existsSync(join(dir, "huge.schem"))).toBe(false);
+
+    const manyLines = ["Too Many Parts", ...Array.from({ length: 501 }, (_, i) => `R${i + 1} n${i} n${i + 1} 1k`), ".end"].join("\n");
+    const tooMany = callTool(s.roots, "schem_import", { path: join(dir, "many.schem"), spice: manyLines, detail: "brief" });
+    expect(tooMany.isError).toBe(true);
+    expect(String(textOf(tooMany).error)).toContain("500");
+    expect(existsSync(join(dir, "many.schem"))).toBe(false);
   }, 120_000);
 });

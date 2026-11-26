@@ -107,6 +107,28 @@ describe("text schematics at the command line", () => {
     expect(cli("describe", dsl, "--table")).toMatchObject({
       code: 0, body: { description: expect.stringContaining("R1 (resistor)"), table: expect.arrayContaining([expect.objectContaining({ name: "PWR" })]) },
     });
+    const descAltJson = cli("describe", dsl, "--alt-text");
+    expect(descAltJson).toMatchObject({
+      code: 0,
+      body: {
+        status: "valid",
+        verified: true,
+        description: expect.stringContaining("R1 (resistor)"),
+        altText: expect.any(String),
+      },
+    });
+    const altOut: string[] = [], altErr: string[] = [];
+    const altCode = run(["describe", dsl, "--alt-text"], { out: (line) => altOut.push(line), err: (line) => altErr.push(line) });
+    expect(altCode).toBe(0);
+    expect(altErr).toEqual([]);
+    expect(altOut).toEqual([String(descAltJson.body.altText)]);
+    expect(altOut[0]).not.toContain("Alt text:");
+    expect(altOut[0]).not.toContain("grid units.");
+    const altTableOut: string[] = [], altTableErr: string[] = [];
+    const altTableCode = run(["describe", dsl, "--table", "--alt-text"], { out: (line) => altTableOut.push(line), err: (line) => altTableErr.push(line) });
+    expect(altTableCode).toBe(0);
+    expect(altTableErr).toEqual([]);
+    expect(altTableOut).toEqual([String(descAltJson.body.altText)]);
     const crop = join(dir, "focus.png"), preview = cli("preview", dsl, "-o", crop, "--focus", "D1", "--max", "160");
     expect(preview).toMatchObject({ code: 0, body: { focus: ["D1"] } });
     const bytes = readFileSync(crop);
