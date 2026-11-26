@@ -44,7 +44,7 @@ Usage:
   npm run schem -- check <file> [--detail brief|normal|full] [--cursor N]
   npm run schem -- preview <file> -o <output.png> [--max N] [--focus R1,U2 | --finding ID]
   npm run schem -- query <file> part|net ID
-  npm run schem -- describe <file> [--table]
+  npm run schem -- describe <file> [--table] [--alt-text]
   npm run schem -- components [query] [--limit 20]
   npm run schem -- component <type>
   npm run schem -- fmt <file> [--to dsl|json]
@@ -388,7 +388,7 @@ const SHARED = {
   query: { values: [], flags: [] },
   undo: { values: [], flags: [] },
   fmt: { values: ["to"], flags: [] },
-  describe: { values: [], flags: ["table"] },
+  describe: { values: [], flags: ["table", "alt-text"] },
   components: { values: ["limit", "cursor"], flags: [] },
   component: { values: [], flags: [] },
 } satisfies Record<string, { values: string[]; flags: string[] }>;
@@ -476,15 +476,18 @@ function shared(verb: SharedVerb, argv: string[], io: Io): number {
       return usage(`--${flag} needs a positive ${flag === "limit" ? "integer" : "number"}.`);
     args[key] = number;
   }
+  const altTextOnly = verb === "describe" && options.has("alt-text");
+  if (altTextOnly) delete args["alt-text"];
   const roots = rootsFor(typeof args.path === "string" ? args.path : undefined);
   const name = verb === "init" ? "schem_create" : `schem_${verb}`;
-  return emit(executeCommand(roots, name, args), json, io);
+  return emit(executeCommand(roots, name, args), json, io, altTextOnly);
 }
 
-function emit(result: CommandResult, json: boolean, io: Io): number {
+function emit(result: CommandResult, json: boolean, io: Io, altTextOnly = false): number {
   const { body } = result;
   if (json) io.out(JSON.stringify(body, null, 2));
   else if (result.isError) io.err(String(body.error ?? body.status ?? "The command failed."));
+  else if (altTextOnly && typeof body.altText === "string") io.out(body.altText);
   else if (typeof body.description === "string") {
     io.out(body.description);
     if (typeof body.altText === "string") io.out(`\nAlt text: ${body.altText}`);
