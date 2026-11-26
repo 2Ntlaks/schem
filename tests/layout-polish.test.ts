@@ -4,11 +4,15 @@
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import type { Circuit } from "../src/core/model.js";
+import { edit } from "../src/edit/edit.js";
+import { stabilityBreaks } from "../src/edit/report.js";
 import { readProject } from "../src/io/project.js";
 import { layout, type Project } from "../src/layout/layout.js";
 import { checkDrawing } from "../src/quality/index.js";
 import { toSvg } from "../src/render/svg.js";
 import { verify } from "../src/verify/verify.js";
+import { generate } from "./support/generate.js";
+import { randomEdit } from "./support/random-edits.js";
 
 function draw(circuit: Circuit) {
   const project: Project = { meta: { title: "layout-polish" }, circuit };
@@ -84,5 +88,19 @@ describe("astable multivibrator crossing reduction", () => {
     const q = checkDrawing(project.circuit, r.pinDefs, r.render!);
     expect(q.valid).toBe(true);
     expect(q.metrics.crossings).toBe(1);
+  });
+});
+
+describe("incremental edit stability", () => {
+  it("keeps untouched columns in place on add-part edits whose existing outlines still clear", () => {
+    for (const seed of [80, 89, 143]) {
+      const g = generate(seed, 5);
+      const base = layout({ circuit: g.circuit });
+      expect(base.status.startsWith("valid"), `seed ${seed}`).toBe(true);
+      const e = randomEdit(g.circuit, seed * 31);
+      const r = edit({ project: { circuit: g.circuit }, previous: base.state, ops: e.ops });
+      expect(r.saved, `seed ${seed}`).toBe(true);
+      expect(stabilityBreaks(r.report!), `seed ${seed}`).toEqual([]);
+    }
   });
 });
