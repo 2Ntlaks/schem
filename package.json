@@ -1,6 +1,6 @@
 {
   "name": "schem-cli",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Turn a JSON netlist into a clean, verified schematic drawing (SVG and PNG). A CLI and an MCP server for AI agents.",
   "keywords": [
     "schematic",
