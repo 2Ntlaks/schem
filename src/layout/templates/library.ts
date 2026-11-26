@@ -708,6 +708,8 @@ function ledAstable(): Template {
   const interior: Rel[] = [];
   const trunks: NonNullable<Template["trunks"]> = [];
   const nets: Template["nets"] = { SUP: { kind: ["power"], port: true }, GND: { kind: ["ground"], port: true } };
+  // Each collector's timing capacitor connects straight to the opposite base's bias column on
+  // the same side, so the two base wires cross once in the centre below the capacitors.
   for (const [side, other] of [["L", "R"], ["R", "L"]] as const) {
     const left = side === "L";
     const q = "q" + side, load = "load" + side, led = "led" + side, bias = "bias" + side, cap = "cap" + side;
@@ -718,9 +720,9 @@ function ledAstable(): Template {
       { name: q, types: ["npn"], role: "member", orient: left ? MIRROR : UPRIGHT, label: left ? "left" : "right",
         rank: { offset: 0 }, pins: [{ pin: "C", net: collector }, { pin: "B", net: base }, { pin: "E", net: "GND" }] },
       { name: cap, types: ["capacitor"], role: "member", symmetric: true, orient: { net: collector, dir: left ? "left" : "right" },
-        label: left ? "above" : "below", pins: [{ pin: "1", net: collector }, { pin: "2", net: nextBase }] },
+        label: "above", pins: [{ pin: "1", net: collector }, { pin: "2", net: nextBase }] },
       { name: bias, types: ["resistor"], role: "member", symmetric: true, orient: { net: "SUP", dir: "up" },
-        label: left ? "left" : "right", pins: [{ pin: "1", net: "SUP" }, { pin: "2", net: base }] },
+        label: left ? "left" : "right", pins: [{ pin: "1", net: "SUP" }, { pin: "2", net: nextBase }] },
       { name: load, types: ["resistor"], role: "member", symmetric: true, orient: { net: collector, dir: "down" },
         label: left ? "left" : "right", pins: [{ pin: "1", net: series }, { pin: "2", net: collector }] },
       { name: led, types: ["led"], role: "member", orient: { net: "SUP", dir: "up" }, label: left ? "left" : "right",
@@ -730,28 +732,45 @@ function ledAstable(): Template {
       rel("x", pin(load, net(collector)), "=", pin(q, "C"), 0, "collector load above the transistor"),
       rel("x", pin(led, "K"), "=", pin(q, "C"), 0, "LED in the collector column"),
       rel("y", pin(led, "K"), "=", pin(load, net(series)), -2, "LED immediately above its resistor"),
-      rel("y", pin(load, net(collector)), "=", pin(q, "C"), -8, "room for the feedback taps"),
-      rel("x", pin(bias, net(base)), left ? ">=" : "<=", pin(q, "B"), left ? 3 : -3, "base bias inside its transistor"),
-      left ? rel("x", env(bias, "left"), ">=", env(load, "right"), 0, "clear the left load label")
-        : rel("x", env(bias, "right"), "<=", env(load, "left"), 0, "clear the right load label"),
-      rel("y", pin(bias, net(base)), "=", pin(load, net(collector)), -2, "bias resistors above the timing network"),
-      rel("x", pin(cap, net(nextBase)), "=", pin("bias" + other, net(nextBase)), left ? -2 : 2, "capacitor leads into the opposite base column"),
-      rel("y", pin(cap, net(collector)), "=", pin(q, "C"), left ? -6 : -2, "separate collector feedback rows"),
+      rel("y", pin(load, net(collector)), "=", pin(q, "C"), -8, "room for the timing capacitor and its label"),
+      rel("y", pin(cap, net(collector)), "=", pin(q, "C"), -3, "timing capacitors level above the collectors"),
+      rel("x", pin(cap, net(collector)), left ? ">=" : "<=", pin(q, "C"), left ? 2 : -2, "capacitor starts at least 2 G inside its collector"),
+      left ? rel("x", env(cap, "left"), ">=", pin(q, "C"), 1, "capacitor label clear of its collector wire")
+        : rel("x", env(cap, "right"), "<=", pin(q, "C"), -1, "capacitor label clear of its collector wire"),
+      rel("x", pin(bias, net(nextBase)), left ? ">=" : "<=", pin(cap, net(nextBase)), left ? 2 : -2, "bias column at least 2 G beyond its capacitor"),
+      left ? rel("x", pin(bias, net(nextBase)), ">=", env(cap, "right"), 1, "bias wire clear of the capacitor label")
+        : rel("x", pin(bias, net(nextBase)), "<=", env(cap, "left"), -1, "bias wire clear of the capacitor label"),
+      left ? rel("x", env(bias, "left"), ">=", env(load, "right"), 1, "clear the left load body")
+        : rel("x", env(bias, "right"), "<=", env(load, "left"), -1, "clear the right load body"),
+      rel("y", pin(bias, net(nextBase)), "<=", env(cap, "top"), -1, "bias resistor above the capacitor label"),
+      rel("y", pin(bias, net(nextBase)), "=", pin(load, net(collector)), -2, "bias resistors aligned above the timing row"),
     );
-    // The opposite capacitor joins this vertical bias wire at a T. Where it crosses
-    // the other feedback row there is no junction.
-    const biasPin = pin(bias, net(base)), basePin = pin(q, "B");
-    trunks.push({ net: base, why: "base bias column turning into the transistor",
-      points: [{ x: biasPin, y: biasPin, dy: 1 }, { x: biasPin, y: basePin }, { x: basePin, y: basePin, dx: left ? 1 : -1 }],
-      require: [{ pin: [bias, net(base)], dir: "down" }, { pin: [q, "B"], dir: left ? "right" : "left" }] });
   }
   interior.push(
     rel("y", pin("qL", "B"), "=", pin("qR", "B"), 0, "transistors at the same height"),
-    rel("x", pin("biasR", net("BR")), ">=", pin("biasL", net("BL")), 8, "two timing paths between the bias columns"),
-    rel("x", env("capL", "left"), ">=", pin("biasL", net("BL")), 1, "left bias wire clears the upper capacitor label"),
-    rel("x", pin("biasR", net("BR")), ">=", env("capR", "right"), 1, "right bias wire clears the lower capacitor label"),
+    rel("x", pin("biasR", net("BL")), ">=", pin("biasL", net("BR")), 6, "centre space for the single cross-over and supply symbols"),
   );
-  return { id: "npn-led-astable", version: 1, priority: 3, summary: "Two grounded NPNs with LED loads and cross-coupled timing capacitors", nets, slots, interior, trunks };
+  // BL runs from biasR down to qL's base row; BR runs from biasL down to 2 G above the base row,
+  // crosses BL once, and steps down into qR's base.
+  trunks.push(
+    { net: "BL", why: "right bias column down to left transistor base",
+      points: [
+        { x: pin("biasR", net("BL")), y: pin("biasR", net("BL")), dy: 1 },
+        { x: pin("biasR", net("BL")), y: pin("qL", "B") },
+        { x: pin("qL", "B"), dx: 1, y: pin("qL", "B") },
+      ],
+      require: [{ pin: ["biasR", net("BL")], dir: "down" }, { pin: ["qL", "B"], dir: "right" }] },
+    { net: "BR", why: "left bias column crossing once to right transistor base",
+      points: [
+        { x: pin("biasL", net("BR")), y: pin("biasL", net("BR")), dy: 1 },
+        { x: pin("biasL", net("BR")), y: pin("qR", "B"), dy: -3 },
+        { x: pin("qR", "B"), dx: -2, y: pin("qR", "B"), dy: -3 },
+        { x: pin("qR", "B"), dx: -2, y: pin("qR", "B") },
+        { x: pin("qR", "B"), dx: -1, y: pin("qR", "B") },
+      ],
+      require: [{ pin: ["biasL", net("BR")], dir: "down" }, { pin: ["qR", "B"], dir: "left" }] },
+  );
+  return { id: "npn-led-astable", version: 2, priority: 3, summary: "Two grounded NPNs with LED loads and cross-coupled timing capacitors", nets, slots, interior, trunks };
 }
 
 /**

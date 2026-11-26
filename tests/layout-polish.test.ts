@@ -1,9 +1,12 @@
 // General layout polish tests: top supply-pin ordering (power_in left of power_out),
 // astable multivibrator crossing reduction, and incremental edit stability.
 
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import type { Circuit } from "../src/core/model.js";
+import { readProject } from "../src/io/project.js";
 import { layout, type Project } from "../src/layout/layout.js";
+import { checkDrawing } from "../src/quality/index.js";
 import { toSvg } from "../src/render/svg.js";
 import { verify } from "../src/verify/verify.js";
 
@@ -50,5 +53,36 @@ describe("top supply-pin ordering", () => {
     expect(pin("U1", "1").dir).toBe("up");
     expect(pin("U1", "3").dir).toBe("up");
     expect(pin("U1", "1").at[0]).toBeLessThan(pin("U1", "3").at[0]);
+  });
+});
+
+describe("astable multivibrator crossing reduction", () => {
+  it("draws the cross-coupled astable with a single centre crossing, level capacitors, and no readability breaches", () => {
+    const project = readProject(join(import.meta.dirname, "../bench/circuits/multivibrator.schem.json")).project!;
+    const r = layout(project);
+    expect(r.status).toBe("valid");
+    const q = checkDrawing(project.circuit, r.pinDefs, r.render!);
+    expect(q.valid).toBe(true);
+    expect(q.breaches).toEqual([]);
+    expect(q.conventions).toEqual([]);
+    expect(q.metrics.crossings).toBe(1);
+    const pins = r.render!.electrical.pins;
+    const c1 = pins.find((p) => p.part === "C1" && p.number === "1")!;
+    const c2 = pins.find((p) => p.part === "C2" && p.number === "1")!;
+    expect(c1.at[1]).toBe(c2.at[1]);
+  });
+
+  it("stays valid under long bias resistor values without interior contradiction", () => {
+    const project = readProject(join(import.meta.dirname, "../bench/circuits/multivibrator.schem.json")).project!;
+    for (const id of ["R2", "R3"]) {
+      const part = project.circuit.parts.find((p) => p.id === id)!;
+      part.props = { ...part.props, value: "470k 1% MF" };
+    }
+    const r = layout(project);
+    expect(r.status).toBe("valid");
+    expect(r.state!.templates?.some((k) => k.startsWith("npn-led-astable@"))).toBe(true);
+    const q = checkDrawing(project.circuit, r.pinDefs, r.render!);
+    expect(q.valid).toBe(true);
+    expect(q.metrics.crossings).toBe(1);
   });
 });
