@@ -21,7 +21,7 @@ column is the template's id in [`src/layout/templates/library.ts`](../src/layout
 
 | Circuit | What schem looks for | How it is drawn | Id |
 |---|---|---|---|
-| Inverting or summing amplifier | An op-amp with a resistor from its output to IN-, and one or more resistors into IN- | Inputs come in from the left, one row each, and meet in one column in front of IN-. The feedback resistor runs above the op-amp. | `opamp-inverting` |
+| Inverting, summing or difference amplifier | An op-amp with a resistor from its output to IN-, one or more resistors into IN-, and optional input and shunt resistors on IN+ | Inputs come in from the left, one row each, and meet in one column in front of IN-. The feedback resistor runs above the op-amp. | `opamp-inverting` |
 | Non-inverting amplifier | An op-amp with a resistor from its output to IN-, and a resistor from IN- to ground | The op-amp is turned so IN+ is on top and the input runs straight in. The feedback resistor lies below, the ground resistor stands under the node. | `opamp-noninverting` |
 
 ## Active filters
@@ -57,10 +57,10 @@ output drives is drawn to its right. Examples:
 
 | Circuit | What schem looks for | How it is drawn | Id |
 |---|---|---|---|
-| Two-transistor LED oscillator | Two grounded NPN emitters. Each collector connects through a timing capacitor to the opposite base. Each base has a resistor to the positive supply. Each collector connects to that supply through a resistor and then an LED. | The transistors stand side by side with their bases facing inward and their loads above. Follow each capacitor across its own row to the junction dot on the opposite base wire. | `npn-led-astable` |
+| Two-transistor LED oscillator | Two grounded NPN emitters. Each collector connects through a timing capacitor to the opposite base. Each base has a resistor to the positive supply. Each collector connects to that supply through a resistor and then an LED. | The transistors stand side by side with their bases facing inward and their LED and resistor loads above. Both timing capacitors sit on one row above the collectors, each connecting to the bias resistor column on its side, and the two base wires cross once in the centre below them. | `npn-led-astable` |
 | H-bridge | Four transistors in two legs between one supply and ground, P-type on the high side and N-type on the low side (MOSFETs or BJTs), with a load between the two leg midpoints | Two vertical legs side by side, high side above low side, the load lying between the midpoints. Gate or base resistors face outward. | `h-bridge-pmos-nmos`, `h-bridge-pnp-npn` |
 | Differential pair | Two transistors sharing a tail resistor, with a current mirror of the opposite type as their load | Two vertical legs, the mirror on top, the pair below, the tail resistor centred under the pair. Inputs face outward. | `diff-pair-npn-pnp-mirror`, `diff-pair-nmos-pmos-mirror` |
-| Low-side switch | An NPN transistor or N-channel MOSFET with its emitter or source on ground and a load (a relay coil, motor, resistor) from its collector or drain to the supply | The load above the transistor on one vertical line. The base or gate resistor lies on the left; a flyback diode stands beside the load. | `low-side-npn-relay`, `low-side-nmos-relay`, `low-side-npn-two-pin`, `low-side-nmos-two-pin` |
+| Low-side switch | An NPN transistor or N-channel MOSFET with its emitter or source on ground and a load (a relay coil, motor, resistor or inductor) from its collector or drain to the supply | The load above the transistor on one vertical line. The base or gate resistor lies on the left; a flyback diode stands beside the load. | `low-side-npn-relay`, `low-side-nmos-relay`, `low-side-npn-two-pin`, `low-side-nmos-two-pin` |
 
 ## Power, buses and small parts
 
@@ -68,7 +68,7 @@ output drives is drawn to its right. Examples:
 |---|---|---|---|
 | Bridge rectifier | Four diodes forming a full bridge | Two vertical diode legs side by side, AC in from the left at the midpoints, + on top. | `bridge-rectifier` |
 | I2C bus with pull-ups | Two nets whose pins carry the `i2c.sda` and `i2c.scl` roles, with a resistor from each to one supply | The controller on the left, SDA above SCL as two straight lines, the pull-ups just above them, the other chips in a row below. | `i2c-pullups` |
-| Voltage divider | Two resistors in series between a supply and ground, with something connected to the point between them | One vertical column, the tap between the resistors. | `voltage-divider` |
+| Voltage divider | Two resistors in series between a supply and ground, with something connected to the point between them | One vertical column with the tap between the resistors, or with the lower resistor staggered right when the tap connects 4 or more pins. | `voltage-divider` |
 | Pull-up, pull-down | A resistor from a signal to a supply or to ground | Vertical, from the supply or ground symbol to the signal wire. | `pull-up`, `pull-down` |
 | LED with its resistor | A resistor in series with an LED | In one line, the resistor first. Vertical when the LED goes to ground. | `led-series-vertical`, `led-series` |
 
@@ -78,8 +78,8 @@ drawn standing next to that pin.
 ## When two templates fit
 
 A part belongs to one template at most. When two templates want the same part, the one earlier in
-this order wins: op-amp stages and filters, then transistor circuits, the bridge rectifier, the
-I2C bus, the low-side switch, and last the small ones (divider, pull-up, LED). Between two of the
+this order wins: op-amp stages, filters and oscillators, then transistor circuits, the bridge
+rectifier, the I2C bus, the low-side switch, and last the small ones (divider, pull-up, LED). Between two of the
 same rank, the one that covers more parts wins. That is why a Sallen-Key filter with gain is drawn
 as one filter and not as a non-inverting amplifier with loose parts around it.
 

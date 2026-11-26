@@ -2,7 +2,7 @@
 
 schem is one command, `schem`, with two jobs:
 
-- `schem draw`, `schem edit`, `schem check`, `schem render`, `schem import`, `schem describe` and the other CLI commands work with `.schem` text DSL, `.schem.json` circuit files and SPICE netlists in a terminal (the CLI, command line interface).
+- `schem init`, `schem draw`, `schem watch`, `schem edit`, `schem check`, `schem render`, `schem import`, `schem describe` and the other CLI commands work with `.schem` text DSL, `.schem.json` circuit files and SPICE netlists in a terminal (the CLI, command line interface).
 - `schem mcp` starts an MCP server: a program an AI agent (Claude Code, Claude Desktop, Cursor, VS Code, Codex CLI) talks to over stdin and stdout to get the schem tools. MCP is the Model Context Protocol, the common way these agents load tools.
 
 You need [Node.js](https://nodejs.org/) 22 or newer on Windows, macOS or Linux.
@@ -59,7 +59,7 @@ npm install -g schem-cli
 schem draw circuit.json -o drawings
 ```
 
-`schem --help` lists the commands and options. Useful flags include `--theme <name>` (`clean`, `dark`, `blueprint`, `textbook`, `mono-print`) and `--transparent` on `schem render` and `schem draw`, `schem import <file.cir> [-o <output.schem>]` to convert SPICE netlists, and `schem describe <file> --alt-text` to print only the verified alt-text line. The `.schem` text DSL (domain-specific language) is in [dsl.md](dsl.md), the JSON netlist format in [netlist-format.md](netlist-format.md), the part types in [parts.md](parts.md), rendering themes in [themes.md](themes.md), SPICE import in [spice-import.md](spice-import.md), edit operations in [editing.md](editing.md) and recognised circuit templates in [templates.md](templates.md). These docs, the agent skill and the examples also ship inside the package, in `node_modules/schem-cli/docs/`, `node_modules/schem-cli/skills/schem/SKILL.md` and `node_modules/schem-cli/examples/`.
+`schem --help` lists all commands and options. Useful commands and flags include `schem init [name] --template <name>` to create a starter `.schem` file (`led`, `divider`, `opamp`, `regulator`, `i2c`, `bjt-amp`), `schem watch <file> [-o <dir>]` to redraw SVG and PNG automatically whenever the file changes, `--theme <name>` (`clean`, `dark`, `blueprint`, `textbook`, `mono-print`) and `--transparent` on `schem render`, `schem draw` and `schem watch`, `schem import <file.cir> [-o <output.schem>]` to convert SPICE netlists, and `schem describe <file> --alt-text` to print only the verified alt-text line. The `.schem` text DSL (domain-specific language) is in [dsl.md](dsl.md), the JSON netlist format in [netlist-format.md](netlist-format.md), the part types in [parts.md](parts.md), rendering themes in [themes.md](themes.md), SPICE import in [spice-import.md](spice-import.md), edit operations in [editing.md](editing.md) and recognised circuit templates in [templates.md](templates.md). These docs, the agent skill and the examples also ship inside the package, in `node_modules/schem-cli/docs/`, `node_modules/schem-cli/skills/schem/SKILL.md` and `node_modules/schem-cli/examples/`.
 
 ## The MCP server's options
 

@@ -42,7 +42,7 @@ Where it stands (2026-11-26):
 |---|---|---|---|---|
 | Before the general-layout work | 8 of 18 | 2118.1 | - | - |
 | General-layout milestone (2026-11-10) | 18 of 18 | 1167.1 | - | ~2.9 s |
-| Current `neon/usability-sprint` | 18 of 18 | 886.9 | 134 of 137 (97.8%) | ~1.1 s (limit 3.0 s) |
+| Current main (2026-11-26) | 18 of 18 | 886.9 | 134 of 137 (97.8%) | ~1.1 s (limit 3.0 s) |
 
 ## How the general layout works
 
