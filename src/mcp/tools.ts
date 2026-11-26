@@ -11,17 +11,15 @@ export interface ToolResult {
   isError: boolean;
 }
 
-const LATER = new Set(["schem_undo", "schem_components", "schem_component"]);
-
 export const TOOLS: Array<{ name: string; description: string; inputSchema: Record<string, unknown> }> = [
   {
     name: "schem_create",
-    description: "Create a new project file from a netlist and draw it. source may be text DSL, JSON text, or a JSON object. The file must not already exist. The reply has status, revision, layoutToken, counts and, unless detail is brief, the first findings.",
+    description: "Create a new project file from a netlist and draw it. source may be .schem text DSL (preferred for brevity), JSON text, or a JSON object. The file must not already exist. The reply has status, revision, layoutToken, counts and, unless detail is brief, the first findings.",
     inputSchema: {
       type: "object",
       properties: {
         path: { type: "string", description: "Project file to create, inside a configured root." },
-        source: { description: "The netlist as text DSL, a JSON string, or a JSON object." },
+        source: { description: "The netlist as .schem text DSL (preferred), a JSON string, or a JSON object." },
         detail: { type: "string", enum: ["brief", "normal", "full"], description: "brief is counts only. normal adds the first findings. full also adds metrics. Default normal." },
       },
       required: ["path", "source"],
@@ -59,13 +57,14 @@ export const TOOLS: Array<{ name: string; description: string; inputSchema: Reco
   },
   {
     name: "schem_preview",
-    description: "Return a PNG of the drawing. maxSize is the longer side in pixels (default 1024, at most 8000). focus is part ids. If fitting the whole sheet would make labels smaller than 9 px, the image is still the overview and the text says to ask again with focus.",
+    description: "Return a PNG of the drawing. maxSize is the longer side in pixels (default 1024, at most 8000). focus is part ids, or pass finding with a finding id from schem_check (not both). If fitting the whole sheet would make labels smaller than 9 px, the image is still the overview and the text says to ask again with focus.",
     inputSchema: {
       type: "object",
       properties: {
         path: { type: "string" },
         maxSize: { type: "number" },
         focus: { description: "Part ids to crop to: a list, or a comma-separated string." },
+        finding: { type: "string", description: "Finding id from schem_check to crop to. Pass focus or finding, not both." },
       },
       required: ["path"],
     },
@@ -100,10 +99,67 @@ export const TOOLS: Array<{ name: string; description: string; inputSchema: Reco
       required: ["path", "format", "out"],
     },
   },
+  {
+    name: "schem_undo",
+    description: "Restore the latest saved snapshot of a project file from its .schem-history folder. Refuses if no history exists or the snapshot does not draw validly. Returns the restored revision, layoutToken and counts.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        path: { type: "string", description: "Project file to restore, inside a configured root." },
+      },
+      required: ["path"],
+    },
+  },
+  {
+    name: "schem_describe",
+    description: "Return a plain-text description of a verified drawing: sheet size, crossing count, part positions and orientations, neighbours and net connections. Set table to true to also return structured net rows.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        path: { type: "string", description: "Project file to describe, inside a configured root." },
+        table: { type: "boolean", description: "Include a structured table of nets, presentations and connected pins." },
+      },
+      required: ["path"],
+    },
+  },
+  {
+    name: "schem_fmt",
+    description: "Format a project file in place, or convert between .schem text DSL and .schem.json when to is given. Converting writes a new sibling file without overwriting an existing one. Conversion to dsl fails cleanly if the JSON uses fields text DSL cannot represent.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        path: { type: "string", description: "Project file to format or convert, inside a configured root." },
+        to: { type: "string", enum: ["dsl", "json"], description: "Target format. Omit to format in place." },
+      },
+      required: ["path"],
+    },
+  },
+  {
+    name: "schem_components",
+    description: "Search the built-in symbol and module catalogue. Returns paginated component ids, kinds and pins. Use cursor for further pages, or call schem_component for full pin metadata on one type.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        query: { type: "string", description: "Optional case-insensitive substring filter on component id or module name." },
+        limit: { type: "integer", minimum: 1, description: "Maximum number of entries per page (default 20)." },
+        cursor: { type: "string", description: "Decimal offset for the next page, returned by an earlier call." },
+      },
+    },
+  },
+  {
+    name: "schem_component",
+    description: "Return full pin metadata for one built-in symbol, ic, header or module:* type: pin numbers, names, aliases, roles, groups, interfaces, refPrefix and module doc metadata. Returns close matches if the type is unknown.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        type: { type: "string", description: "Component type id, such as resistor, opamp, ic, header or module:esp32-devkitc-v4." },
+      },
+      required: ["type"],
+    },
+  },
 ];
 
 export function callTool(roots: Roots, name: string, args: unknown): ToolResult {
-  if (LATER.has(name)) return failure(`${name} is not in this server. Use the CLI for undo and the component catalogue.`);
   if (!TOOLS.some((tool) => tool.name === name)) return failure(`unknown tool "${name}".`);
   if (typeof args !== "object" || args === null || Array.isArray(args)) return failure("arguments must be an object.");
   const result = executeCommand(roots, name, args as Record<string, unknown>);
