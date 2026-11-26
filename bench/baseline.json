@@ -12,12 +12,12 @@
     "levelshift": 67.9,
     "mcu": 72,
     "mixer-ce": 56.4,
-    "multivibrator": 63.3,
+    "multivibrator": 58.3,
     "ne555": 41.3,
     "pushpull": 61.3,
-    "regulator": 38.9,
+    "regulator": 37,
     "schmitt": 32.6,
-    "sensor-node": 92.1,
+    "sensor-node": 77.8,
     "shift": 53.8
   }
 }

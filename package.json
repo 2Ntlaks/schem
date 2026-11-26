@@ -37,6 +37,8 @@
     "docs/parts.md",
     "docs/editing.md",
     "docs/templates.md",
+    "docs/themes.md",
+    "docs/spice-import.md",
     "docs/install.md",
     "skills/schem/SKILL.md",
     "examples/*.schem.json",

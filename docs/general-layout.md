@@ -36,12 +36,13 @@ image.** Update the baseline only when you have looked at every drawing that cha
 
 Two blind AI judges compared the old and new drawing of every bench circuit, shuffled and unlabelled, on 2026-11-11. One preferred the new drawing in 17 of 18 pairs with one tie; the other in 16, with one tie and one marginal vote for the old emitter follower. Mean marks out of 5: old 2.2 and 1.9, new 3.9 and 3.8. Their most common complaints about the new drawings are the first five open jobs below.
 
-Where it stands (2026-11-10):
+Where it stands (2026-11-26):
 
-| | Valid drawings | Total score |
-|---|---|---|
-| Before the general-layout work | 8 of 18 | 2118.1 |
-| After | 18 of 18 | 1167.1 |
+| | Valid drawings | Total score | Edit stability | Gate 6 warm p95 (30-part) |
+|---|---|---|---|---|
+| Before the general-layout work | 8 of 18 | 2118.1 | - | - |
+| General-layout milestone (2026-11-10) | 18 of 18 | 1167.1 | - | ~2.9 s |
+| Current `neon/usability-sprint` | 18 of 18 | 886.9 | 134 of 137 (97.8%) | ~1.1 s (limit 3.0 s) |
 
 ## How the general layout works
 
@@ -99,13 +100,10 @@ pass. Layout engine changes need an agreed issue first (see `AGENTS.md`).
 
 | Job | Seen in | What is wrong today | Where to work |
 |---|---|---|---|
-| Regulators | `regulator`, `sensor-node` | A three-terminal regulator has IN and OUT side by side on top. IN belongs on the left and OUT on the right, with the rail drawn as a wire through it. Pull request 7 (series supply path) is the start; it needs rebasing on this engine. | `icFor` in `src/layout/layout.ts`, `grok/power-path` |
-| Long labels widen columns | `sensor-node` | A module's long title pushes its whole column apart. Wrap or shorten the title, or let it overhang. | `labelFor` in `src/layout/layout.ts` |
-| A wire looping under a divider | `ce-amp`, `follower`, `mixer-ce` | The wire from the bias divider's tap to the base goes down, under the lower resistor and back up. Both blind judges named this as the one real defect in otherwise good drawings. Cause: the input capacitor joins the tap from the left, and a second wire leaving the same point to the right would make a four-way junction, which SPEC 9.1 rule 9 forbids; the router also refuses to join 1 G from a junction. Two ways out, and the owner should choose: allow a dotted four-way junction at a divider tap (how most textbooks draw it), or shift the lower resistor 2 G sideways so the line gets two T junctions. | `DIVIDER` in `src/layout/templates/library.ts`, the join rules in `src/layout/router.ts` |
-| Instrumentation amplifier | `inamp` | Drawn left to right. A template could show the symmetry of the two input stages. | `src/layout/templates/library.ts`, `docs/templates.md` |
-| Edit stability | `npx tsx scripts/edit-sweep.ts` | 131 of 137 random edits are stable (the gate is 95%). Two of the six failures are a longer label pushing the next column 8 G. | `src/layout/layout.ts` (incremental mode) |
-| Speed | `npm run gates`, gate 6 | The generated 30-part circuit takes about 2.9 s for layout plus checked fixes; the limit is 3 s. A failed fix runs the whole fallback chain. | `src/layout/layout.ts` (the `retry` chain), `src/edit/findings.ts` |
-| More bench circuits | - | The corpus has no crystal oscillator, switching converter or relay logic, because their symbols are in open pull requests 2 to 4. Add circuits as the symbols land. | `bench/circuits/` |
+| Differentiator squeezed run | `differentiator` | `opamp-inverting` does not reserve its output tap column `T`, so a downstream wire runs 1 G next to the tap (`squeezedRuns: 1`). | `OPAMP_INVERTING` in `src/layout/templates/library.ts`, `tests/opamp-templates.test.ts` |
+| RC / RL filter template | PR #5 (`grok/rc-rl-filter`) | Matching `rc-rl-filter` regresses `ne555` and drops random-edit stability below 95% (130 of 137) by claiming existing parts into new rigid regions during incremental edits. | `src/layout/templates/library.ts`, incremental mode in `src/layout/layout.ts` |
+| Edit stability (longer values) | `npx tsx scripts/edit-sweep.ts` | 134 of 137 random edits are stable (97.8%; gate is 95%). Three longer-value edits (`#28`, `#50`, `#76`) still move untouched parts or reroute extra nets when a long value label pushes neighbours sideways. | `src/layout/layout.ts` (incremental label placement) |
+| More bench circuits | - | Add bench circuits covering the new symbols (`crystal`, `inductor`, `zener`, `schottky`, `current-source`, `spdt`, `photodiode`) and board modules. | `bench/circuits/` |
 | Calibrate the score | - | The weights in `scripts/lib/bench-score.ts` are judgement. Compare the scores with blind ratings and adjust. | `scripts/lib/bench-score.ts` |
 
 ## Adding a bench circuit

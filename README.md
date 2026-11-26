@@ -28,10 +28,10 @@ Built for AI agents, pleasant for people.
 
 An agent can tell you that an ESP32 drives a relay through a transistor with a flyback diode. Ask it to *draw* that, and it has to pick every coordinate itself, and when the picture comes out wrong it has nothing to go on but the picture. schem takes the drawing off its hands:
 
-- **You write a netlist.** Parts and the pins they connect. No coordinates, no wires, no layout.
+- **You write a netlist.** Parts and the pins they connect, in JSON or the concise `.schem` text format. No coordinates, no wires, no layout.
 - **schem draws it the way an engineer would.** Power at the top, ground at the bottom, signals flowing left to right, familiar circuits in their textbook arrangement.
 - **Then it checks its own work.** The connections are rebuilt from the finished drawing and compared with your netlist, and parts and labels are checked for overlaps. If the picture does not say exactly what the netlist says, you are told.
-- **Edits stay put.** Change a value or add a part with `schem edit`, and the rest of the drawing stays where it was (untouched parts may shift a little, within a measured limit; 133 of 137 random test edits stay inside it, and `--strict` refuses the rest). A figure in your report does not reshuffle itself between versions.
+- **Edits stay put.** Change a value or add a part with `schem edit`, and the rest of the drawing stays where it was (untouched parts may shift a little, within a measured limit; 134 of 137 random test edits stay inside it, and `--strict` refuses the rest). A figure in your report does not reshuffle itself between versions.
 
 ## Quick start
 
@@ -48,9 +48,9 @@ npm run schem -- draw examples/esp32-relay.schem.json
 esp32-relay: valid. Wrote out/esp32-relay.svg and out/esp32-relay.png (190 ms)
 ```
 
-Eight circuits to try are in [`examples/`](examples/). Add `-o <folder>` to write somewhere else. The exit code is `0` for a valid drawing, `1` when the drawing has problems (the files are still written and the problems listed), and `2` when the file could not be drawn, with a message saying what is wrong and where.
+Twelve circuits to try are in [`examples/`](examples/) (8 JSON and 4 `.schem` text files). Add `-o <folder>` to write somewhere else. The exit code is `0` for a valid drawing, `1` when the drawing has problems (the files are still written and the problems listed), and `2` when the file could not be drawn, with a message saying what is wrong and where.
 
-For a short text netlist, try `npm run schem -- check examples/led.schem`. [Text schematic guide](docs/dsl.md).
+For a short text netlist, try `npm run schem -- check examples/led.schem`. Render in publication themes (`clean`, `dark`, `blueprint`, `textbook`, `mono-print`) or with `--transparent` backgrounds ([themes guide](docs/themes.md)), or convert existing SPICE netlists with `npm run schem -- import circuit.cir` ([SPICE import guide](docs/spice-import.md)). [Text schematic guide](docs/dsl.md).
 
 To change a circuit without reshuffling its drawing, list the changes in a small JSON file and run `npm run schem -- edit <file> --ops <changes.json>`. [`docs/editing.md`](docs/editing.md) shows how.
 
@@ -65,7 +65,7 @@ npm install -g .
 schem draw examples/led.schem.json
 ```
 
-The same command runs the MCP server for AI agents: `schem mcp --root <folder>`. [`docs/install.md`](docs/install.md) has the setup for Claude Code, Claude Desktop, Cursor, VS Code and Codex CLI, and the one-line `npx` form for once the package is published.
+The same command runs the 11-tool MCP server for AI agents: `schem mcp --root <folder>`, and the repo ships a short agent skill in [`skills/schem/SKILL.md`](skills/schem/SKILL.md). [`docs/install.md`](docs/install.md) has the setup for Claude Code, Claude Desktop, Cursor, VS Code and Codex CLI, and the one-line `npx` form for once the package is published. The browser playground (`npm run web:serve`) also runs `.schem` text DSL and JSON directly in your browser.
 
 ## How it works
 
@@ -179,12 +179,14 @@ schem is an early prototype. It is useful today for small and medium circuits, a
   <tr>
     <td valign="top">
 
-- 26 symbols: passives, diodes, LEDs, BJTs, MOSFETs, op-amps, relays, switches, sources and more
-- Chips as labelled boxes, connectors, and 4 boards with their real pinouts (Arduino Uno, ESP32-DevKitC, a Pololu regulator, an I2C LCD)
+- 31 symbols: passives, diodes (Zener, Schottky, photodiode, LED), BJTs, MOSFETs, op-amps, relays, SPST/SPDT/pushbutton switches, sources (voltage, current, battery, AC) and more
+- Chips as labelled boxes, connectors, and 10 boards with their real pinouts (Arduino Uno and Nano, Raspberry Pi Pico, ESP32-DevKitC, ESP32-S3-DevKitC-1, Pololu 5V regulator, LM7805, Adafruit BME280, SSD1306 OLED, Waveshare I2C LCD)
+- `.schem` text DSL and JSON netlists, SPICE `.cir` import (`schem import`), 5 rendering themes (`clean`, `dark`, `blueprint`, `textbook`, `mono-print`) plus transparent export ([themes](docs/themes.md), [SPICE import](docs/spice-import.md))
 - Common circuits drawn in their textbook shape: op-amp amplifiers, Sallen-Key and other active filters, two oscillators, H-bridges, I2C buses and more ([the list](docs/templates.md))
 - Circuits with no template are laid out from what their parts are: inputs on the left, loads above a transistor and emitter parts below it, a supply-to-ground string in one column. All 18 everyday circuits in the benchmark draw valid ([how it works](docs/general-layout.md))
-- All 8 development circuits draw valid; a generated 30-part circuit draws in under 3 seconds
-- Edits from the command line that keep the drawing and report anything that moved
+- All 8 development circuits draw valid; a generated 30-part circuit completes layout and checked fixes in about 1.1 s (under the 3 s limit)
+- 11-tool MCP server, shipped agent skill (`skills/schem/SKILL.md`), accessible `altText` and net tables, and a `.schem`-capable browser playground
+- Edits from the command line that keep the drawing and report anything that moved (134 of 137 random test edits stay within the limit)
 - Byte-identical output on Windows and Linux
 - Clear errors for broken input
 
@@ -192,8 +194,7 @@ schem is an early prototype. It is useful today for small and medium circuits, a
     <td valign="top">
 
 - Dense boards with several chips spread out too far
-- Some symmetric circuits, such as an instrumentation amplifier, still need a template for their textbook layout ([open jobs](docs/general-layout.md#open-jobs))
-- The symbol and board library is small
+- One benchmark circuit (`differentiator`) still has a squeezed wire run, and the `rc-rl-filter` template is held back ([open jobs](docs/general-layout.md#open-jobs))
 - Not on npm yet (it will be published as `schem-cli`)
 - No blind rating by outside judges yet
 
