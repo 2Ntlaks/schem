@@ -9,9 +9,10 @@
 // src/io/edit-script.ts and saves the project with its layout (src/io/layout-cache.ts), so the
 // next draw or edit starts from the drawing the user has seen.
 
-import { existsSync, mkdirSync, readFileSync, realpathSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, realpathSync, watch as fsWatch } from "node:fs";
 import { basename, dirname, extname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { getInitTemplate, INIT_TEMPLATE_NAMES } from "./cli-templates.js";
 import type { LayoutState } from "./core/intent.js";
 import { revision } from "./edit/edit.js";
 import { stabilityBreaks } from "./edit/report.js";
@@ -39,7 +40,7 @@ export interface Io {
 const USAGE = `schem - draw a circuit from JSON or text
 
 Usage:
-  npm run schem -- init [name]
+  npm run schem -- init [name] [--template <name>]
   npm run schem -- render <file> -o <output.svg|png> [--scale N | --dpi N] [--theme <name>] [--transparent] [--draft] [--overwrite]
   npm run schem -- check <file> [--detail brief|normal|full] [--cursor N]
   npm run schem -- preview <file> -o <output.png> [--max N] [--focus R1,U2 | --finding ID]
@@ -51,6 +52,7 @@ Usage:
   npm run schem -- undo <file>
   npm run schem -- import <file.cir> [-o <output.schem>] [--overwrite] [--json]
   npm run schem -- draw <file> [-o <dir>] [--theme <name>] [--transparent]
+  npm run schem -- watch <file> [-o <dir>] [--theme <name>] [--transparent]
   npm run schem -- edit <file> --ops <ops.json> [-o <dir>] [--strict] [--dry-run]
                    [--expect-revision <R>] [--expect-layout <L>] [--json]
   npm run schem -- --help
@@ -61,7 +63,10 @@ File commands accept .schem text or .json. Use --json for machine output.
 Example:
   npm run schem -- draw examples/led.schem.json
 
+init creates a starter .schem file (templates: ${INIT_TEMPLATE_NAMES.join(", ")}; default: led).
+
 draw writes <dir>/<name>.svg and <dir>/<name>.png. <dir> defaults to out.
+watch draws once, then redraws SVG and PNG whenever <file> changes.
 
 edit applies the operations in <ops.json> as one change, keeps the rest of the
 drawing where it was, saves the file (the old one goes to .schem-history/) and
@@ -381,7 +386,7 @@ function editLocked(a: Args & { file: string; ops: string }, real: string, roots
 
 
 const SHARED = {
-  init: { values: [], flags: [] },
+  init: { values: ["template"], flags: [] },
   check: { values: ["detail", "cursor"], flags: [] },
   render: { values: ["out", "scale", "dpi", "theme"], flags: ["draft", "overwrite", "transparent"] },
   preview: { values: ["out", "max", "focus", "finding"], flags: [] },
@@ -392,17 +397,6 @@ const SHARED = {
   components: { values: ["limit", "cursor"], flags: [] },
   component: { values: [], flags: [] },
 } satisfies Record<string, { values: string[]; flags: string[] }>;
-
-const STARTER = [
-  'circuit "LED indicator"',
-  "part B1 battery 9V",
-  "part R1 resistor 470",
-  "part D1 led color=red",
-  "net PWR = B1[+] R1[1]",
-  "connect R1[2] D1[A]",
-  "net GND = D1[K] B1[-]",
-  "",
-].join("\n");
 
 type SharedVerb = keyof typeof SHARED;
 
@@ -441,9 +435,15 @@ function shared(verb: SharedVerb, argv: string[], io: Io): number {
   if (verb === "components") args.query = file;
   else if (verb === "component") args.type = file;
   else if (verb === "init") {
+    const templateName = typeof args.template === "string" ? args.template : "led";
+    const source = getInitTemplate(templateName);
+    if (source === undefined) {
+      return usage(`Unknown template "${templateName}". Valid templates: ${INIT_TEMPLATE_NAMES.join(", ")}.`);
+    }
+    delete args.template;
     const name = file ?? "circuit";
     args.path = /\.(?:schem|json)$/i.test(name) ? name : `${name}.schem`;
-    args.source = STARTER;
+    args.source = source;
   } else args.path = file;
 
   if (verb === "query") {
@@ -590,6 +590,139 @@ function importCommand(rest: string[], io: Io): number {
   return 0;
 }
 
+export interface WatchOptions {
+  dir?: string;
+  theme?: string;
+  transparent?: boolean;
+  debounceMs?: number;
+  io?: Io;
+  onDraw?: (result: { code: number; count: number }) => void;
+}
+
+export interface WatchHandle {
+  close(): void;
+  readonly drawCount: number;
+}
+
+/**
+ * Draw `file` once, then watch its parent folder with debounce and redraw SVG/PNG on edits.
+ * Errors during intermediate edits are written to stderr without crashing the watcher.
+ */
+export function watchFile(file: string, options: WatchOptions = {}): WatchHandle {
+  const dir = options.dir ?? "out";
+  const debounceMs = options.debounceMs ?? 150;
+  const io: Io = options.io ?? {
+    out: (s) => process.stdout.write(`${s}\n`),
+    err: (s) => process.stderr.write(`${s}\n`),
+  };
+  if (options.theme !== undefined) resolveTheme(options.theme);
+  const svgOpts: SvgOptions | undefined = options.theme !== undefined || options.transparent
+    ? { ...(options.theme !== undefined ? { theme: options.theme } : {}), ...(options.transparent ? { transparent: true } : {}) }
+    : undefined;
+
+  const filePath = resolve(file);
+  const watchDir = dirname(filePath);
+  const targetBase = basename(filePath);
+  let closed = false;
+  let drawCount = 0;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+
+  const runDraw = (): void => {
+    let code = 1;
+    try {
+      code = draw(file, dir, false, io, svgOpts);
+    } catch (e) {
+      io.err(`watch: ${e instanceof Error ? e.message : String(e)}`);
+      code = 3;
+    }
+    drawCount += 1;
+    options.onDraw?.({ code, count: drawCount });
+  };
+
+  runDraw();
+
+  const watcher = fsWatch(watchDir, (_eventType, filename) => {
+    if (closed) return;
+    if (filename !== null) {
+      const name = String(filename);
+      const matches = process.platform === "win32"
+        ? name.toLowerCase() === targetBase.toLowerCase()
+        : name === targetBase;
+      if (!matches) return;
+    }
+    if (timer !== undefined) clearTimeout(timer);
+    timer = setTimeout(() => {
+      timer = undefined;
+      if (!closed) runDraw();
+    }, debounceMs);
+  });
+
+  watcher.on("error", (err) => {
+    if (!closed) io.err(`watch: ${err.message}`);
+  });
+
+  return {
+    get drawCount() { return drawCount; },
+    close() {
+      if (closed) return;
+      closed = true;
+      if (timer !== undefined) {
+        clearTimeout(timer);
+        timer = undefined;
+      }
+      watcher.close();
+    },
+  };
+}
+
+function watchCommand(rest: string[], io: Io): number {
+  let file: string | undefined;
+  let dir = "out";
+  let theme: string | undefined;
+  let transparent = false;
+  for (let i = 0; i < rest.length; i++) {
+    const arg = rest[i]!;
+    if (arg === "-o" || arg === "--out") {
+      const next = rest[i + 1];
+      if (next === undefined || next.startsWith("--")) return usageError(`${arg}: no folder given.`, false, io);
+      dir = next;
+      i++;
+    } else if (arg === "--theme") {
+      const next = rest[i + 1];
+      if (next === undefined || next.startsWith("--")) return usageError(`${arg}: no value given.`, false, io);
+      theme = next;
+      i++;
+    } else if (arg === "--transparent") {
+      transparent = true;
+    } else if (arg.startsWith("-") && arg !== "-") {
+      return usageError(`Unknown option "${arg}".`, false, io);
+    } else if (file === undefined) {
+      file = arg;
+    } else {
+      return usageError(`watch: more than one file given ("${file}" and "${arg}").`, false, io);
+    }
+  }
+  if (file === undefined) return usageError("watch: no file given.", false, io);
+  if (theme !== undefined) {
+    try { resolveTheme(theme); }
+    catch (e) { return usageError((e as Error).message, false, io); }
+  }
+  if (!existsSync(resolve(file))) {
+    io.err(`Cannot read ${showPath(file)}. no such file`);
+    return formatOf(file) === "dsl" ? 1 : 2;
+  }
+  const handle = watchFile(file, { dir, theme, transparent, io });
+  io.out(`Watching ${showPath(file)} (Ctrl+C to stop).`);
+  const stop = () => {
+    process.off("SIGINT", stop);
+    process.off("SIGTERM", stop);
+    handle.close();
+  };
+  process.on("SIGINT", stop);
+  process.on("SIGTERM", stop);
+  return 0;
+}
+
 function dispatch(argv: string[], io: Io): number {
   const [command, ...rest] = argv;
   if (command === undefined || command === "--help" || command === "-h" || command === "help") {
@@ -602,6 +735,7 @@ function dispatch(argv: string[], io: Io): number {
   }
   if (Object.hasOwn(SHARED, command)) return shared(command as SharedVerb, rest, io);
   if (command === "import") return importCommand(rest, io);
+  if (command === "watch") return watchCommand(rest, io);
   if (command !== "draw" && command !== "edit") {
     return usageError(`Unknown command "${command}".`, rest.includes("--json"), io);
   }

@@ -44,7 +44,7 @@ All commands accept `.schem` or `.schem.json` and `--json` for machine output:
 ```sh
 schem components [query] [--limit 20]
 schem component <type>
-schem init [name]
+schem init [name] [--template led|divider|opamp|regulator|i2c|bjt-amp]
 schem import <file.cir> [-o <output.schem>] [--overwrite]
 schem check <file> [--detail brief|normal|full] [--cursor N]
 schem edit <file> --ops ops.json [--expect-revision R] [--expect-layout L] [--dry-run] [--strict]
@@ -57,9 +57,10 @@ schem fmt <file> [--to dsl|json]
 schem render <file> -o out.svg [--theme clean|dark|blueprint|textbook|mono-print] [--transparent] [--overwrite]
 schem render <file> -o out.png --dpi 300 [--theme dark] [--transparent] [--overwrite]
 schem draw <file> [-o out] [--theme <name>] [--transparent]
+schem watch <file> [-o out] [--theme <name>] [--transparent]
 ```
 
-Exit codes: `0` valid, `1` invalid or input error, `2` usage, `3` internal error, `4` lock or revision conflict. Pass `--alt-text` to `schem describe` to print only the verified alt-text line for Markdown or blog posts.
+Exit codes: `0` valid, `1` invalid or input error, `2` usage, `3` internal error, `4` lock or revision conflict. Use `schem init --template <name>` to start from a verified template (`led`, `divider`, `opamp`, `regulator`, `i2c`, `bjt-amp`), `schem watch <file>` to redraw SVG/PNG automatically on save, and `schem describe --alt-text` to print only the verified alt-text line for Markdown or blog posts.
 
 ## `.schem` quick syntax cheat sheet
 
