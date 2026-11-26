@@ -1,7 +1,7 @@
 {
   "name": "schem-cli",
   "version": "0.0.2",
-  "description": "Turn a JSON netlist into a clean, verified schematic drawing (SVG and PNG). A CLI and an MCP server for AI agents.",
+  "description": "Turn a circuit description (.schem text, JSON, or SPICE) into a clean, verified schematic drawing (SVG and PNG). A CLI and an MCP server for AI agents.",
   "keywords": [
     "schematic",
     "circuit",
@@ -71,7 +71,6 @@
     "@types/opentype.js": "1.3.8",
     "dejavu-fonts-ttf": "2.37.3",
     "esbuild": "0.25.0",
-    "marked": "12.0.2",
     "tsx": "4.19.2",
     "typescript": "5.6.3",
     "vitest": "2.1.8"
