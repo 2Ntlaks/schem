@@ -23,7 +23,7 @@ export interface SymbolDef {
   /** Artwork bounds in local units (fractional allowed). */
   art: Box;
   labelPrefer: Array<"above" | "below" | "right" | "left">;
-  kind: "two-pin" | "source" | "opamp" | "ic" | "port" | "transistor" | "potentiometer" | "relay" | "header";
+  kind: "two-pin" | "source" | "opamp" | "ic" | "port" | "transistor" | "potentiometer" | "relay" | "switch" | "header";
   texts?: SymText[];
 }
 
@@ -414,10 +414,103 @@ const RELAY: SymbolDef = {
   ],
 };
 
+// ---------------------------------------------------------------------------
+// Phase 1 symbols: current source, lamp, speaker, photodiode, SPDT switch.
+
+/** DC current source: circle with arrow pointing towards "+" (up when standing vertical). */
+const CURRENT_SOURCE: SymbolDef = {
+  id: "current-source", version: 1, refPrefix: "I", source: "original", kind: "source",
+  pins: [
+    pin("+", "+", [0, 0], "left", "output", { aliases: ["pos", "p", "1"], chain: "out" }),
+    pin("-", "-", [6, 0], "right", "output", { aliases: ["neg", "n", "2"], chain: "in" }),
+  ],
+  align: [3, 0],
+  graphics: [
+    { d: "M0 0 H1.8 M4.2 0 H6" },
+    { d: "M1.8 0 A1.2 1.2 0 1 1 4.2 0 A1.2 1.2 0 1 1 1.8 0 Z" },
+    { d: "M3.85 0 H2.65" },
+    { d: arrowHead([3.85, 0], [2.15, 0], 1, 0.6, 0.28), fill: "stroke" },
+  ],
+  art: { x: 0, y: -1.2, w: 6, h: 2.4 },
+  labelPrefer: ["left", "right", "above", "below"],
+};
+
+/** Indicator or incandescent lamp: circle with a 45-degree cross inside. */
+const LAMP: SymbolDef = {
+  id: "lamp", version: 1, refPrefix: "LA", source: "original", kind: "two-pin",
+  pins: [
+    pin("1", "1", [0, 0], "left", "passive", { chain: "in" }),
+    pin("2", "2", [6, 0], "right", "passive", { chain: "out" }),
+  ],
+  align: [3, 0],
+  graphics: [
+    { d: "M0 0 H1.8 M4.2 0 H6" },
+    { d: "M1.8 0 A1.2 1.2 0 1 1 4.2 0 A1.2 1.2 0 1 1 1.8 0 Z" },
+    { d: "M2.15 -0.85 L3.85 0.85 M2.15 0.85 L3.85 -0.85" },
+  ],
+  art: { x: 0, y: -1.2, w: 6, h: 2.4 },
+  labelPrefer: ["above", "below", "right", "left"],
+};
+
+/** Loudspeaker: rectangular driver with a flaring trapezoid cone on the front. */
+const SPEAKER: SymbolDef = {
+  id: "speaker", version: 1, refPrefix: "LS", source: "original", kind: "two-pin",
+  pins: [
+    pin("+", "+", [0, 0], "left", "passive", { aliases: ["pos", "p", "1"], chain: "in" }),
+    pin("-", "-", [6, 0], "right", "passive", { aliases: ["neg", "n", "2"], chain: "out" }),
+  ],
+  align: [3, 0],
+  graphics: [
+    { d: "M0 0 H1.8 M4.2 0 H6" },
+    { d: "M1.8 -0.5 H4.2 V0.5 H1.8 Z" },
+    { d: "M1.8 -0.5 L0.9 -1.8 H5.1 L4.2 -0.5" },
+    { d: "M0.4 -0.65 H0.9 M0.65 -0.9 V-0.4" },
+  ],
+  art: { x: 0, y: -1.8, w: 6, h: 2.3 },
+  labelPrefer: ["below", "above", "right", "left"],
+};
+
+/** Photodiode: diode body matching LED, with two inward light arrows. */
+const PHOTODIODE: SymbolDef = {
+  id: "photodiode", version: 1, refPrefix: "D", source: "original", kind: "two-pin",
+  pins: [
+    pin("A", "anode", [0, 0], "left", "passive", { aliases: ["a", "+", "1"], chain: "in" }),
+    pin("K", "cathode", [4, 0], "right", "passive", { aliases: ["k", "-", "2"], chain: "out" }),
+  ],
+  align: [2, 0],
+  graphics: [
+    { d: "M0 0 H1.3 M2.7 0 H4 M2.7 -0.75 V0.75" },
+    { d: "M1.3 -0.75 L2.7 0 L1.3 0.75 Z", fill: "stroke" },
+    { d: "M2.4 -1.7 L1.8 -1.1 M2.1 -1.1 H1.8 V-1.4 M3.0 -1.6 L2.4 -1.0 M2.7 -1.0 H2.4 V-1.3" },
+  ],
+  art: { x: 0, y: -1.7, w: 4, h: 2.45 },
+  labelPrefer: ["below", "above", "right", "left"],
+};
+
+/** Single-pole double-throw switch: COM on the left, NO (top) and NC (bottom) on the right. */
+const SPDT: SymbolDef = {
+  id: "spdt", version: 1, refPrefix: "SW", source: "original", kind: "switch",
+  pins: [
+    pin("COM", "COM", [0, 0], "left", "passive", { aliases: ["com", "c", "1"] }),
+    pin("NO", "NO", [4, -1], "right", "passive", { aliases: ["no", "2"] }),
+    pin("NC", "NC", [4, 1], "right", "passive", { aliases: ["nc", "3"] }),
+  ],
+  align: [2, 0],
+  graphics: [
+    { d: "M0 0 H0.8 M3.2 -1 H4 M3.2 1 H4" },
+    { d: "M0.8 0 A0.2 0.2 0 1 1 1.2 0 A0.2 0.2 0 1 1 0.8 0 Z M2.8 -1 A0.2 0.2 0 1 1 3.2 -1 A0.2 0.2 0 1 1 2.8 -1 Z M2.8 1 A0.2 0.2 0 1 1 3.2 1 A0.2 0.2 0 1 1 2.8 1 Z" },
+    // Blade at rest: pivots from COM and touches the normally closed contact.
+    { d: "M1.19 0.07 L3.05 0.82" },
+  ],
+  art: { x: 0, y: -1.2, w: 4, h: 2.4 },
+  labelPrefer: ["above", "below", "left", "right"],
+};
+
 export const BUILTIN: Record<string, SymbolDef> = Object.fromEntries(
   [RESISTOR, CAPACITOR, LED, BATTERY, VSOURCE, OPAMP, GROUND, SUPPLY,
     DIODE, ZENER, SCHOTTKY, POLCAP, POTENTIOMETER, bjt("npn"), bjt("pnp"), mosfet("nmos"), mosfet("pmos"),
-    SPST, PUSHBUTTON, BUZZER, MOTOR, RELAY, FUSE, INDUCTOR, CRYSTAL, ACSOURCE].map((s) => [s.id, s]),
+    SPST, PUSHBUTTON, BUZZER, MOTOR, RELAY, FUSE, INDUCTOR, CRYSTAL, ACSOURCE,
+    CURRENT_SOURCE, LAMP, SPEAKER, PHOTODIODE, SPDT].map((s) => [s.id, s]),
 );
 
 /** Part types whose pins are declared on the part (SPEC 6.2 `pins`), with a generated symbol. */

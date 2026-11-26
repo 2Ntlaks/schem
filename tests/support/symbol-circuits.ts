@@ -273,4 +273,85 @@ export const SYMBOL_CIRCUITS: Record<string, { covers: string[]; project: Projec
       nc: ["J1[3]"],
     } },
   },
+  "current-source-load": {
+    covers: ["current-source"],
+    project: { meta: { title: "Current source divider" }, circuit: {
+      parts: [
+        { id: "I1", type: "current-source", props: { value: "10 mA" } },
+        { id: "R1", type: "resistor", props: { value: "1k" } },
+        { id: "R2", type: "resistor", props: { value: "470" } },
+      ],
+      nets: [
+        net("n1", "IN", "I1[+]", "R1[1]", "R2[1]"),
+        net("n2", "GND", "I1[-]", "R1[2]", "R2[2]"),
+      ],
+    } },
+  },
+  "lamp-indicator": {
+    covers: ["lamp"],
+    project: { meta: { title: "Switched indicator lamp" }, circuit: {
+      parts: [
+        { id: "B1", type: "battery", props: { value: "12V" } },
+        { id: "SW1", type: "spst" },
+        { id: "LA1", type: "lamp", props: { label: "12 V" } },
+      ],
+      nets: [
+        net("n1", "12V", "B1[+]", "SW1[1]"),
+        net("n2", "LAMP", "SW1[2]", "LA1[1]"),
+        net("n3", "GND", "B1[-]", "LA1[2]"),
+      ],
+    } },
+  },
+  "speaker-driver": {
+    covers: ["speaker"],
+    project: { meta: { title: "AC-coupled loudspeaker" }, circuit: {
+      parts: [
+        { id: "V1", type: "ac-source", props: { value: "1V" } },
+        { id: "C1", type: "polarised-capacitor", props: { value: "100u" } },
+        { id: "LS1", type: "speaker", props: { label: "8 Ω" } },
+      ],
+      nets: [
+        net("n1", "IN", "V1[1]", "C1[+]"),
+        net("n2", "OUT", "C1[-]", "LS1[+]"),
+        net("n3", "GND", "V1[2]", "LS1[-]"),
+      ],
+    } },
+  },
+  "photodiode-sensor": {
+    covers: ["photodiode"],
+    project: { meta: { title: "Photodiode light sensor" }, circuit: {
+      parts: [
+        { id: "B1", type: "battery", props: { value: "5V" } },
+        { id: "R1", type: "resistor", props: { value: "100k" } },
+        { id: "D1", type: "photodiode", props: { partNumber: "BPW34" } },
+        header("J1", "OUT", ["VOUT", "GND"]),
+      ],
+      nets: [
+        net("n1", "5V", "B1[+]", "R1[1]"),
+        net("n2", "VOUT", "R1[2]", "D1[K]", "J1[1]"),
+        net("n3", "GND", "B1[-]", "D1[A]", "J1[2]"),
+      ],
+    } },
+  },
+  "spdt-selector": {
+    covers: ["spdt"],
+    project: { meta: { title: "SPDT two-LED selector" }, circuit: {
+      parts: [
+        { id: "B1", type: "battery", props: { value: "9V" } },
+        { id: "SW1", type: "spdt" },
+        { id: "R1", type: "resistor", props: { value: "470" } },
+        { id: "D1", type: "led", props: { color: "green" } },
+        { id: "R2", type: "resistor", props: { value: "470" } },
+        { id: "D2", type: "led", props: { color: "red" } },
+      ],
+      nets: [
+        net("n1", "9V", "B1[+]", "SW1[COM]"),
+        net("n2", "RUN", "SW1[NO]", "R1[1]"),
+        net("n3", undefined, "R1[2]", "D1[A]"),
+        net("n4", "STBY", "SW1[NC]", "R2[1]"),
+        net("n5", undefined, "R2[2]", "D2[A]"),
+        net("n6", "GND", "B1[-]", "D1[K]", "D2[K]"),
+      ],
+    } },
+  },
 };

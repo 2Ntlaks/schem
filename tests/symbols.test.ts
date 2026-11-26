@@ -148,3 +148,63 @@ describe("symbol library: geometry", () => {
     }
   });
 });
+
+describe("symbol library: Phase 1 symbols", () => {
+  const PHASE1 = ["current-source", "lamp", "speaker", "photodiode", "spdt"] as const;
+
+  it("registers all 5 Phase 1 symbols with expected prefixes, aliases and test circuit coverage", () => {
+    const covered = new Set(Object.values(SYMBOL_CIRCUITS).flatMap((c) => c.covers));
+    for (const id of PHASE1) {
+      expect(BUILTIN[id], id).toBeDefined();
+      expect(covered.has(id), `${id} covered in SYMBOL_CIRCUITS`).toBe(true);
+    }
+    expect(BUILTIN["current-source"]!.refPrefix).toBe("I");
+    expect(BUILTIN["current-source"]!.pins.map((p) => p.number)).toEqual(["+", "-"]);
+    expect(BUILTIN["current-source"]!.pins[0]!.aliases).toEqual(["pos", "p", "1"]);
+    expect(BUILTIN["current-source"]!.pins[1]!.aliases).toEqual(["neg", "n", "2"]);
+    expect(BUILTIN.lamp!.refPrefix).toBe("LA");
+    expect(BUILTIN.lamp!.pins.map((p) => p.number)).toEqual(["1", "2"]);
+    expect(BUILTIN.speaker!.refPrefix).toBe("LS");
+    expect(BUILTIN.speaker!.pins.map((p) => p.number)).toEqual(["+", "-"]);
+    expect(BUILTIN.speaker!.pins[0]!.aliases).toEqual(["pos", "p", "1"]);
+    expect(BUILTIN.speaker!.pins[1]!.aliases).toEqual(["neg", "n", "2"]);
+    expect(BUILTIN.photodiode!.refPrefix).toBe("D");
+    expect(BUILTIN.photodiode!.pins.map((p) => p.number)).toEqual(["A", "K"]);
+    expect(BUILTIN.photodiode!.pins[0]!.aliases).toEqual(["a", "+", "1"]);
+    expect(BUILTIN.photodiode!.pins[1]!.aliases).toEqual(["k", "-", "2"]);
+    expect(BUILTIN.spdt!.refPrefix).toBe("SW");
+    expect(BUILTIN.spdt!.pins.map((p) => p.number)).toEqual(["COM", "NO", "NC"]);
+    expect(BUILTIN.spdt!.pins[0]!.aliases).toEqual(["com", "c", "1"]);
+    expect(BUILTIN.spdt!.pins[1]!.aliases).toEqual(["no", "2"]);
+    expect(BUILTIN.spdt!.pins[2]!.aliases).toEqual(["nc", "3"]);
+  });
+
+  it("keeps drawing conventions for the Phase 1 circuits", () => {
+    const pinAt = (circuitName: string, id: string): DrawnPin => {
+      const r = layout(SYMBOL_CIRCUITS[circuitName]!.project);
+      expect(r.status, circuitName).toBe("valid");
+      return r.render!.electrical.pins.find((p) => `${p.part}[${p.number}]` === id)!;
+    };
+    // Current source stands vertical with "+" above "-".
+    const iPlus = pinAt("current-source-load", "I1[+]").at;
+    const iMinus = pinAt("current-source-load", "I1[-]").at;
+    expect(iPlus[0]).toBe(iMinus[0]);
+    expect(iPlus[1]).toBeLessThan(iMinus[1]);
+    // Lamp stands vertical above ground.
+    expect(pinAt("lamp-indicator", "LA1[1]").at[0]).toBe(pinAt("lamp-indicator", "LA1[2]").at[0]);
+    expect(pinAt("lamp-indicator", "LA1[1]").at[1]).toBeLessThan(pinAt("lamp-indicator", "LA1[2]").at[1]);
+    // Loudspeaker stands vertical with "+" above "-" (ground).
+    expect(pinAt("speaker-driver", "LS1[+]").at[0]).toBe(pinAt("speaker-driver", "LS1[-]").at[0]);
+    expect(pinAt("speaker-driver", "LS1[+]").at[1]).toBeLessThan(pinAt("speaker-driver", "LS1[-]").at[1]);
+    // Reverse-biased photodiode stands vertical with cathode above anode (ground).
+    expect(pinAt("photodiode-sensor", "D1[K]").at[0]).toBe(pinAt("photodiode-sensor", "D1[A]").at[0]);
+    expect(pinAt("photodiode-sensor", "D1[K]").at[1]).toBeLessThan(pinAt("photodiode-sensor", "D1[A]").at[1]);
+    // SPDT switch keeps COM on the left and NO above NC on the right.
+    const com = pinAt("spdt-selector", "SW1[COM]").at;
+    const no = pinAt("spdt-selector", "SW1[NO]").at;
+    const nc = pinAt("spdt-selector", "SW1[NC]").at;
+    expect(com[0]).toBeLessThan(no[0]);
+    expect(no[0]).toBe(nc[0]);
+    expect(no[1]).toBeLessThan(nc[1]);
+  });
+});
