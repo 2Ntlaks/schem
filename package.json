@@ -32,10 +32,13 @@
   },
   "files": [
     "dist/",
+    "docs/dsl.md",
     "docs/netlist-format.md",
     "docs/parts.md",
     "docs/editing.md",
+    "docs/templates.md",
     "docs/install.md",
+    "skills/schem/SKILL.md",
     "examples/*.schem.json",
     "examples/*.schem",
     "examples/README.md"
