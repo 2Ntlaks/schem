@@ -5,7 +5,9 @@
 //   parts between its emitter or source and ground hang below it. A second branch on the same pin
 //   (a bypass capacitor, a flyback diode) stands beside the first.
 // - A string: two-pin parts in series from a supply down to ground stand in one column, top to
-//   bottom, with the points between them free for wires to the side (a 555's timing string).
+//   bottom, with the points between them free for wires to the side (a 555's timing string). A
+//   battery or source may end the string: a fuse or switch from a supply down to the battery that
+//   feeds it stands on the battery, one vertical line from ground to the supply symbol.
 // - A hanging chain: two-pin parts strictly in series that end at ground or start at a supply.
 //
 // This file only decides who stacks on whom. The geometry is worked out in layout.ts, which may
@@ -78,6 +80,8 @@ export function findStacks(g: StackGraph): Stack[] {
   const used = new Set<string>();
   const usable = (p: string) => BUILTIN[typeOf.get(p) ?? ""]?.kind === "two-pin" && pinsOf.get(p)?.length === 2 && !used.has(p) && g.free(p);
   const far = (p: string, pin: string) => pinsOf.get(p)!.find((x) => x.pin !== pin)!;
+  /** A battery or source that can end a string: its other pin goes straight to ground. */
+  const source = (p: string) => BUILTIN[typeOf.get(p) ?? ""]?.kind === "source" && pinsOf.get(p)?.length === 2 && !used.has(p) && g.free(p);
   const ids = g.parts.map((p) => p.id).sort(cmpStr);
   const stacks: Stack[] = [];
 
@@ -148,7 +152,7 @@ export function findStacks(g: StackGraph): Stack[] {
     if (!wire(f.net) || here.length >= MAX_STRING) return undefined;
     let best: Array<{ part: string; near: string }> | undefined;
     for (const t of onNet.get(f.net) ?? []) {
-      if (here.includes(t.part) || !usable(t.part)) continue;
+      if (here.includes(t.part) || !(usable(t.part) || (source(t.part) && rail(far(t.part, t.pin).net, "down")))) continue;
       const rest = toGround(t.part, t.pin, here);
       if (rest && (!best || rest.length < best.length)) best = rest;
     }
