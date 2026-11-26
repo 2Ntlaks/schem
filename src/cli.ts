@@ -44,6 +44,7 @@ Usage:
   npm run schem -- query <file> part|net ID
   npm run schem -- describe <file> [--table]
   npm run schem -- components [query] [--limit 20]
+  npm run schem -- component <type>
   npm run schem -- fmt <file> [--to dsl|json]
   npm run schem -- undo <file>
   npm run schem -- draw <file> [-o <dir>]
@@ -380,6 +381,7 @@ const SHARED = {
   fmt: { values: ["to"], flags: [] },
   describe: { values: [], flags: ["table"] },
   components: { values: ["limit", "cursor"], flags: [] },
+  component: { values: [], flags: [] },
 } satisfies Record<string, { values: string[]; flags: string[] }>;
 
 const STARTER = [
@@ -428,6 +430,7 @@ function shared(verb: SharedVerb, argv: string[], io: Io): number {
     return usage(verb === "query" ? "query needs a file, part or net, and an id." : `Check the arguments for ${verb}.`);
   const args: Record<string, unknown> = Object.fromEntries(options);
   if (verb === "components") args.query = file;
+  else if (verb === "component") args.type = file;
   else if (verb === "init") {
     const name = file ?? "circuit";
     args.path = /\.(?:schem|json)$/i.test(name) ? name : `${name}.schem`;
@@ -482,6 +485,19 @@ function emit(result: CommandResult, json: boolean, io: Io): number {
   } else if (typeof body.out === "string") io.out(`Wrote ${body.out}.`);
   else if (Array.isArray(body.components)) {
     for (const entry of body.components) io.out(`${entry.id}  ${entry.pins.map((pin: { name: string }) => pin.name).join(", ")}`.trimEnd());
+  } else if (typeof body.id === "string" && Array.isArray(body.pins)) {
+    const header = [body.id, body.kind, body.refPrefix ? `ref=${body.refPrefix}` : ""].filter(Boolean).join("  ");
+    io.out(header);
+    if (typeof body.name === "string") io.out(`Name: ${body.name}`);
+    if (typeof body.note === "string") io.out(body.note);
+    for (const pin of body.pins as Array<{ number: string; name: string; role: string; aliases?: string[]; group?: string; iface?: string[] }>) {
+      const extras = [
+        pin.aliases?.length ? `aliases=${pin.aliases.join(",")}` : "",
+        pin.group ? `group=${pin.group}` : "",
+        pin.iface?.length ? `iface=${pin.iface.join(",")}` : "",
+      ].filter(Boolean).join(" ");
+      io.out(`  [${pin.number}] ${pin.name} (${pin.role})${extras ? ` ${extras}` : ""}`);
+    }
   } else if (body.part || body.net) io.out(JSON.stringify(body.part ?? body.net, null, 2));
   else {
     io.out([body.path, body.status].filter(Boolean).join("  "));
