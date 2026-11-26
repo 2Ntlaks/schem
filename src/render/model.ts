@@ -27,5 +27,5 @@ export interface RenderModel {
   electrical: Electrical;
   art: Art[];
   bounds: Box;
-  meta: { title?: string };
+  meta: { title?: string; theme?: string };
 }
