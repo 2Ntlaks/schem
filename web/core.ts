@@ -3,20 +3,28 @@
 // tests/web.test.ts runs it in Node too, before and after bundling, and checks it draws every
 // example byte-identically to the command line.
 
+import { compileDsl, type DslIssue } from "../src/core/dsl.js";
+import { formatDsl } from "../src/core/dsl-format.js";
 import { revision } from "../src/edit/edit.js";
 import { jsonProblem, lineColumn } from "../src/io/json-problem.js";
 import { fromLayoutCache } from "../src/io/layout-cache.js";
-import { loadProject } from "../src/io/project.js";
+import { loadProject, saveProject, type LoadedProject } from "../src/io/project.js";
 import { layout } from "../src/layout/layout.js";
 import { MODULE_LIBRARY } from "../src/modules/index.js";
 import { checkDrawing } from "../src/quality/index.js";
 import { toSvg } from "../src/render/svg.js";
 import { BUILTIN } from "../src/symbols/library.js";
+import { detectFormat, type CircuitFormat } from "./highlight.js";
+import { isJsonObj, tidyJson, type Json } from "./tidy-json.js";
+
+export { detectFormat, type CircuitFormat } from "./highlight.js";
+
+const CACHE_PREFIX = "# schem-layout: ";
 
 export interface Problem {
   kind: "error" | "warning" | "note" | "verifier" | "overlap" | "issue" | "layout";
   text: string;
-  /** 1-based position in the text, for JSON syntax errors. */
+  /** 1-based position in the text, for JSON and .schem syntax or semantic errors. */
   line?: number;
   column?: number;
 }
@@ -31,28 +39,85 @@ export interface DrawResult {
   ms: number;
 }
 
-/** Lay out, check and render a circuit file's text, as `schem draw` does. */
+export interface ConvertResult {
+  ok: boolean;
+  text?: string;
+  lostFields?: string[];
+  error?: string;
+}
+
+export interface TidyResult {
+  ok: boolean;
+  text?: string;
+  error?: string;
+  line?: number;
+  column?: number;
+}
+
+function dslProblem(kind: "error" | "warning", issue: DslIssue): Problem {
+  const { line, column } = issue.span.start;
+  return { kind, text: `${issue.code} (line ${line}, column ${column}): ${issue.message}`, line, column };
+}
+
+function trailingLayoutComment(text: string): string | undefined {
+  const last = text.trimEnd().split(/\r?\n/).at(-1);
+  return last?.startsWith(CACHE_PREFIX) ? last : undefined;
+}
+
+type LoadedInput =
+  | { ok: true; format: CircuitFormat; project: LoadedProject; warnings: Problem[] }
+  | { ok: false; format: CircuitFormat; problems: Problem[] };
+
+function loadCircuitText(text: string): LoadedInput {
+  const format = detectFormat(text);
+  if (format === "json") {
+    const clean = text.replace(/^\uFEFF/, "");
+    try {
+      JSON.parse(clean);
+    } catch {
+      const p = jsonProblem(clean);
+      if (!p) return { ok: false, format, problems: [{ kind: "error", text: "The text is not valid JSON." }] };
+      const { line, column } = lineColumn(clean, p.index);
+      return { ok: false, format, problems: [{ kind: "error", text: `Bad JSON at line ${line}, column ${column}: ${p.message}`, line, column }] };
+    }
+    const loaded = loadProject(clean);
+    if (!loaded.ok || !loaded.project) {
+      const problems: Problem[] = [
+        ...loaded.errors.map((e) => ({ kind: "error" as const, text: e.message })),
+        ...loaded.warnings.map((w) => ({ kind: "warning" as const, text: w.message })),
+      ];
+      if (loaded.missingTypes.length) problems.push({ kind: "note", text: "Open Parts to see every part type and its pin names." });
+      return { ok: false, format, problems };
+    }
+    return { ok: true, format, project: loaded.project, warnings: loaded.warnings.map((w) => ({ kind: "warning", text: w.message })) };
+  }
+
+  const loaded = compileDsl(text);
+  if (!loaded.ok || !loaded.project) {
+    const problems: Problem[] = [
+      ...loaded.errors.map((e) => dslProblem("error", e)),
+      ...loaded.warnings.map((w) => dslProblem("warning", w)),
+    ];
+    if (loaded.missingTypes.length) problems.push({ kind: "note", text: "Open Parts to see every part type and its pin names." });
+    return { ok: false, format, problems };
+  }
+  const comment = trailingLayoutComment(text);
+  if (comment) {
+    try { loaded.project.layoutCache = JSON.parse(comment.slice(CACHE_PREFIX.length)); }
+    catch { loaded.project.layoutCache = null; }
+  }
+  return { ok: true, format, project: loaded.project, warnings: loaded.warnings.map((w) => dslProblem("warning", w)) };
+}
+
+/** Lay out, check and render a circuit file's text (.schem or JSON), as `schem draw` does. */
 export function draw(text: string): DrawResult {
   const t0 = performance.now();
   const done = (r: Omit<DrawResult, "ms">): DrawResult => ({ ...r, ms: Math.round(performance.now() - t0) });
 
-  try {
-    JSON.parse(text);
-  } catch {
-    const p = jsonProblem(text);
-    if (!p) return done({ verdict: "error", problems: [{ kind: "error", text: "The text is not valid JSON." }] });
-    const { line, column } = lineColumn(text, p.index);
-    return done({ verdict: "error", problems: [{ kind: "error", text: `Bad JSON at line ${line}, column ${column}: ${p.message}`, line, column }] });
-  }
-
-  const loaded = loadProject(text);
-  if (!loaded.ok || !loaded.project) {
-    const problems: Problem[] = [...loaded.errors.map((e) => ({ kind: "error" as const, text: e.message })), ...loaded.warnings.map((w) => ({ kind: "warning" as const, text: w.message }))];
-    if (loaded.missingTypes.length) problems.push({ kind: "note", text: "Open Parts to see every part type and its pin names." });
-    return done({ verdict: "error", problems });
-  }
+  const loaded = loadCircuitText(text);
+  if (!loaded.ok) return done({ verdict: "error", problems: loaded.problems });
   const project = loaded.project;
-  const problems: Problem[] = loaded.warnings.map((w) => ({ kind: "warning", text: w.message }));
+  const problems: Problem[] = [...loaded.warnings];
 
   // A file saved by `schem edit` is drawn as it was saved, as `schem draw` does.
   const saved = fromLayoutCache(project.layoutCache, revision(project));
@@ -85,6 +150,67 @@ export function draw(text: string): DrawResult {
     problems,
     stats: { parts: project.circuit.parts.length, nets: project.circuit.nets.length, overlaps: quality.overlaps.length },
   });
+}
+
+/** Convert a circuit between .schem text DSL and canonical JSON. Reports fields that .schem cannot represent. */
+export function convertCircuit(text: string, to: CircuitFormat): ConvertResult {
+  const loaded = loadCircuitText(text);
+  if (!loaded.ok) {
+    return { ok: false, error: loaded.problems[0]?.text ?? "Fix the circuit file before converting." };
+  }
+  const { project } = loaded;
+  if (to === "json") {
+    if (project.unknownFields.length) {
+      return {
+        ok: false,
+        lostFields: [...project.unknownFields],
+        error: `Cannot write JSON without losing unknown fields: ${project.unknownFields.join(", ")}.`,
+      };
+    }
+    return { ok: true, text: saveProject(project) };
+  }
+  const formatted = formatDsl(project);
+  if (!formatted.ok) {
+    return {
+      ok: false,
+      lostFields: formatted.fields,
+      error: `Cannot convert to .schem without losing fields: ${formatted.fields.join(", ")}.`,
+    };
+  }
+  return { ok: true, text: formatted.source };
+}
+
+/** Format a circuit file cleanly in whichever format (.schem or JSON) it is currently written in. */
+export function tidyCircuit(text: string): TidyResult {
+  const format = detectFormat(text);
+  if (format === "json") {
+    const clean = text.replace(/^\uFEFF/, "");
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(clean);
+    } catch {
+      const p = jsonProblem(clean);
+      if (!p) return { ok: false, error: "The text is not valid JSON." };
+      const { line, column } = lineColumn(clean, p.index);
+      return { ok: false, error: `Bad JSON at line ${line}, column ${column}: ${p.message}`, line, column };
+    }
+    if (!isJsonObj(parsed)) return { ok: false, error: "A project file must be a JSON object." };
+    return { ok: true, text: tidyJson(parsed as { [k: string]: Json }) };
+  }
+
+  const loaded = compileDsl(text);
+  if (!loaded.ok || !loaded.project) {
+    const first = loaded.errors[0];
+    if (!first) return { ok: false, error: "Fix the .schem file before tidying." };
+    const { line, column } = first.span.start;
+    return { ok: false, error: `${first.code} (line ${line}, column ${column}): ${first.message}`, line, column };
+  }
+  const formatted = formatDsl(loaded.project);
+  if (!formatted.ok) {
+    return { ok: false, error: `Cannot tidy .schem: unsupported fields (${formatted.fields.join(", ")}).` };
+  }
+  const comment = trailingLayoutComment(text);
+  return { ok: true, text: comment ? `${formatted.source}${comment}\n` : formatted.source };
 }
 
 export interface PartType {

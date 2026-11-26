@@ -20,11 +20,40 @@ function jsonFiles(dir: string, suffix = ".json"): Array<[string, string]> {
   return readdirSync(dir).filter((f) => f.endsWith(suffix)).sort().map((f) => [f, readFileSync(path.join(dir, f), "utf8")]);
 }
 
+function exampleFiles(dir: string): Array<[string, string]> {
+  return readdirSync(dir)
+    .filter((f) => f.endsWith(".schem.json") || f.endsWith(".schem"))
+    .sort()
+    .map((f) => [f, readFileSync(path.join(dir, f), "utf8")]);
+}
+
+const NODE_UTIL_SHIM = `export function isDeepStrictEqual(a, b) {
+  if (Object.is(a, b)) return true;
+  if (typeof a !== "object" || typeof b !== "object" || a === null || b === null) return false;
+  if (Array.isArray(a) !== Array.isArray(b)) return false;
+  if (Array.isArray(a)) {
+    if (a.length !== b.length) return false;
+    for (let i = 0; i < a.length; i++) if (!isDeepStrictEqual(a[i], b[i])) return false;
+    return true;
+  }
+  if (Object.getPrototypeOf(a) !== Object.getPrototypeOf(b)) return false;
+  const ak = Object.keys(a), bk = Object.keys(b);
+  if (ak.length !== bk.length) return false;
+  for (const k of ak) {
+    if (!Object.prototype.hasOwnProperty.call(b, k)) return false;
+    if (!isDeepStrictEqual(a[k], b[k])) return false;
+  }
+  return true;
+}
+export default { isDeepStrictEqual };`;
+
 export const browserEngine: Plugin = {
   name: "schem-browser-engine",
   setup(build) {
     const fontFile = norm(path.join(ROOT, "src/text/font-file.ts"));
     const moduleFiles = norm(path.join(ROOT, "src/modules/files.ts"));
+    build.onResolve({ filter: /^(node:util|util)$/ }, (a) => ({ path: a.path, namespace: "node-util-shim" }));
+    build.onLoad({ filter: /.*/, namespace: "node-util-shim" }, () => ({ contents: NODE_UTIL_SHIM, loader: "js" }));
     build.onResolve({ filter: /^(node:.*|fs|path|module|url|crypto|os)$/ }, (a) => ({ path: a.path, namespace: "node-stub" }));
     build.onLoad({ filter: /.*/, namespace: "node-stub" }, (a) => ({
       contents: `const no = () => { throw new Error(${JSON.stringify(`${a.path} is not available in the browser`)}); };
@@ -44,7 +73,7 @@ export const browserEngine: Plugin = {
     }));
     build.onResolve({ filter: /^virtual:examples$/ }, () => ({ path: "examples", namespace: "schem-examples" }));
     build.onLoad({ filter: /.*/, namespace: "schem-examples" }, () => ({
-      contents: `export const EXAMPLES = ${JSON.stringify(jsonFiles(path.join(ROOT, "examples"), ".schem.json"))};`,
+      contents: `export const EXAMPLES = ${JSON.stringify(exampleFiles(path.join(ROOT, "examples")))};`,
       loader: "js",
     }));
   },
