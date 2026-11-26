@@ -1,0 +1,401 @@
+{
+  "id": "module:esp32-s3-devkitc-1",
+  "version": 1,
+  "kind": "module",
+  "name": "ESP32-S3-DevKitC-1",
+  "refPrefix": "U",
+  "controller": true,
+  "doc": {
+    "title": "ESP32-S3-DevKitC-1 v1.1 User Guide, section Header Block (tables J1 and J3)",
+    "url": "https://docs.espressif.com/projects/esp-dev-kits/en/latest/esp32s3/esp32-s3-devkitc-1/user_guide_v1.1.html",
+    "revision": "board ESP32-S3-DevKitC-1 v1.1 (page 'latest' as retrieved)",
+    "retrieved": "2026-11-26",
+    "pinNumbering": "J1-n and J3-n are the header and the 'No.' column of the user guide's J1 and J3 tables (22 pins each, 44 total).",
+    "notes": "GND is on J1-22, J3-1, J3-21 and J3-22 (labelled G in the tables; one board ground, group GND). 3V3 is on J1-1 and J1-2 (group 3V3, power_out from the on-board 5 V to 3.3 V LDO); 5V on J1-21 is power_in. GPIO pins are named GPIO<n> (with IO<n> and silkscreen number <n> as aliases), except J3-2 (TX, GPIO43) and J3-3 (RX, GPIO44). On v1.1 the on-board RGB LED is driven by GPIO38 (initial revision used GPIO48). No fixed interface roles: ESP32-S3 routes I2C and SPI through its GPIO matrix, so the user guide assigns none."
+  },
+  "pins": [
+    {
+      "number": "J1-1",
+      "name": "3V3",
+      "role": "power_out",
+      "group": "3V3"
+    },
+    {
+      "number": "J1-2",
+      "name": "3V3",
+      "role": "power_out",
+      "group": "3V3"
+    },
+    {
+      "number": "J1-3",
+      "name": "RST",
+      "role": "input",
+      "aliases": [
+        "EN",
+        "CHIP_PU"
+      ]
+    },
+    {
+      "number": "J1-4",
+      "name": "GPIO4",
+      "role": "bidir",
+      "aliases": [
+        "IO4",
+        "4"
+      ]
+    },
+    {
+      "number": "J1-5",
+      "name": "GPIO5",
+      "role": "bidir",
+      "aliases": [
+        "IO5",
+        "5"
+      ]
+    },
+    {
+      "number": "J1-6",
+      "name": "GPIO6",
+      "role": "bidir",
+      "aliases": [
+        "IO6",
+        "6"
+      ]
+    },
+    {
+      "number": "J1-7",
+      "name": "GPIO7",
+      "role": "bidir",
+      "aliases": [
+        "IO7",
+        "7"
+      ]
+    },
+    {
+      "number": "J1-8",
+      "name": "GPIO15",
+      "role": "bidir",
+      "aliases": [
+        "IO15",
+        "15"
+      ]
+    },
+    {
+      "number": "J1-9",
+      "name": "GPIO16",
+      "role": "bidir",
+      "aliases": [
+        "IO16",
+        "16"
+      ]
+    },
+    {
+      "number": "J1-10",
+      "name": "GPIO17",
+      "role": "bidir",
+      "aliases": [
+        "IO17",
+        "17"
+      ]
+    },
+    {
+      "number": "J1-11",
+      "name": "GPIO18",
+      "role": "bidir",
+      "aliases": [
+        "IO18",
+        "18"
+      ]
+    },
+    {
+      "number": "J1-12",
+      "name": "GPIO8",
+      "role": "bidir",
+      "aliases": [
+        "IO8",
+        "8"
+      ]
+    },
+    {
+      "number": "J1-13",
+      "name": "GPIO3",
+      "role": "bidir",
+      "aliases": [
+        "IO3",
+        "3"
+      ]
+    },
+    {
+      "number": "J1-14",
+      "name": "GPIO46",
+      "role": "bidir",
+      "aliases": [
+        "IO46",
+        "46"
+      ]
+    },
+    {
+      "number": "J1-15",
+      "name": "GPIO9",
+      "role": "bidir",
+      "aliases": [
+        "IO9",
+        "9"
+      ]
+    },
+    {
+      "number": "J1-16",
+      "name": "GPIO10",
+      "role": "bidir",
+      "aliases": [
+        "IO10",
+        "10"
+      ]
+    },
+    {
+      "number": "J1-17",
+      "name": "GPIO11",
+      "role": "bidir",
+      "aliases": [
+        "IO11",
+        "11"
+      ]
+    },
+    {
+      "number": "J1-18",
+      "name": "GPIO12",
+      "role": "bidir",
+      "aliases": [
+        "IO12",
+        "12"
+      ]
+    },
+    {
+      "number": "J1-19",
+      "name": "GPIO13",
+      "role": "bidir",
+      "aliases": [
+        "IO13",
+        "13"
+      ]
+    },
+    {
+      "number": "J1-20",
+      "name": "GPIO14",
+      "role": "bidir",
+      "aliases": [
+        "IO14",
+        "14"
+      ]
+    },
+    {
+      "number": "J1-21",
+      "name": "5V",
+      "role": "power_in"
+    },
+    {
+      "number": "J1-22",
+      "name": "GND",
+      "role": "ground",
+      "group": "GND"
+    },
+    {
+      "number": "J3-1",
+      "name": "GND",
+      "role": "ground",
+      "group": "GND"
+    },
+    {
+      "number": "J3-2",
+      "name": "TX",
+      "role": "bidir",
+      "aliases": [
+        "GPIO43",
+        "IO43",
+        "U0TXD"
+      ]
+    },
+    {
+      "number": "J3-3",
+      "name": "RX",
+      "role": "bidir",
+      "aliases": [
+        "GPIO44",
+        "IO44",
+        "U0RXD"
+      ]
+    },
+    {
+      "number": "J3-4",
+      "name": "GPIO1",
+      "role": "bidir",
+      "aliases": [
+        "IO1",
+        "1"
+      ]
+    },
+    {
+      "number": "J3-5",
+      "name": "GPIO2",
+      "role": "bidir",
+      "aliases": [
+        "IO2",
+        "2"
+      ]
+    },
+    {
+      "number": "J3-6",
+      "name": "GPIO42",
+      "role": "bidir",
+      "aliases": [
+        "IO42",
+        "42",
+        "MTMS"
+      ]
+    },
+    {
+      "number": "J3-7",
+      "name": "GPIO41",
+      "role": "bidir",
+      "aliases": [
+        "IO41",
+        "41",
+        "MTDI"
+      ]
+    },
+    {
+      "number": "J3-8",
+      "name": "GPIO40",
+      "role": "bidir",
+      "aliases": [
+        "IO40",
+        "40",
+        "MTDO"
+      ]
+    },
+    {
+      "number": "J3-9",
+      "name": "GPIO39",
+      "role": "bidir",
+      "aliases": [
+        "IO39",
+        "39",
+        "MTCK"
+      ]
+    },
+    {
+      "number": "J3-10",
+      "name": "GPIO38",
+      "role": "bidir",
+      "aliases": [
+        "IO38",
+        "38"
+      ]
+    },
+    {
+      "number": "J3-11",
+      "name": "GPIO37",
+      "role": "bidir",
+      "aliases": [
+        "IO37",
+        "37"
+      ]
+    },
+    {
+      "number": "J3-12",
+      "name": "GPIO36",
+      "role": "bidir",
+      "aliases": [
+        "IO36",
+        "36"
+      ]
+    },
+    {
+      "number": "J3-13",
+      "name": "GPIO35",
+      "role": "bidir",
+      "aliases": [
+        "IO35",
+        "35"
+      ]
+    },
+    {
+      "number": "J3-14",
+      "name": "GPIO0",
+      "role": "bidir",
+      "aliases": [
+        "IO0",
+        "0",
+        "BOOT"
+      ]
+    },
+    {
+      "number": "J3-15",
+      "name": "GPIO45",
+      "role": "bidir",
+      "aliases": [
+        "IO45",
+        "45"
+      ]
+    },
+    {
+      "number": "J3-16",
+      "name": "GPIO48",
+      "role": "bidir",
+      "aliases": [
+        "IO48",
+        "48"
+      ]
+    },
+    {
+      "number": "J3-17",
+      "name": "GPIO47",
+      "role": "bidir",
+      "aliases": [
+        "IO47",
+        "47"
+      ]
+    },
+    {
+      "number": "J3-18",
+      "name": "GPIO21",
+      "role": "bidir",
+      "aliases": [
+        "IO21",
+        "21"
+      ]
+    },
+    {
+      "number": "J3-19",
+      "name": "GPIO20",
+      "role": "bidir",
+      "aliases": [
+        "IO20",
+        "20",
+        "USB_D+"
+      ]
+    },
+    {
+      "number": "J3-20",
+      "name": "GPIO19",
+      "role": "bidir",
+      "aliases": [
+        "IO19",
+        "19",
+        "USB_D-"
+      ]
+    },
+    {
+      "number": "J3-21",
+      "name": "GND",
+      "role": "ground",
+      "group": "GND"
+    },
+    {
+      "number": "J3-22",
+      "name": "GND",
+      "role": "ground",
+      "group": "GND"
+    }
+  ]
+}

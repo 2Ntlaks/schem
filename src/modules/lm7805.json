@@ -1,0 +1,45 @@
+{
+  "id": "module:lm7805",
+  "version": 1,
+  "kind": "module",
+  "name": "LM7805 5V Linear Regulator",
+  "refPrefix": "U",
+  "controller": false,
+  "doc": {
+    "title": "Texas Instruments LM340, LM340A and LM7805 Family Datasheet (section 5 Pin Configuration and Functions, 3-Pin TO-220 NDE package) and uA78xx Datasheet",
+    "url": "https://www.ti.com/lit/ds/symlink/lm340.pdf",
+    "url2": "https://www.ti.com/lit/ds/symlink/ua78.pdf",
+    "revision": "SNOSBT0L (February 2000, Revised September 2016) and SLVS056P (May 1976, Revised January 2015)",
+    "retrieved": "2026-11-26",
+    "pinNumbering": "Pins 1-3 follow the 3-Pin TO-220 (NDE / KCS) Pin Functions table: 1 INPUT, 2 GND (COMMON), 3 OUTPUT. The TO-220 metal tab is connected to pin 2 (GND).",
+    "notes": "Fixed 5 V positive linear regulator, up to 1.5 A output current, DC input up to 35 V (7.5-20 V recommended for line regulation). Typical application uses a 0.22 uF or 0.33 uF input capacitor and a 0.1 uF output capacitor to GND."
+  },
+  "pins": [
+    {
+      "number": "1",
+      "name": "IN",
+      "role": "power_in",
+      "aliases": [
+        "INPUT",
+        "VIN"
+      ]
+    },
+    {
+      "number": "2",
+      "name": "GND",
+      "role": "ground",
+      "aliases": [
+        "COMMON"
+      ]
+    },
+    {
+      "number": "3",
+      "name": "OUT",
+      "role": "power_out",
+      "aliases": [
+        "OUTPUT",
+        "VOUT"
+      ]
+    }
+  ]
+}

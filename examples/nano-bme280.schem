@@ -1,0 +1,16 @@
+circuit "Arduino Nano with Adafruit BME280 I2C sensor"
+style theme=clean
+
+part A1 module:arduino-nano
+part U1 module:adafruit-bme280
+part R1 resistor 4.7k
+part R2 resistor 4.7k
+part R3 resistor 330
+part D1 led color=blue
+
+net 5V = A1.5V U1.VIN R1[1] R2[1]
+net GND = A1{GND} U1.GND D1.cathode
+net SDA = A1.SDA U1.SDA R1[2]
+net SCL = A1.SCL U1.SCL R2[2]
+connect A1.D9 R3[1]
+connect R3[2] D1.anode

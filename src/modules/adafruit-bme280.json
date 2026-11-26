@@ -1,0 +1,92 @@
+{
+  "id": "module:adafruit-bme280",
+  "version": 1,
+  "kind": "module",
+  "name": "Adafruit BME280 Breakout",
+  "refPrefix": "U",
+  "controller": false,
+  "doc": {
+    "title": "Adafruit BME280 Humidity + Barometric Pressure + Temperature Sensor Breakout: Pinouts and rev C Schematic (JP1)",
+    "url": "https://learn.adafruit.com/adafruit-bme280-humidity-barometric-pressure-temperature-sensor-breakout/pinouts",
+    "url2": "https://learn.adafruit.com/adafruit-bme280-humidity-barometric-pressure-temperature-sensor-breakout/downloads",
+    "revision": "Adafruit BME280 STEMMA QT rev C (schematic 2020-07-20; Pinouts guide last edited 2024-03-08)",
+    "retrieved": "2026-11-26",
+    "pinNumbering": "Pins 1-7 match header JP1 on the rev C schematic and left-to-right silkscreen order on the PCB (VIN, 3Vo, GND, SCK, SDO, SDI, CS).",
+    "notes": "On-board 3.3 V regulator (AP2112K-3.3) accepts 3-5 V on VIN and supplies 3.3 V (up to 100 mA) on 3Vo. SCK and SDI have BSS138 level-shifters and 10 kOhm pull-ups and serve both SPI (SCK/MOSI) and I2C (SCL/SDA). SDO is SPI MISO and sets the I2C address (default 0x77, pull to GND for 0x76). CS is SPI chip select (leave unconnected for I2C)."
+  },
+  "pins": [
+    {
+      "number": "1",
+      "name": "VIN",
+      "role": "power_in",
+      "aliases": [
+        "VCC",
+        "Vin"
+      ]
+    },
+    {
+      "number": "2",
+      "name": "3Vo",
+      "role": "power_out",
+      "aliases": [
+        "3V3"
+      ]
+    },
+    {
+      "number": "3",
+      "name": "GND",
+      "role": "ground"
+    },
+    {
+      "number": "4",
+      "name": "SCK",
+      "role": "input",
+      "aliases": [
+        "SCL"
+      ],
+      "iface": [
+        "spi.sck",
+        "i2c.scl"
+      ]
+    },
+    {
+      "number": "5",
+      "name": "SDO",
+      "role": "bidir",
+      "aliases": [
+        "MISO",
+        "CIPO",
+        "ADR"
+      ],
+      "iface": [
+        "spi.miso"
+      ]
+    },
+    {
+      "number": "6",
+      "name": "SDI",
+      "role": "bidir",
+      "aliases": [
+        "SDA",
+        "MOSI",
+        "COPI"
+      ],
+      "iface": [
+        "spi.mosi",
+        "i2c.sda"
+      ]
+    },
+    {
+      "number": "7",
+      "name": "CS",
+      "role": "input",
+      "aliases": [
+        "CSB",
+        "SS"
+      ],
+      "iface": [
+        "spi.ss"
+      ]
+    }
+  ]
+}

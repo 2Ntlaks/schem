@@ -1,0 +1,239 @@
+{
+  "id": "module:arduino-nano",
+  "version": 1,
+  "kind": "module",
+  "name": "Arduino Nano",
+  "refPrefix": "A",
+  "controller": true,
+  "doc": {
+    "title": "Arduino Nano (SKU A000005): Full Pinout PDF, Schematic NanoV3.3 (headers J1 and J2), and User Manual",
+    "url": "https://docs.arduino.cc/resources/pinouts/A000005-full-pinout.pdf",
+    "url2": "https://docs.arduino.cc/resources/schematics/A000005-schematics.pdf",
+    "url3": "https://docs.arduino.cc/resources/datasheets/A000005-datasheet.pdf",
+    "revision": "Nano V3.3 (A000005); full pinout 'Last update: 30/06/2021'; schematic 'NanoV3.3 23/01/19'; datasheet Rev 5 'Modified: 19/11/2026'",
+    "retrieved": "2026-11-26",
+    "pinNumbering": "Pins 1-30 follow the standard DIP-30 pinout of the two 15-pin headers on the schematic: pins 1-15 are J1-1 to J1-15 (D1/TX through D12/MISO) and pins 16-30 are J2-15 down to J2-1 (D13/SCK through VIN), matching the datasheet Features section (pin 27 is +5V, pin 30 is VIN).",
+    "notes": "GND pins 4 and 29 form group GND; RESET pins 3 and 28 form group RESET. A0-A5 also function as digital pins D14-D19 (aliases); A6 and A7 are analog-only inputs on the ATmega328P TQFP-32. I2C uses A4 (SDA) and A5 (SCL). SPI uses D10 (SS), D11 (COPI/MOSI), D12 (CIPO/MISO) and D13 (SCK/LED_BUILTIN). Roles: +5V and +3V3 are power_out (on-board regulator outputs), VIN is power_in (7-12 V)."
+  },
+  "pins": [
+    {
+      "number": "1",
+      "name": "D1",
+      "role": "bidir",
+      "aliases": [
+        "TX"
+      ]
+    },
+    {
+      "number": "2",
+      "name": "D0",
+      "role": "bidir",
+      "aliases": [
+        "RX"
+      ]
+    },
+    {
+      "number": "3",
+      "name": "RESET",
+      "role": "input",
+      "group": "RESET"
+    },
+    {
+      "number": "4",
+      "name": "GND",
+      "role": "ground",
+      "group": "GND"
+    },
+    {
+      "number": "5",
+      "name": "D2",
+      "role": "bidir"
+    },
+    {
+      "number": "6",
+      "name": "D3",
+      "role": "bidir"
+    },
+    {
+      "number": "7",
+      "name": "D4",
+      "role": "bidir"
+    },
+    {
+      "number": "8",
+      "name": "D5",
+      "role": "bidir"
+    },
+    {
+      "number": "9",
+      "name": "D6",
+      "role": "bidir"
+    },
+    {
+      "number": "10",
+      "name": "D7",
+      "role": "bidir"
+    },
+    {
+      "number": "11",
+      "name": "D8",
+      "role": "bidir"
+    },
+    {
+      "number": "12",
+      "name": "D9",
+      "role": "bidir"
+    },
+    {
+      "number": "13",
+      "name": "D10",
+      "role": "bidir",
+      "aliases": [
+        "SS"
+      ],
+      "iface": [
+        "spi.ss"
+      ]
+    },
+    {
+      "number": "14",
+      "name": "D11",
+      "role": "bidir",
+      "aliases": [
+        "COPI",
+        "MOSI"
+      ],
+      "iface": [
+        "spi.mosi"
+      ]
+    },
+    {
+      "number": "15",
+      "name": "D12",
+      "role": "bidir",
+      "aliases": [
+        "CIPO",
+        "MISO"
+      ],
+      "iface": [
+        "spi.miso"
+      ]
+    },
+    {
+      "number": "16",
+      "name": "D13",
+      "role": "bidir",
+      "aliases": [
+        "SCK",
+        "LED_BUILTIN"
+      ],
+      "iface": [
+        "spi.sck"
+      ]
+    },
+    {
+      "number": "17",
+      "name": "+3V3",
+      "role": "power_out",
+      "aliases": [
+        "3V3"
+      ]
+    },
+    {
+      "number": "18",
+      "name": "AREF",
+      "role": "input"
+    },
+    {
+      "number": "19",
+      "name": "A0",
+      "role": "bidir",
+      "aliases": [
+        "D14"
+      ]
+    },
+    {
+      "number": "20",
+      "name": "A1",
+      "role": "bidir",
+      "aliases": [
+        "D15"
+      ]
+    },
+    {
+      "number": "21",
+      "name": "A2",
+      "role": "bidir",
+      "aliases": [
+        "D16"
+      ]
+    },
+    {
+      "number": "22",
+      "name": "A3",
+      "role": "bidir",
+      "aliases": [
+        "D17"
+      ]
+    },
+    {
+      "number": "23",
+      "name": "A4",
+      "role": "bidir",
+      "aliases": [
+        "D18",
+        "SDA"
+      ],
+      "iface": [
+        "i2c.sda"
+      ]
+    },
+    {
+      "number": "24",
+      "name": "A5",
+      "role": "bidir",
+      "aliases": [
+        "D19",
+        "SCL"
+      ],
+      "iface": [
+        "i2c.scl"
+      ]
+    },
+    {
+      "number": "25",
+      "name": "A6",
+      "role": "input"
+    },
+    {
+      "number": "26",
+      "name": "A7",
+      "role": "input"
+    },
+    {
+      "number": "27",
+      "name": "+5V",
+      "role": "power_out",
+      "aliases": [
+        "5V"
+      ]
+    },
+    {
+      "number": "28",
+      "name": "RESET",
+      "role": "input",
+      "group": "RESET"
+    },
+    {
+      "number": "29",
+      "name": "GND",
+      "role": "ground",
+      "group": "GND"
+    },
+    {
+      "number": "30",
+      "name": "VIN",
+      "role": "power_in"
+    }
+  ]
+}

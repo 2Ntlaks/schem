@@ -1,0 +1,21 @@
+circuit "LM7805 5V linear power supply"
+style theme=clean
+
+part B1 battery 12V
+part D1 diode 1N4007
+part C1 capacitor 330n
+part U1 module:lm7805
+part C2 capacitor 100n
+part R1 resistor 330
+part D2 led color=green
+
+connect B1.+ D1.anode
+connect D1.cathode C1[1] U1.IN
+net 5V = U1.OUT C2[1] R1[1]
+connect R1[2] D2.anode
+net GND = B1.- C1[2] U1.GND C2[2] D2.cathode
+
+hint D1 horizontal
+hint U1 pins-left IN pins-right OUT pins-bottom GND
+hint C1 decouples U1.IN
+hint C2 decouples U1.OUT

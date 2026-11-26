@@ -26,3 +26,20 @@ All eight should print `valid` and exit with code 0.
 
 The last three are drawn the way they are because schem recognises them:
 [`docs/templates.md`](../docs/templates.md) lists every circuit it knows.
+
+## Text schematic examples (`.schem`)
+
+Four examples in the text format described in [`docs/dsl.md`](../docs/dsl.md):
+
+```
+npm run schem -- draw examples/pico-i2c-oled.schem
+```
+
+| File | Circuit | What it shows |
+|---|---|---|
+| `led.schem` | LED with a current-limiting resistor | The same starter circuit as `led.schem.json`, written in text. |
+| `pico-i2c-oled.schem` | Raspberry Pi Pico with SSD1306 OLED | `module:raspberry-pi-pico` driving `module:ssd1306-oled-i2c` over I2C with 4.7k pull-ups and a status LED. |
+| `lm7805-supply.schem` | LM7805 5V linear power supply | `module:lm7805` with reverse-polarity protection, bypass capacitors, power LED and layout hints. |
+| `nano-bme280.schem` | Arduino Nano with Adafruit BME280 | `module:arduino-nano` reading `module:adafruit-bme280` over I2C (A4/A5) with 4.7k pull-ups and a status LED. |
+
+All four should print `valid` and exit with code 0.

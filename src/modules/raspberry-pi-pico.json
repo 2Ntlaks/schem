@@ -1,0 +1,340 @@
+{
+  "id": "module:raspberry-pi-pico",
+  "version": 1,
+  "kind": "module",
+  "name": "Raspberry Pi Pico",
+  "refPrefix": "U",
+  "controller": true,
+  "doc": {
+    "title": "Raspberry Pi Pico Datasheet (section 2.1 Raspberry Pi Pico pinout) and Raspberry Pi Pico Pinout (Rev 3)",
+    "url": "https://datasheets.raspberrypi.com/pico/pico-datasheet.pdf",
+    "url2": "https://datasheets.raspberrypi.com/pico/Pico-R3-A4-Pinout.pdf",
+    "revision": "Raspberry Pi Pico (RP2040, Rev 3); Datasheet RP-008307-DS-3 (2026-11-19); Pinout RP-008309-DS-1",
+    "retrieved": "2026-11-26",
+    "pinNumbering": "Pins 1-40 follow the physical 40-pin DIP edge numbering on the board and in the official pinout PDF (left edge 1-20 top to bottom, right edge 21-40 bottom to top). The 3-pin bottom SWD debug header is separate.",
+    "notes": "Eight ground pins (3, 8, 13, 18, 23, 28, 33 AGND, 38) share the board ground plane and form group GND. Pin 36 is printed 3V3(OUT) on the pinout and named 3V3_OUT here (with alias 3V3) so dotted endpoint references work. Default peripheral assignments marked on the official pinout receive interface roles: GP4/GP5 (I2C0 SDA/SCL) and GP16-GP19 (SPI0 RX/CSn/SCK/TX). VBUS is 5 V from the micro-USB port; VSYS is the 1.8-5.5 V system power input; 3V3_OUT is the on-board 3.3 V SMPS output; 3V3_EN enables the regulator; RUN is active-low chip reset; ADC_VREF is the ADC voltage reference."
+  },
+  "pins": [
+    {
+      "number": "1",
+      "name": "GP0",
+      "role": "bidir",
+      "aliases": [
+        "GPIO0",
+        "UART0_TX"
+      ]
+    },
+    {
+      "number": "2",
+      "name": "GP1",
+      "role": "bidir",
+      "aliases": [
+        "GPIO1",
+        "UART0_RX"
+      ]
+    },
+    {
+      "number": "3",
+      "name": "GND",
+      "role": "ground",
+      "group": "GND"
+    },
+    {
+      "number": "4",
+      "name": "GP2",
+      "role": "bidir",
+      "aliases": [
+        "GPIO2"
+      ]
+    },
+    {
+      "number": "5",
+      "name": "GP3",
+      "role": "bidir",
+      "aliases": [
+        "GPIO3"
+      ]
+    },
+    {
+      "number": "6",
+      "name": "GP4",
+      "role": "bidir",
+      "aliases": [
+        "GPIO4",
+        "I2C0_SDA"
+      ],
+      "iface": [
+        "i2c.sda"
+      ]
+    },
+    {
+      "number": "7",
+      "name": "GP5",
+      "role": "bidir",
+      "aliases": [
+        "GPIO5",
+        "I2C0_SCL"
+      ],
+      "iface": [
+        "i2c.scl"
+      ]
+    },
+    {
+      "number": "8",
+      "name": "GND",
+      "role": "ground",
+      "group": "GND"
+    },
+    {
+      "number": "9",
+      "name": "GP6",
+      "role": "bidir",
+      "aliases": [
+        "GPIO6"
+      ]
+    },
+    {
+      "number": "10",
+      "name": "GP7",
+      "role": "bidir",
+      "aliases": [
+        "GPIO7"
+      ]
+    },
+    {
+      "number": "11",
+      "name": "GP8",
+      "role": "bidir",
+      "aliases": [
+        "GPIO8"
+      ]
+    },
+    {
+      "number": "12",
+      "name": "GP9",
+      "role": "bidir",
+      "aliases": [
+        "GPIO9"
+      ]
+    },
+    {
+      "number": "13",
+      "name": "GND",
+      "role": "ground",
+      "group": "GND"
+    },
+    {
+      "number": "14",
+      "name": "GP10",
+      "role": "bidir",
+      "aliases": [
+        "GPIO10"
+      ]
+    },
+    {
+      "number": "15",
+      "name": "GP11",
+      "role": "bidir",
+      "aliases": [
+        "GPIO11"
+      ]
+    },
+    {
+      "number": "16",
+      "name": "GP12",
+      "role": "bidir",
+      "aliases": [
+        "GPIO12"
+      ]
+    },
+    {
+      "number": "17",
+      "name": "GP13",
+      "role": "bidir",
+      "aliases": [
+        "GPIO13"
+      ]
+    },
+    {
+      "number": "18",
+      "name": "GND",
+      "role": "ground",
+      "group": "GND"
+    },
+    {
+      "number": "19",
+      "name": "GP14",
+      "role": "bidir",
+      "aliases": [
+        "GPIO14"
+      ]
+    },
+    {
+      "number": "20",
+      "name": "GP15",
+      "role": "bidir",
+      "aliases": [
+        "GPIO15"
+      ]
+    },
+    {
+      "number": "21",
+      "name": "GP16",
+      "role": "bidir",
+      "aliases": [
+        "GPIO16",
+        "SPI0_RX"
+      ],
+      "iface": [
+        "spi.miso"
+      ]
+    },
+    {
+      "number": "22",
+      "name": "GP17",
+      "role": "bidir",
+      "aliases": [
+        "GPIO17",
+        "SPI0_CSn"
+      ],
+      "iface": [
+        "spi.ss"
+      ]
+    },
+    {
+      "number": "23",
+      "name": "GND",
+      "role": "ground",
+      "group": "GND"
+    },
+    {
+      "number": "24",
+      "name": "GP18",
+      "role": "bidir",
+      "aliases": [
+        "GPIO18",
+        "SPI0_SCK"
+      ],
+      "iface": [
+        "spi.sck"
+      ]
+    },
+    {
+      "number": "25",
+      "name": "GP19",
+      "role": "bidir",
+      "aliases": [
+        "GPIO19",
+        "SPI0_TX"
+      ],
+      "iface": [
+        "spi.mosi"
+      ]
+    },
+    {
+      "number": "26",
+      "name": "GP20",
+      "role": "bidir",
+      "aliases": [
+        "GPIO20"
+      ]
+    },
+    {
+      "number": "27",
+      "name": "GP21",
+      "role": "bidir",
+      "aliases": [
+        "GPIO21"
+      ]
+    },
+    {
+      "number": "28",
+      "name": "GND",
+      "role": "ground",
+      "group": "GND"
+    },
+    {
+      "number": "29",
+      "name": "GP22",
+      "role": "bidir",
+      "aliases": [
+        "GPIO22"
+      ]
+    },
+    {
+      "number": "30",
+      "name": "RUN",
+      "role": "input",
+      "aliases": [
+        "RESET"
+      ]
+    },
+    {
+      "number": "31",
+      "name": "GP26",
+      "role": "bidir",
+      "aliases": [
+        "GPIO26",
+        "ADC0"
+      ]
+    },
+    {
+      "number": "32",
+      "name": "GP27",
+      "role": "bidir",
+      "aliases": [
+        "GPIO27",
+        "ADC1"
+      ]
+    },
+    {
+      "number": "33",
+      "name": "AGND",
+      "role": "ground",
+      "group": "GND"
+    },
+    {
+      "number": "34",
+      "name": "GP28",
+      "role": "bidir",
+      "aliases": [
+        "GPIO28",
+        "ADC2"
+      ]
+    },
+    {
+      "number": "35",
+      "name": "ADC_VREF",
+      "role": "input"
+    },
+    {
+      "number": "36",
+      "name": "3V3_OUT",
+      "role": "power_out",
+      "aliases": [
+        "3V3"
+      ]
+    },
+    {
+      "number": "37",
+      "name": "3V3_EN",
+      "role": "input"
+    },
+    {
+      "number": "38",
+      "name": "GND",
+      "role": "ground",
+      "group": "GND"
+    },
+    {
+      "number": "39",
+      "name": "VSYS",
+      "role": "power_in"
+    },
+    {
+      "number": "40",
+      "name": "VBUS",
+      "role": "power_out"
+    }
+  ]
+}
