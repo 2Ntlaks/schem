@@ -1,40 +1,32 @@
 // The playground's documentation page (out/web/docs.html), made at build time from the docs in
 // the repository, so the site and the Markdown never disagree:
+//   docs/dsl.md             -> "Text schematics"
 //   docs/netlist-format.md  -> "The circuit file"
 //   docs/parts.md           -> "Part types"
+//   docs/templates.md       -> "Recognised circuits"
 //   docs/editing.md         -> "Editing from the command line"
+//   docs/install.md         -> "Installing schem"
 // Links between these files become links within the page; other repository links go to GitHub.
-// A complete example circuit gets an "Open in the playground" button (web/docs.ts).
+// A complete example circuit (JSON or .schem) gets an "Open in the playground" button (web/docs.ts).
 
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { Marked } from "marked";
+import { compileDsl } from "../../src/core/dsl.js";
+import { escHtml as esc, highlightDsl, highlightJson } from "../../web/highlight.js";
 
 const REPO = "https://github.com/2Ntlaks/schem/blob/main/";
 
 export const SECTIONS = [
+  { file: "docs/dsl.md", id: "dsl", title: "Text schematics" },
   { file: "docs/netlist-format.md", id: "format", title: "The circuit file" },
   { file: "docs/parts.md", id: "parts", title: "Part types" },
+  { file: "docs/templates.md", id: "templates", title: "Recognised circuits" },
   { file: "docs/editing.md", id: "editing", title: "Editing from the command line" },
+  { file: "docs/install.md", id: "install", title: "Installing schem" },
 ] as const;
 
-const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 const slug = (s: string) => s.toLowerCase().replace(/<[^>]+>/g, "").replace(/&[a-z]+;/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
-
-/** JSON colours, the same classes as the playground editor. */
-function highlightJson(code: string): string {
-  const re = /("(?:[^"\\]|\\.)*")(\s*:)?|(-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)|(true|false|null)|([{}[\],:])/g;
-  let out = "", last = 0;
-  for (const m of code.matchAll(re)) {
-    out += esc(code.slice(last, m.index));
-    if (m[1]) out += `<span class="${m[2] ? "t-key" : "t-str"}">${esc(m[1])}</span>${m[2] ? `<span class="t-pun">${esc(m[2])}</span>` : ""}`;
-    else if (m[3]) out += `<span class="t-num">${m[3]}</span>`;
-    else if (m[4]) out += `<span class="t-lit">${m[4]}</span>`;
-    else out += `<span class="t-pun">${esc(m[5]!)}</span>`;
-    last = m.index! + m[0].length;
-  }
-  return out + esc(code.slice(last));
-}
 
 /** Where a link in one of the docs should point on the page. */
 function target(href: string, from: string): string {
@@ -72,7 +64,9 @@ export function renderDocs(root: string): DocsPage {
         },
         code(code, lang) {
           let open = "";
+          let rendered = esc(code);
           if (lang === "json") {
+            rendered = highlightJson(code);
             try {
               const doc = JSON.parse(code) as { circuit?: unknown };
               if (doc && typeof doc === "object" && doc.circuit) {
@@ -80,8 +74,17 @@ export function renderDocs(root: string): DocsPage {
                 open = `<button type="button" class="open-pg" data-open>Open in the playground</button>`;
               }
             } catch { /* a fragment, not a whole file */ }
+          } else if (lang === "schem" || lang === "text") {
+            const compiled = compileDsl(code);
+            if (compiled.ok && compiled.project && compiled.project.circuit.parts.length > 0) {
+              circuits.push(code);
+              open = `<button type="button" class="open-pg" data-open>Open in the playground</button>`;
+              rendered = highlightDsl(code);
+            } else if (lang === "schem") {
+              rendered = highlightDsl(code);
+            }
           }
-          return `<div class="code"><pre><code>${lang === "json" ? highlightJson(code) : esc(code)}</code></pre>${open}</div>\n`;
+          return `<div class="code"><pre><code>${rendered}</code></pre>${open}</div>\n`;
         },
         table(header, rows) {
           return `<div class="table-wrap"><table><thead>${header}</thead><tbody>${rows}</tbody></table></div>\n`;
