@@ -19,10 +19,12 @@ import { applyEditScript, parseEditScript } from "./io/edit-script.js";
 import { jsonProblem, lineColumn } from "./io/json-problem.js";
 import { fromLayoutCache } from "./io/layout-cache.js";
 import type { LoadedProject, LoadResult } from "./io/project.js";
+import { importSpice } from "./io/spice.js";
 import { layout, type LayoutResult } from "./layout/layout.js";
 import { checkDrawing } from "./quality/index.js";
-import { toSvg } from "./render/svg.js";
+import { toSvg, type SvgOptions } from "./render/svg.js";
 import { toPng } from "./render/png.js";
+import { resolveTheme } from "./render/themes.js";
 import { executeCommand, type CommandResult } from "./mcp/commands.js";
 import { commitProject, formatOf, issueText, loadWithin, projectText, readWithin } from "./mcp/project-files.js";
 import { insideRoot, openRoots, resolvePath, showPath, type Roots } from "./mcp/roots.js";
@@ -38,7 +40,7 @@ const USAGE = `schem - draw a circuit from JSON or text
 
 Usage:
   npm run schem -- init [name]
-  npm run schem -- render <file> -o <output.svg|png> [--scale N | --dpi N] [--draft] [--overwrite]
+  npm run schem -- render <file> -o <output.svg|png> [--scale N | --dpi N] [--theme <name>] [--transparent] [--draft] [--overwrite]
   npm run schem -- check <file> [--detail brief|normal|full] [--cursor N]
   npm run schem -- preview <file> -o <output.png> [--max N] [--focus R1,U2 | --finding ID]
   npm run schem -- query <file> part|net ID
@@ -47,7 +49,8 @@ Usage:
   npm run schem -- component <type>
   npm run schem -- fmt <file> [--to dsl|json]
   npm run schem -- undo <file>
-  npm run schem -- draw <file> [-o <dir>]
+  npm run schem -- import <file.cir> [-o <output.schem>] [--overwrite] [--json]
+  npm run schem -- draw <file> [-o <dir>] [--theme <name>] [--transparent]
   npm run schem -- edit <file> --ops <ops.json> [-o <dir>] [--strict] [--dry-run]
                    [--expect-revision <R>] [--expect-layout <L>] [--json]
   npm run schem -- --help
@@ -180,9 +183,9 @@ function savedLayout(project: LoadedProject, io: Io): LayoutState | undefined {
 }
 
 /** Write the SVG and PNG of a laid-out drawing; returns their paths, or undefined after saying why not. */
-function writeDrawing(result: LayoutResult, dir: string, name: string, file: string, roots: Roots, io: Io): { svgPath: string; pngPath: string } | undefined {
-  const svg = toSvg(result.render!);
-  const png = toPng(svg);
+function writeDrawing(result: LayoutResult, dir: string, name: string, file: string, roots: Roots, io: Io, svgOpts?: SvgOptions): { svgPath: string; pngPath: string } | undefined {
+  const svg = toSvg(result.render!, svgOpts);
+  const png = svgOpts?.transparent ? toPng(svg, 10, { transparent: true }) : toPng(svg);
   const svgPath = join(dir, `${name}.svg`);
   const pngPath = join(dir, `${name}.png`);
   try {
@@ -198,9 +201,13 @@ function writeDrawing(result: LayoutResult, dir: string, name: string, file: str
   return { svgPath, pngPath };
 }
 
-function draw(file: string | undefined, dir: string, json: boolean, io: Io): number {
+function draw(file: string | undefined, dir: string, json: boolean, io: Io, svgOpts?: SvgOptions): number {
   if (file === undefined) {
     return usageError("draw: no file given.", json, io);
+  }
+  if (svgOpts?.theme !== undefined) {
+    try { resolveTheme(svgOpts.theme); }
+    catch (e) { return usageError((e as Error).message, json, io); }
   }
   const input = openProjectForCli(file, "draw", json, io);
   if (!input.ok) return input.code;
@@ -225,7 +232,7 @@ function draw(file: string | undefined, dir: string, json: boolean, io: Io): num
   }
 
   const quality = checkDrawing(project.circuit, result.pinDefs, result.render);
-  const written = writeDrawing(result, dir, name, real, withLegacyOutput(roots, dir), io);
+  const written = writeDrawing(result, dir, name, real, withLegacyOutput(roots, dir), io, svgOpts);
   if (written === undefined) return json ? emit({ isError: true, body: { error: "Could not write the drawings." } }, true, io) : 2;
   const ms = performance.now() - started;
 
@@ -255,6 +262,8 @@ interface Args {
   json: boolean;
   expectRevision?: string;
   expectLayout?: string;
+  theme?: string;
+  transparent: boolean;
 }
 
 function edit(a: Args, io: Io): number {
@@ -374,7 +383,7 @@ function editLocked(a: Args & { file: string; ops: string }, real: string, roots
 const SHARED = {
   init: { values: [], flags: [] },
   check: { values: ["detail", "cursor"], flags: [] },
-  render: { values: ["out", "scale", "dpi"], flags: ["draft", "overwrite"] },
+  render: { values: ["out", "scale", "dpi", "theme"], flags: ["draft", "overwrite", "transparent"] },
   preview: { values: ["out", "max", "focus", "finding"], flags: [] },
   query: { values: [], flags: [] },
   undo: { values: [], flags: [] },
@@ -478,6 +487,7 @@ function emit(result: CommandResult, json: boolean, io: Io): number {
   else if (result.isError) io.err(String(body.error ?? body.status ?? "The command failed."));
   else if (typeof body.description === "string") {
     io.out(body.description);
+    if (typeof body.altText === "string") io.out(`\nAlt text: ${body.altText}`);
     if (Array.isArray(body.table)) {
       io.out("\nNet | Presentation | Pins\n--- | --- | ---");
       for (const row of body.table) io.out(`${row.name} | ${row.presentation} | ${row.pins.join(", ")}`);
@@ -509,6 +519,74 @@ function emit(result: CommandResult, json: boolean, io: Io): number {
   return result.isError || (typeof body.status === "string" && body.status !== "valid") || body.verified === false ? 1 : 0;
 }
 
+function importCommand(rest: string[], io: Io): number {
+  const json = rest.includes("--json");
+  let file: string | undefined, outPath: string | undefined, overwrite = false;
+  for (let i = 0; i < rest.length; i++) {
+    const arg = rest[i]!;
+    if (arg === "--json") continue;
+    if (arg === "--overwrite") { overwrite = true; continue; }
+    if (arg === "-o" || arg === "--out") {
+      const next = rest[i + 1];
+      if (next === undefined || next.startsWith("--")) return usageError(`${arg}: no output file given.`, json, io);
+      outPath = next;
+      i++;
+      continue;
+    }
+    if (arg.startsWith("-") && arg !== "-") return usageError(`Unknown option "${arg}".`, json, io);
+    if (file === undefined) file = arg;
+    else return usageError(`import: more than one file given ("${file}" and "${arg}").`, json, io);
+  }
+  if (file === undefined) return usageError("import: no SPICE file given.", json, io);
+  const readRoots = rootsFor(file);
+  const opened = readWithin(readRoots, file);
+  if (!opened.ok) {
+    if (json) return emit({ isError: true, body: { ok: false, error: opened.message } }, true, io);
+    io.err(`Cannot read ${showPath(file)}. ${opened.message}`);
+    return 1;
+  }
+  const imported = importSpice(opened.text);
+  if (!imported.ok || !imported.dsl || !imported.project) {
+    if (json) {
+      io.out(JSON.stringify({ ok: false, error: imported.errors[0] ?? "Could not import SPICE netlist.", errors: imported.errors, warnings: imported.warnings }, null, 2));
+    } else {
+      io.err(`Cannot import ${showPath(file)}:`);
+      for (const e of imported.errors) io.err(issueLine("error", e));
+      for (const w of imported.warnings) io.err(issueLine("warning", w));
+    }
+    return 1;
+  }
+  const parts = imported.project.circuit.parts.length;
+  const nets = imported.project.circuit.nets.length;
+  let written: string | undefined;
+  if (outPath !== undefined) {
+    const writeRoots = withLegacyOutput(readRoots, dirname(resolve(outPath)));
+    try {
+      written = writeOutput(writeRoots, outPath, opened.real, imported.dsl, overwrite);
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e);
+      if (json) io.out(JSON.stringify({ ok: false, error: message }, null, 2));
+      else io.err(message);
+      return 1;
+    }
+  }
+  if (json) {
+    io.out(JSON.stringify({
+      ok: true,
+      ...(written ? { out: showPath(written) } : {}),
+      dsl: imported.dsl,
+      warnings: imported.warnings,
+      parts,
+      nets,
+    }, null, 2));
+    return 0;
+  }
+  for (const w of imported.warnings) io.err(issueLine("warning", w));
+  if (written !== undefined) io.out(`Wrote ${showPath(written)} (${parts} parts, ${nets} nets).`);
+  else io.out(imported.dsl.trimEnd());
+  return 0;
+}
+
 function dispatch(argv: string[], io: Io): number {
   const [command, ...rest] = argv;
   if (command === undefined || command === "--help" || command === "-h" || command === "help") {
@@ -520,14 +598,19 @@ function dispatch(argv: string[], io: Io): number {
     return 0;
   }
   if (Object.hasOwn(SHARED, command)) return shared(command as SharedVerb, rest, io);
+  if (command === "import") return importCommand(rest, io);
   if (command !== "draw" && command !== "edit") {
     return usageError(`Unknown command "${command}".`, rest.includes("--json"), io);
   }
 
-  const a: Args = { dir: "out", strict: false, dryRun: false, json: rest.includes("--json") };
+  const a: Args = { dir: "out", strict: false, dryRun: false, json: rest.includes("--json"), transparent: false };
   // Options that take a value, and flags, per command.
   const valued: Record<string, (v: string) => void> = { "-o": (v) => (a.dir = v), "--out": (v) => (a.dir = v) };
   const flags: Record<string, () => void> = { "--json": () => (a.json = true) };
+  if (command === "draw") {
+    valued["--theme"] = (v) => (a.theme = v);
+    flags["--transparent"] = () => (a.transparent = true);
+  }
   if (command === "edit") {
     valued["--ops"] = (v) => (a.ops = v);
     valued["--expect-revision"] = (v) => (a.expectRevision = v);
@@ -553,7 +636,10 @@ function dispatch(argv: string[], io: Io): number {
       return usageError(`${command}: more than one file given ("${a.file}" and "${arg}").`, a.json, io);
     }
   }
-  return command === "draw" ? draw(a.file, a.dir, a.json, io) : edit(a, io);
+  const svgOpts: SvgOptions | undefined = a.theme !== undefined || a.transparent
+    ? { ...(a.theme !== undefined ? { theme: a.theme } : {}), ...(a.transparent ? { transparent: true } : {}) }
+    : undefined;
+  return command === "draw" ? draw(a.file, a.dir, a.json, io, svgOpts) : edit(a, io);
 }
 
 /** Run the CLI with arguments and output sinks; returns the process exit code. */

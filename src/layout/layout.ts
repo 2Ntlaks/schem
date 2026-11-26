@@ -1256,7 +1256,10 @@ export function layout(project: Project, opts: LayoutOptions = {}): LayoutResult
   for (const d of el.dots) art.push({ t: "path", d: circle(d[0] * 10, d[1] * 10, 3.5), fill: "stroke" });
 
   const sheet = { x: bounds.x - MARGIN, y: bounds.y - MARGIN, w: bounds.w + 2 * MARGIN, h: bounds.h + 2 * MARGIN };
-  const render: RenderModel = { electrical: el, art, bounds: sheet, meta: project.meta?.title ? { title: project.meta.title } : {} };
+  const meta: RenderModel["meta"] = {};
+  if (project.meta?.title) meta.title = project.meta.title;
+  if (project.intent?.style?.theme) meta.theme = project.intent.style.theme;
+  const render: RenderModel = { electrical: el, art, bounds: sheet, meta };
   const lowConfidence = notes.some((n) => n.includes("low confidence"));
   // Step 8: a drawing is valid only if verification layers 1 and 2 pass on the render model.
   if (!failed.length) {

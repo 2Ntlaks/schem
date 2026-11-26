@@ -8,7 +8,9 @@ import { saveProject } from "../io/project.js";
 import { applyEditScript, parseEditScript, type EditScript } from "../io/edit-script.js";
 import { revision } from "../edit/edit.js";
 import { stabilityBreaks, type ChangeReport } from "../edit/report.js";
-import { toSvg } from "../render/svg.js";
+import { altText } from "../quality/alt-text.js";
+import { toSvg, type SvgOptions } from "../render/svg.js";
+import { resolveTheme, THEME_NAMES } from "../render/themes.js";
 import { cmpStr } from "../geom/geom.js";
 import { MODULE_LIBRARY, modulePins } from "../modules/index.js";
 import { BUILTIN } from "../symbols/library.js";
@@ -371,6 +373,17 @@ function schemRender(roots: Roots, args: Record<string, unknown>): CommandResult
   if (args.format === "svg" && (args.scale !== undefined || args.dpi !== undefined)) return fail("scale and dpi are for png. svg is vector.");
   const scale = readScale(args);
   if (!scale.ok) return fail(scale.message);
+  let theme: string | undefined;
+  if (args.theme !== undefined) {
+    if (typeof args.theme !== "string" || args.theme.trim() === "") return fail(`theme must be one of: ${THEME_NAMES.join(", ")}.`);
+    try { theme = resolveTheme(args.theme).id; }
+    catch (e) { return fail((e as Error).message); }
+  }
+  const transparent = flag(args.transparent, "transparent");
+  if (!transparent.ok) return fail(transparent.message);
+  const svgOpts: SvgOptions | undefined = theme !== undefined || transparent.value
+    ? { ...(theme !== undefined ? { theme } : {}), ...(transparent.value ? { transparent: true } : {}) }
+    : undefined;
   const overwrite = flag(args.overwrite, "overwrite");
   if (!overwrite.ok) return fail(overwrite.message);
   const loaded = loadWithin(roots, path.path);
@@ -386,14 +399,14 @@ function schemRender(roots: Roots, args: Record<string, unknown>): CommandResult
   if (!payload.ok) return fail(payload.message);
   try {
     if (args.format === "svg") {
-      const svg = toSvg(render);
+      const svg = toSvg(render, svgOpts);
       payload.body.format = "svg";
       payload.body.out = showPath(writeOutput(roots, out.path, loaded.real, svg, overwrite.value));
       payload.body.bytes = Buffer.byteLength(svg, "utf8");
       payload.body.grid = [render.bounds.w, render.bounds.h];
       return success(payload.body);
     }
-    const image = renderPng(render, scale.px);
+    const image = renderPng(render, scale.px, undefined, svgOpts);
     if (!image.ok) return fail(image.message);
     const png = scale.dpi === undefined ? image.png : pngWithDpi(image.png, scale.dpi);
     payload.body.format = "png";
@@ -518,7 +531,12 @@ function schemDescribe(roots: Roots, args: Record<string, unknown>): CommandResu
   for (const net of rows) lines.push(`${net.name} uses ${net.presentation} and connects ${net.pins.join(", ")}.`);
   const payload = sheetPayload(project, drawn, { detail: "brief" });
   if (!payload.ok) return fail(payload.message);
-  return success({ ...payload.body, description: lines.join("\n"), ...(table.value ? { table: rows } : {}) });
+  return success({
+    ...payload.body,
+    description: lines.join("\n"),
+    altText: altText(project.circuit, pinDefs, render, drawn.result.notes),
+    ...(table.value ? { table: rows } : {}),
+  });
 }
 
 function schemComponents(args: Record<string, unknown>): CommandResult {

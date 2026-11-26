@@ -14,7 +14,7 @@ import { textBlocks } from "../quality/drawing.js";
 import type { Box, Pt } from "../geom/geom.js";
 import type { RenderModel } from "../render/model.js";
 import { toPng } from "../render/png.js";
-import { toSvg } from "../render/svg.js";
+import { toSvg, type SvgOptions } from "../render/svg.js";
 
 export const MAX_FILE = 2 * 1024 * 1024;
 export const MAX_PARTS = 500;
@@ -317,12 +317,13 @@ export function cropSvg(svg: string, crop: Box): string {
   return svg.replace(/^<svg\b[^>]*>/, open);
 }
 
-export function renderPng(render: RenderModel, pxPerGrid: number, crop?: Box): { ok: true; png: Buffer; width: number; height: number; pxPerGrid: number } | { ok: false; message: string } {
+export function renderPng(render: RenderModel, pxPerGrid: number, crop?: Box, svgOpts?: SvgOptions): { ok: true; png: Buffer; width: number; height: number; pxPerGrid: number } | { ok: false; message: string } {
   const box = crop ?? render.bounds;
   const sized = rasterSize(box.w, box.h, pxPerGrid);
   if (!sized.ok) return sized;
-  const svg = crop ? cropSvg(toSvg(render), crop) : toSvg(render);
-  const png = toPng(svg, sized.pxPerGrid);
+  const rawSvg = toSvg(render, svgOpts);
+  const svg = crop ? cropSvg(rawSvg, crop) : rawSvg;
+  const png = svgOpts?.transparent ? toPng(svg, sized.pxPerGrid, { transparent: true }) : toPng(svg, sized.pxPerGrid);
   const actual = pngSize(png);
   if (actual === undefined) return { ok: false, message: "the PNG renderer did not return a PNG." };
   if (actual.width > MAX_PNG_SIDE || actual.height > MAX_PNG_SIDE || actual.width * actual.height > MAX_PNG_PIXELS) {

@@ -94,6 +94,8 @@ export const TOOLS: Array<{ name: string; description: string; inputSchema: Reco
         out: { type: "string" },
         scale: { type: "number" },
         dpi: { type: "number" },
+        theme: { type: "string", enum: ["clean", "dark", "blueprint", "textbook", "mono-print"], description: "Color theme for rendering. Defaults to the file style theme or clean." },
+        transparent: { type: "boolean", description: "Omit the background rectangle for a transparent SVG or PNG." },
         overwrite: { type: "boolean" },
       },
       required: ["path", "format", "out"],

@@ -32,4 +32,5 @@ export function checkDrawing(circuit: Circuit, pinDefs: PinDefs, m: RenderModel)
   };
 }
 
+export { altText, netTable, netTableMarkdown, type NetTableRow } from "./alt-text.js";
 export type { Finding, LimitBreach, Metrics, QualityIssue };

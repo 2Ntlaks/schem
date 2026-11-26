@@ -519,7 +519,7 @@ describe("component catalogue tools", () => {
 
     const filtered = callTool(s.roots, "schem_components", { query: "arduino" });
     expect(filtered.isError).toBe(false);
-    expect((textOf(filtered).components as Array<{ id: string }>).map((c) => c.id)).toEqual(["module:arduino-uno-r3"]);
+    expect((textOf(filtered).components as Array<{ id: string }>).map((c) => c.id)).toEqual(["module:arduino-nano", "module:arduino-uno-r3"]);
 
     const empty = callTool(s.roots, "schem_components", { query: "does-not-exist-xyz" });
     expect(empty.isError).toBe(false);
