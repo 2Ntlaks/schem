@@ -1,5 +1,5 @@
-// The module library's files as (name, text) pairs: every *.json in this folder. The playground
-// build (scripts/web.ts) replaces this file with the same pairs written in at build time.
+// The module library's files as (name, text) pairs: every *.json in this folder. The package
+// build (scripts/build.ts) replaces this file with the same pairs embedded at build time.
 
 import { readdirSync, readFileSync } from "node:fs";
 

@@ -10,7 +10,6 @@ import { openRoots } from "../src/mcp/roots.js";
 import { callTool, type ToolResult } from "../src/mcp/tools.js";
 import { toSvg } from "../src/render/svg.js";
 import { THEMES } from "../src/render/themes.js";
-import { draw as webDraw } from "../web/core.js";
 
 const WORK = mkdtempSync(join(tmpdir(), "schem-sprint-"));
 afterAll(() => rmSync(WORK, { recursive: true, force: true }));
@@ -113,7 +112,7 @@ describe("usability sprint end-to-end integration", () => {
     expect(String(toolJson(bad).error)).toContain("Unknown theme");
   });
 
-  it("propagates style theme=dark through layout(), CLI, and playground web/core draw()", () => {
+  it("propagates style theme=dark through layout(), toSvg(), and CLI draw", () => {
     const dir = folder();
     const dsl = [
       'circuit "Dark Style Sheet"',
@@ -133,10 +132,6 @@ describe("usability sprint end-to-end integration", () => {
     expect(laid.render?.meta.theme).toBe("dark");
     const expectedSvg = toSvg(laid.render!);
     expect(expectedSvg).toContain(`fill="${THEMES.dark.background}"`);
-
-    const web = webDraw(dsl);
-    expect(web.verdict).toBe("valid");
-    expect(web.svg).toBe(expectedSvg);
 
     const file = join(dir, "dark.schem");
     writeFileSync(file, dsl, "utf8");

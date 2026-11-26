@@ -10,7 +10,7 @@
 //                          reads the copy in dist/fonts/ instead, so that 12 MB font package
 //                          stays a dev dependency.
 //   src/modules/files.ts   reads the module library's *.json next to it. The bundle carries
-//                          those files as text, as the playground build does (scripts/lib/web-bundle.ts).
+//                          those files as text so the packaged CLI needs no separate data folder.
 //   package.json           read for the version. src/cli.ts looks one folder up from itself,
 //                          which from dist/ is the package root; src/mcp/server.ts looks two
 //                          folders up, so its path is rewritten to one.

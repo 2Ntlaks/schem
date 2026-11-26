@@ -1,5 +1,5 @@
-// The font file's bytes. In Node they are read from the dejavu-fonts-ttf package; the playground
-// build (scripts/web.ts) replaces this file with one that returns bytes the page fetched.
+// The font file's bytes. From source they are read from the dejavu-fonts-ttf package; the package
+// build (scripts/build.ts) replaces this file so dist/schem.js reads from dist/fonts/.
 
 import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";

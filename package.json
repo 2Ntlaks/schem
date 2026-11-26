@@ -52,7 +52,7 @@
     "build": "tsx scripts/build.ts",
     "pack:smoke": "tsx scripts/pack-smoke.ts",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit && tsc --noEmit -p web",
+    "typecheck": "tsc --noEmit",
     "draw": "tsx scripts/draw.ts",
     "schem": "tsx src/cli.ts",
     "mcp": "tsx src/mcp/main.ts",
@@ -64,8 +64,6 @@
     "draw:symbols": "tsx scripts/symbols.ts",
     "readme:art": "tsx scripts/readme-art.ts",
     "readme:gallery": "tsx scripts/gallery.ts",
-    "web:build": "tsx scripts/web.ts build",
-    "web:serve": "tsx scripts/web.ts serve",
     "prepack": "npm run build"
   },
   "devDependencies": {

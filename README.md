@@ -65,7 +65,7 @@ npm install -g .
 schem draw examples/led.schem.json
 ```
 
-The same command runs the 11-tool MCP server for AI agents: `schem mcp --root <folder>`, and the repo ships a short agent skill in [`skills/schem/SKILL.md`](skills/schem/SKILL.md). [`docs/install.md`](docs/install.md) has the setup for Claude Code, Claude Desktop, Cursor, VS Code and Codex CLI, and the one-line `npx` form for once the package is published. The browser playground (`npm run web:serve`) also runs `.schem` text DSL and JSON directly in your browser.
+The same command runs the 12-tool MCP server for AI agents: `schem mcp --root <folder>`, and the repo ships a short agent skill in [`skills/schem/SKILL.md`](skills/schem/SKILL.md). [`docs/install.md`](docs/install.md) has the setup for Claude Code, Claude Desktop, Cursor, VS Code and Codex CLI, and the one-line `npx` form for once the package is published.
 
 ## How it works
 
@@ -185,7 +185,7 @@ schem is an early prototype. It is useful today for small and medium circuits, a
 - Common circuits drawn in their textbook shape: op-amp amplifiers, Sallen-Key and other active filters, two oscillators, H-bridges, I2C buses and more ([the list](docs/templates.md))
 - Circuits with no template are laid out from what their parts are: inputs on the left, loads above a transistor and emitter parts below it, a supply-to-ground string in one column. All 18 everyday circuits in the benchmark draw valid ([how it works](docs/general-layout.md))
 - All 8 development circuits draw valid; a generated 30-part circuit completes layout and checked fixes in about 1.1 s (under the 3 s limit)
-- 11-tool MCP server, shipped agent skill (`skills/schem/SKILL.md`), accessible `altText` and net tables, and a `.schem`-capable browser playground
+- 12-tool MCP server, shipped agent skill (`skills/schem/SKILL.md`), accessible `altText` and net tables, and CLI templates and file watching (`schem init --template`, `schem watch`)
 - Edits from the command line that keep the drawing and report anything that moved (134 of 137 random test edits stay within the limit)
 - Byte-identical output on Windows and Linux
 - Clear errors for broken input

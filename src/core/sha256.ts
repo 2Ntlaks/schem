@@ -1,7 +1,6 @@
-// SHA-256 (FIPS 180-4) in plain TypeScript, so the engine hashes the same way in Node and in a
-// browser (the playground runs the engine in a Web Worker, where node:crypto does not exist and
-// the Web Crypto digest is asynchronous). Used for revision and layout tokens and the font id;
-// tests/sha256.test.ts checks it against node:crypto.
+// Synchronous SHA-256 (FIPS 180-4) in plain TypeScript with no external dependencies.
+// Used for revision and layout tokens and the font id; tests/sha256.test.ts checks it
+// against node:crypto.
 
 const K = new Uint32Array([
   0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,

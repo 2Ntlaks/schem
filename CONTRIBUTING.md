@@ -74,16 +74,6 @@ A board (an Arduino, a sensor breakout, a regulator module) is a *module*: a JSO
 
 In the pull request, link the documentation you used. A reviewer checks the pins against it.
 
-## Working on the playground
-
-The playground in `web/` is the engine in a web page: the circuit file on the left, the verified drawing on the right, all in the visitor's browser. `npm run web:serve` builds it and serves it on http://localhost:8080, rebuilding when a file changes.
-
-- `web/core.ts` does what `schem draw` does, for text instead of a file; the page runs it in a Web Worker (`web/worker.ts`) so typing stays smooth. `web/main.ts` is the page.
-- The engine needs no changes to run there: the build (`scripts/lib/web-bundle.ts`) swaps the two files that read from disk, `src/text/font-file.ts` and `src/modules/files.ts`. Keep new disk access out of `src/`, or the playground breaks.
-- `tests/web.test.ts` checks that the bundled engine draws every example byte-identically to the command line. A playground that draws differently from `schem draw` is a bug.
-- The docs page (`docs.html`) is made from `docs/netlist-format.md`, `docs/parts.md` and `docs/editing.md` when the site is built (`scripts/lib/docs-page.ts`). Edit those files, not the page; a whole example circuit in them gets an "Open in the playground" button.
-- Nothing may leave the browser: no analytics, no fonts or scripts from other sites, no server calls. A share link carries the circuit itself after the `#`.
-
 ## Pull requests
 
 - Keep each pull request to one topic.
