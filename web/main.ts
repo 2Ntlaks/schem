@@ -1,11 +1,13 @@
-// The playground page: a circuit file on the left, the verified drawing on the right. The engine
-// runs in a Web Worker (web/worker.ts); this file is the editor, the drawing view, the title block,
-// the parts panel, share links and downloads. Nothing leaves the browser: a share link carries the
-// circuit itself, compressed, after the #.
+// The playground page: a circuit file (.schem or JSON) on the left, the verified drawing on the
+// right. The engine runs in a Web Worker (web/worker.ts); this file is the editor, the drawing
+// view, the title block, the parts panel, share links and downloads. Nothing leaves the browser:
+// a share link carries the circuit itself, compressed, after the #.
 
 import { EXAMPLES } from "virtual:examples";
-import type { DrawResult, PartType, Problem } from "./core.js";
+import type { CircuitFormat, ConvertResult, DrawResult, PartType, Problem, TidyResult } from "./core.js";
+import { detectFormat, escHtml, highlightDslLine, highlightJson } from "./highlight.js";
 import { pack, unpack } from "./share.js";
+import { isJsonObj, tidyJson, type Json } from "./tidy-json.js";
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 const src = $<HTMLTextAreaElement>("src");
@@ -13,77 +15,38 @@ const hl = $("hl"), gutter = $("gutter"), hlPre = hl.parentElement!;
 const desk = document.querySelector<HTMLElement>(".desk")!;
 const viewport = $("viewport"), stage = $("stage"), sheet = $("sheet");
 const stamp = $("stamp"), tbTitle = $("tb-title"), tbStats = $("tb-stats"), tbMs = $("tb-ms"), problemsEl = $<HTMLOListElement>("problems");
+const fileNameEl = $("file-name"), convertBtn = $<HTMLButtonElement>("convert-btn"), tidyBtn = $<HTMLButtonElement>("tidy-btn");
 
 const DRAFT_KEY = "schem-playground-draft";
 const DEFAULT_EXAMPLE = "summing-amp.schem.json";
 
 // ---------------------------------------------------------------------------------------------
-// Formatting: one part and one net per line (as in the README picture), everything else indented.
-
-type Json = null | boolean | number | string | Json[] | { [k: string]: Json };
-const isObj = (v: unknown): v is { [k: string]: Json } => typeof v === "object" && v !== null && !Array.isArray(v);
-
-function compact(v: Json): string {
-  if (Array.isArray(v)) return `[${v.map(compact).join(", ")}]`;
-  if (isObj(v)) return `{ ${Object.entries(v).map(([k, x]) => `${JSON.stringify(k)}: ${compact(x)}`).join(", ")} }`;
-  return JSON.stringify(v);
-}
-
-function tidy(doc: { [k: string]: Json }): string {
-  const indent = (s: string, pad: string) => s.split("\n").join(`\n${pad}`);
-  const item = (v: Json, pad: string) => {
-    // A part with its own pins: the pins one per line.
-    if (isObj(v) && Array.isArray(v.pins) && v.pins.length) {
-      const { pins, ...head } = v;
-      return `${compact(head).replace(/ \}$/, ",")} "pins": [\n${(pins as Json[]).map((p) => `${pad}  ${compact(p)}`).join(",\n")}\n${pad}] }`;
-    }
-    return compact(v);
-  };
-  const out = ["{"];
-  const keys = Object.keys(doc);
-  keys.forEach((k, i) => {
-    const end = i < keys.length - 1 ? "," : "";
-    const v = doc[k]!;
-    if (k === "circuit" && isObj(v)) {
-      out.push(`  "circuit": {`);
-      const ck = Object.keys(v);
-      ck.forEach((c, j) => {
-        const e2 = j < ck.length - 1 ? "," : "";
-        const cv = v[c]!;
-        if ((c === "parts" || c === "nets") && Array.isArray(cv) && cv.length) {
-          out.push(`    ${JSON.stringify(c)}: [`);
-          cv.forEach((it, m) => out.push(`      ${item(it, "      ")}${m < cv.length - 1 ? "," : ""}`));
-          out.push(`    ]${e2}`);
-        } else out.push(`    ${JSON.stringify(c)}: ${indent(JSON.stringify(cv, null, 2), "    ")}${e2}`);
-      });
-      out.push(`  }${end}`);
-    } else out.push(`  ${JSON.stringify(k)}: ${indent(JSON.stringify(v, null, 2), "  ")}${end}`);
-  });
-  out.push("}");
-  return `${out.join("\n")}\n`;
-}
-
-// ---------------------------------------------------------------------------------------------
 // The editor: a transparent textarea over a highlighted copy, with line numbers.
 
-const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-const TOKEN = /("(?:[^"\\]|\\.)*")(\s*:)?|(-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)|(true|false|null)|([{}[\],:])/g;
+function syncFormatUi(fmt: CircuitFormat): void {
+  fileNameEl.dataset.format = fmt;
+  convertBtn.textContent = fmt === "json" ? "To .schem" : "To JSON";
+  convertBtn.title = fmt === "json" ? "Convert this JSON circuit to .schem text" : "Convert this .schem circuit to JSON";
+  tidyBtn.title = fmt === "json" ? "One part and one net per line" : "Format .schem statements";
+  src.setAttribute("aria-label", fmt === "json" ? "Circuit file, JSON" : "Circuit file, .schem");
+}
 
-function highlightLine(line: string): string {
-  let out = "", last = 0;
-  for (const m of line.matchAll(TOKEN)) {
-    out += esc(line.slice(last, m.index));
-    if (m[1]) out += `<span class="${m[2] ? "t-key" : "t-str"}">${esc(m[1])}</span>${m[2] ? `<span class="t-pun">${esc(m[2])}</span>` : ""}`;
-    else if (m[3]) out += `<span class="t-num">${m[3]}</span>`;
-    else if (m[4]) out += `<span class="t-lit">${m[4]}</span>`;
-    else out += `<span class="t-pun">${esc(m[5]!)}</span>`;
-    last = m.index! + m[0].length;
+function renameFileForFormat(fmt: CircuitFormat): void {
+  const cur = fileNameEl.textContent ?? "circuit.schem.json";
+  if (fmt === "dsl") {
+    fileNameEl.textContent = cur.replace(/\.schem\.json$|\.json$/, ".schem");
+    if (!fileNameEl.textContent.endsWith(".schem")) fileNameEl.textContent = `${cur}.schem`;
+  } else {
+    fileNameEl.textContent = cur.replace(/\.schem$/, ".schem.json");
+    if (!fileNameEl.textContent.endsWith(".json")) fileNameEl.textContent = `${cur}.schem.json`;
   }
-  return out + esc(line.slice(last));
 }
 
 let errorLine = 0, addedLine = 0;
 function paint(): void {
+  const fmt = detectFormat(src.value);
+  syncFormatUi(fmt);
+  const highlightLine = fmt === "json" ? highlightJson : highlightDslLine;
   const lines = src.value.split("\n");
   // Long lines wrap; the highlighted copy must wrap at the same width, so it stops where the
   // textarea's scrollbar starts, and each line number takes its line's wrapped height.
@@ -151,7 +114,8 @@ function loadDraft(): string | null {
 // The engine worker. One drawing at a time; the newest text waits while one is running.
 
 const worker = new Worker(new URL("worker.js", import.meta.url), { type: "module" });
-let ready = false, busy = false, pending: string | null = null, seq = 0, lastSvg = "", lastTitle = "";
+let ready = false, busy = false, pending: string | null = null, seq = 0, opSeq = 0;
+let lastSvg = "", lastTitle = "", lastProblems: Problem[] = [];
 let catalog: PartType[] = [];
 let fitNext = true;
 
@@ -168,8 +132,30 @@ function pump(): void {
   pending = null;
 }
 
+type WorkerMessage =
+  | { type: "ready"; catalog: PartType[] }
+  | { type: "drawn"; id: number; result: DrawResult }
+  | { type: "tidied"; id: number; result: TidyResult }
+  | { type: "converted"; id: number; to: CircuitFormat; purpose: "edit" | "download"; result: ConvertResult }
+  | { type: "failed"; message: string };
+
+function showConversionFailure(to: CircuitFormat, result: ConvertResult): void {
+  if (result.lostFields?.length) {
+    const fields = result.lostFields.join(", ");
+    toast(`Cannot convert to ${to === "dsl" ? ".schem" : "JSON"}: unsupported fields (${fields}).`);
+    const notice: Problem = {
+      kind: "note",
+      text: `Could not convert to ${to === "dsl" ? ".schem" : "JSON"} because these fields have no ${to === "dsl" ? "text" : "JSON"} form: ${fields}.`,
+    };
+    renderProblems([notice, ...lastProblems]);
+    return;
+  }
+  toast(result.error ?? "Fix the circuit file before converting.");
+  request(false);
+}
+
 worker.onmessage = (e: MessageEvent) => {
-  const m = e.data as { type: "ready"; catalog: PartType[] } | { type: "drawn"; id: number; result: DrawResult } | { type: "failed"; message: string };
+  const m = e.data as WorkerMessage;
   if (m.type === "ready") {
     ready = true;
     catalog = m.catalog;
@@ -179,10 +165,39 @@ worker.onmessage = (e: MessageEvent) => {
     setStamp("error", "Not started");
     tbTitle.textContent = "The engine could not start";
     tbStats.textContent = m.message;
-  } else {
+  } else if (m.type === "drawn") {
     busy = false;
     if (pending === null) show(m.result);
     pump();
+  } else if (m.type === "tidied") {
+    if (m.id !== opSeq) return;
+    if (m.result.ok && m.result.text !== undefined) {
+      setText(m.result.text, false);
+      saveDraft();
+    } else {
+      toast(m.result.error ?? "Tidy needs a valid circuit file. The title block points at the problem.");
+      request(false);
+    }
+  } else if (m.type === "converted") {
+    if (m.id !== opSeq) return;
+    if (m.purpose === "download") {
+      if (m.result.ok && m.result.text !== undefined) {
+        if (m.to === "dsl") save(new Blob([m.result.text], { type: "text/plain;charset=utf-8" }), `${baseName()}.schem`);
+        else save(new Blob([m.result.text], { type: "application/json" }), `${baseName()}.schem.json`);
+      } else {
+        showConversionFailure(m.to, m.result);
+      }
+      return;
+    }
+    if (m.result.ok && m.result.text !== undefined) {
+      renameFileForFormat(m.to);
+      setText(m.result.text, false);
+      saveDraft();
+      request(false);
+      toast(m.to === "dsl" ? "Converted to .schem text." : "Converted to JSON.");
+    } else {
+      showConversionFailure(m.to, m.result);
+    }
   }
 };
 worker.onerror = () => {
@@ -232,8 +247,9 @@ function show(r: DrawResult): void {
   void stamp.offsetWidth;
   stamp.classList.add("thud");
 
-  const jsonErr = r.problems.find((p) => p.line);
-  errorLine = jsonErr?.line ?? 0;
+  lastProblems = r.problems;
+  const locatedErr = r.problems.find((p) => p.kind === "error" && p.line) ?? r.problems.find((p) => p.line);
+  errorLine = locatedErr?.line ?? 0;
   paint();
   renderProblems(r.problems);
   // Fit last, once the title block has its final height.
@@ -345,7 +361,8 @@ const DEFAULT_PROPS: Record<string, Record<string, string>> = {
   resistor: { value: "10k" }, capacitor: { value: "100n" }, "polarised-capacitor": { value: "10u" }, inductor: { value: "10u" }, battery: { value: "9V" },
   vsource: { value: "5V" }, "ac-source": { value: "1V" }, led: { color: "red" }, fuse: { value: "1A" }, zener: { value: "5.1V" }, crystal: { value: "16MHz" }, potentiometer: { value: "10k" },
 };
-const BOX_PINS: Record<string, Json[]> = {
+interface BoxPin { number: string; name: string; role?: string }
+const BOX_PINS: Record<string, BoxPin[]> = {
   ic: [{ number: "1", name: "VCC", role: "power_in" }, { number: "2", name: "GND", role: "ground" }, { number: "3", name: "IN", role: "input" }, { number: "4", name: "OUT", role: "output" }],
   header: [{ number: "1", name: "1" }, { number: "2", name: "2" }, { number: "3", name: "3" }],
 };
@@ -356,9 +373,9 @@ function partTile(p: PartType): HTMLButtonElement {
   b.className = "part";
   const pins = p.kind === "box" ? "you choose its pins" : p.pins.length > 6 ? `${p.pins.length} pins` : p.pins.map((q) => q.name).join(", ");
   const art = p.art
-    ? `<svg viewBox="${p.art.viewBox}" preserveAspectRatio="xMidYMid meet" aria-hidden="true">${p.art.paths.map((q) => `<path d="${esc(q.d)}"${q.fill ? ' class="fill"' : ""}/>`).join("")}</svg>`
+    ? `<svg viewBox="${p.art.viewBox}" preserveAspectRatio="xMidYMid meet" aria-hidden="true">${p.art.paths.map((q) => `<path d="${escHtml(q.d)}"${q.fill ? ' class="fill"' : ""}/>`).join("")}</svg>`
     : `<div class="box" aria-hidden="true"><span></span></div>`;
-  b.innerHTML = `${art}<span class="name">${esc(p.type).replace(/[-:]/g, "$&<wbr>")}</span><span class="pins">${esc(p.name ? `${p.name}. ` : "")}${esc(pins)}</span>`;
+  b.innerHTML = `${art}<span class="name">${escHtml(p.type).replace(/[-:]/g, "$&<wbr>")}</span><span class="pins">${escHtml(p.name ? `${p.name}. ` : "")}${escHtml(pins)}</span>`;
   b.title = p.pins.length ? `Pins: ${p.pins.map((q) => (q.name !== q.number ? `${q.number} (${q.name})` : q.number)).join(", ")}` : p.name ?? p.type;
   b.addEventListener("click", () => addPart(p));
   return b;
@@ -384,25 +401,101 @@ function renderParts(query: string): void {
   if (!list.childElementCount) list.textContent = "No part matches. The README's contributing section says how to add one.";
 }
 
+function dslVal(value: string): string {
+  return /^[A-Za-z0-9_+.-]+$/.test(value) ? value : `"${value.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
+}
+
+function dslPartLine(id: string, p: PartType): string {
+  const tokens = ["part", id, p.type];
+  const props = DEFAULT_PROPS[p.type];
+  if (props?.value !== undefined) tokens.push(dslVal(props.value));
+  if (props) {
+    for (const [k, v] of Object.entries(props)) {
+      if (k !== "value") tokens.push(`${k}=${dslVal(v)}`);
+    }
+  }
+  if (p.kind === "box") {
+    tokens.push(`label=${p.type === "ic" ? "CHIP" : "CONN"}`);
+    const pins = BOX_PINS[p.type] ?? [];
+    if (pins.length) {
+      tokens.push("pins:");
+      for (const pin of pins) {
+        const role = pin.role ?? (p.type === "header" ? "passive" : undefined);
+        tokens.push(`${pin.number}:${pin.name}${role ? `/${role}` : ""}`);
+      }
+    }
+  }
+  return tokens.join(" ");
+}
+
+function addPartDsl(p: PartType): void {
+  const lines = src.value.replace(/\r\n/g, "\n").split("\n");
+  const used = new Set<string>();
+  let lastPartIdx = -1, lastHeadIdx = -1;
+  lines.forEach((line, idx) => {
+    const m = /^\s*part\s+([A-Za-z][A-Za-z0-9_]*)\b/.exec(line);
+    if (m) { used.add(m[1]!); lastPartIdx = idx; }
+    else if (/^\s*(?:circuit|style)\b/.test(line)) lastHeadIdx = idx;
+  });
+  let n = 1;
+  while (used.has(`${p.prefix}${n}`)) n++;
+  const id = `${p.prefix}${n}`;
+  const decl = dslPartLine(id, p);
+
+  let insertAt: number;
+  if (lastPartIdx !== -1) {
+    insertAt = lastPartIdx + 1;
+    lines.splice(insertAt, 0, decl);
+  } else if (lastHeadIdx !== -1) {
+    insertAt = lastHeadIdx + 1;
+    lines.splice(insertAt, 0, "", decl);
+    insertAt++;
+  } else if (lines.length === 1 && !lines[0]!.trim()) {
+    lines[0] = decl;
+    insertAt = 0;
+  } else if (lines.at(-1) === "") {
+    insertAt = lines.length - 1;
+    lines.splice(insertAt, 0, decl);
+  } else {
+    insertAt = lines.length;
+    lines.push(decl);
+  }
+
+  const next = lines.join("\n");
+  setText(next.endsWith("\n") ? next : `${next}\n`, false);
+  const lineNum = insertAt + 1;
+  toggleParts(false);
+  addedLine = lineNum;
+  paint();
+  goTo(lineNum, (src.value.split("\n")[lineNum - 1] ?? "").indexOf(id) + 1);
+  setTimeout(() => { addedLine = 0; }, 1700);
+  saveDraft();
+  dismissCoach();
+  request(true);
+  const samplePin = p.pins[0]?.name ?? "1";
+  toast(`Added ${id}. Connect it with "connect ${id}.${samplePin} ..." or a net line.`);
+}
+
 function addPart(p: PartType): void {
+  if (detectFormat(src.value) === "dsl") { addPartDsl(p); return; }
   let doc: { [k: string]: Json };
   try {
     doc = JSON.parse(src.value) as { [k: string]: Json };
-    if (!isObj(doc) || !isObj(doc.circuit) || !Array.isArray(doc.circuit.parts)) throw new Error();
+    if (!isJsonObj(doc) || !isJsonObj(doc.circuit) || !Array.isArray(doc.circuit.parts)) throw new Error();
   } catch {
     toast("Fix the circuit file first: it must be valid JSON with circuit.parts.");
     return;
   }
   const parts = (doc.circuit as { [k: string]: Json }).parts as Json[];
-  const used = new Set(parts.map((x) => (isObj(x) ? String(x.id) : "")));
+  const used = new Set(parts.map((x) => (isJsonObj(x) ? String(x.id) : "")));
   let n = 1;
   while (used.has(`${p.prefix}${n}`)) n++;
   const id = `${p.prefix}${n}`;
   const part: { [k: string]: Json } = { id, type: p.type };
   if (DEFAULT_PROPS[p.type]) part.props = DEFAULT_PROPS[p.type]!;
-  if (p.kind === "box") { part.props = { label: p.type === "ic" ? "CHIP" : "CONN" }; part.pins = BOX_PINS[p.type]!; }
+  if (p.kind === "box") { part.props = { label: p.type === "ic" ? "CHIP" : "CONN" }; part.pins = BOX_PINS[p.type]! as unknown as Json[]; }
   parts.push(part);
-  setText(tidy(doc), false);
+  setText(tidyJson(doc), false);
   const line = src.value.split("\n").findIndex((l) => l.includes(`"id": "${id}"`)) + 1;
   toggleParts(false);
   if (line) {
@@ -430,22 +523,32 @@ $<HTMLInputElement>("parts-q").addEventListener("input", (e) => renderParts((e.t
 // ---------------------------------------------------------------------------------------------
 // Examples, share links, downloads, the narrow-screen tabs, toasts.
 
+function exampleTitle(file: string, text: string): string {
+  if (file.endsWith(".schem")) {
+    const m = /^\s*circuit\s+"((?:[^"\\]|\\.)*)"/m.exec(text);
+    const title = m ? m[1]!.replace(/\\(["\\])/g, "$1") : file;
+    return `${title} (.schem)`;
+  }
+  try { return (JSON.parse(text) as { meta?: { title?: string } }).meta?.title ?? file; } catch { return file; }
+}
+
 const select = $<HTMLSelectElement>("examples");
 for (const [file, text] of EXAMPLES) {
   const o = document.createElement("option");
   o.value = file;
-  try { o.textContent = (JSON.parse(text) as { meta?: { title?: string } }).meta?.title ?? file; } catch { o.textContent = file; }
+  o.textContent = exampleTitle(file, text);
   select.append(o);
 }
 function exampleText(file: string): string {
   const text = EXAMPLES.find(([f]) => f === file)![1];
-  return tidy(JSON.parse(text) as { [k: string]: Json });
+  if (file.endsWith(".schem")) return text;
+  return tidyJson(JSON.parse(text) as { [k: string]: Json });
 }
 select.addEventListener("change", () => {
   if (!select.value) return;
   dismissCoach();
   setText(exampleText(select.value));
-  $("file-name").textContent = select.value;
+  fileNameEl.textContent = select.value;
   saveDraft();
   select.value = "";
 });
@@ -489,7 +592,18 @@ dlMenu.addEventListener("click", async (e) => {
   if (!kind) return;
   closeMenu();
   if (kind === "share") return share();
-  if (kind === "json") return save(new Blob([src.value], { type: "application/json" }), `${baseName()}.schem.json`);
+  if (kind === "schem") {
+    if (detectFormat(src.value) === "dsl") return save(new Blob([src.value], { type: "text/plain;charset=utf-8" }), `${baseName()}.schem`);
+    if (!ready) return toast("Wait a moment for the engine to finish starting.");
+    worker.postMessage({ type: "convert", id: ++opSeq, text: src.value, to: "dsl", purpose: "download" });
+    return;
+  }
+  if (kind === "json") {
+    if (detectFormat(src.value) === "json") return save(new Blob([src.value], { type: "application/json" }), `${baseName()}.schem.json`);
+    if (!ready) return toast("Wait a moment for the engine to finish starting.");
+    worker.postMessage({ type: "convert", id: ++opSeq, text: src.value, to: "json", purpose: "download" });
+    return;
+  }
   if (!lastSvg) return toast("There is no drawing yet.");
   if (kind === "svg") return save(new Blob([lastSvg], { type: "image/svg+xml" }), `${baseName()}.svg`);
   // PNG: the browser rasterises the SVG (its text is already outlined) at 2 px per unit, on white.
@@ -517,14 +631,15 @@ function showView(v: "code" | "sheet"): void {
 $("tab-code").addEventListener("click", () => showView("code"));
 $("tab-sheet").addEventListener("click", () => showView("sheet"));
 
-$("tidy-btn").addEventListener("click", () => {
-  try {
-    setText(tidy(JSON.parse(src.value) as { [k: string]: Json }), false);
-    saveDraft();
-  } catch {
-    toast("Tidy needs valid JSON. The title block points at the problem.");
-    request(false);
-  }
+convertBtn.addEventListener("click", () => {
+  if (!ready) { toast("Wait a moment for the engine to finish starting."); return; }
+  const to: CircuitFormat = detectFormat(src.value) === "json" ? "dsl" : "json";
+  worker.postMessage({ type: "convert", id: ++opSeq, text: src.value, to, purpose: "edit" });
+});
+
+tidyBtn.addEventListener("click", () => {
+  if (!ready) { toast("Wait a moment for the engine to finish starting."); return; }
+  worker.postMessage({ type: "tidy", id: ++opSeq, text: src.value });
 });
 
 // First visit: one line saying what to do, until the visitor does something.
@@ -551,9 +666,22 @@ function toast(text: string): void {
 async function start(): Promise<void> {
   const shared = /^#c=([A-Za-z0-9_-]+)$/.exec(location.hash)?.[1];
   if (shared) {
-    try { setText(await unpack(shared)); $("file-name").textContent = "shared.schem.json"; return; } catch { toast("That share link is damaged; showing an example instead."); }
+    try {
+      const unpacked = await unpack(shared);
+      fileNameEl.textContent = detectFormat(unpacked) === "dsl" ? "shared.schem" : "shared.schem.json";
+      setText(unpacked);
+      return;
+    } catch {
+      toast("That share link is damaged; showing an example instead.");
+    }
   }
   const draft = loadDraft();
-  setText(draft && draft.trim() ? draft : exampleText(DEFAULT_EXAMPLE));
+  if (draft && draft.trim()) {
+    fileNameEl.textContent = detectFormat(draft) === "dsl" ? "circuit.schem" : "circuit.schem.json";
+    setText(draft);
+  } else {
+    fileNameEl.textContent = DEFAULT_EXAMPLE;
+    setText(exampleText(DEFAULT_EXAMPLE));
+  }
 }
 void start();
