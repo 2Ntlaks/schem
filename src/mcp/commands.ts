@@ -1,7 +1,7 @@
 // File commands used by both front ends (SPEC 11).
 import { basename, dirname, join } from "node:path";
 import { formatDsl } from "../core/dsl-format.js";
-import { canonical } from "../core/model.js";
+import { canonical, type PinDef } from "../core/model.js";
 import { validate } from "../core/validate.js";
 import { fromLayoutCache } from "../io/layout-cache.js";
 import { saveProject } from "../io/project.js";
@@ -84,6 +84,7 @@ export function executeCommand(roots: Roots, name: string, args: Record<string, 
     case "schem_fmt": return schemFmt(roots, args);
     case "schem_describe": return schemDescribe(roots, args);
     case "schem_components": return schemComponents(args);
+    case "schem_component": return schemComponent(args);
     default: return fail(`unknown tool "${name}".`);
   }
 }
@@ -489,6 +490,8 @@ function schemFmt(roots: Roots, args: Record<string, unknown>): CommandResult {
 function schemDescribe(roots: Roots, args: Record<string, unknown>): CommandResult {
   const path = pathOf(args.path, "path");
   if (!path.ok) return fail(path.message);
+  const table = flag(args.table, "table");
+  if (!table.ok) return fail(table.message);
   const loaded = loadWithin(roots, path.path);
   if (!loaded.ok) return inputFailure(loaded);
   const { project } = loaded, drawn = drawProject(project);
@@ -515,7 +518,7 @@ function schemDescribe(roots: Roots, args: Record<string, unknown>): CommandResu
   for (const net of rows) lines.push(`${net.name} uses ${net.presentation} and connects ${net.pins.join(", ")}.`);
   const payload = sheetPayload(project, drawn, { detail: "brief" });
   if (!payload.ok) return fail(payload.message);
-  return success({ ...payload.body, description: lines.join("\n"), ...(args.table === true ? { table: rows } : {}) });
+  return success({ ...payload.body, description: lines.join("\n"), ...(table.value ? { table: rows } : {}) });
 }
 
 function schemComponents(args: Record<string, unknown>): CommandResult {
@@ -532,4 +535,118 @@ function schemComponents(args: Record<string, unknown>): CommandResult {
   const page = pageOf(entries, typeof cursor === "string" ? cursor : undefined, limit);
   if (!page.ok) return fail(page.message);
   return success({ components: page.items, total: entries.length, cursor: page.next });
+}
+
+function componentPin(pin: PinDef): Record<string, unknown> {
+  return {
+    number: pin.number,
+    name: pin.name,
+    role: pin.role,
+    ...(pin.aliases?.length ? { aliases: [...pin.aliases] } : {}),
+    ...(pin.group !== undefined ? { group: pin.group } : {}),
+    ...(pin.iface?.length ? { iface: [...pin.iface] } : {}),
+    ...(pin.chain !== undefined ? { chain: pin.chain } : {}),
+    ...(pin.representative ? { representative: true } : {}),
+  };
+}
+
+function editDistance(a: string, b: string): number {
+  let row = Array.from({ length: b.length + 1 }, (_, i) => i);
+  for (let i = 0; i < a.length; i++) {
+    const next = [i + 1];
+    for (let j = 0; j < b.length; j++) {
+      next.push(Math.min(row[j + 1]! + 1, next[j]! + 1, row[j]! + Number(a[i] !== b[j])));
+    }
+    row = next;
+  }
+  return row[b.length]!;
+}
+
+function closeComponentMatches(query: string): string[] {
+  const q = query.toLowerCase();
+  const qBare = q.startsWith("module:") ? q.slice("module:".length) : q;
+  const tokens = qBare.split(/[-_:\s]+/).filter((t) => t.length >= 2);
+  const all: Array<{ id: string; names: string[] }> = [
+    ...Object.keys(BUILTIN).map((id) => ({ id, names: [id] })),
+    ...Object.entries(MODULE_LIBRARY).map(([id, mod]) => ({
+      id,
+      names: [id, id.slice("module:".length), mod.name],
+    })),
+    { id: "header", names: ["header"] },
+    { id: "ic", names: ["ic"] },
+  ];
+  const candidates: Array<{ id: string; tier: number; score: number }> = [];
+  for (const entry of all) {
+    const lowers = entry.names.map((n) => n.toLowerCase());
+    const idLower = entry.id.toLowerCase();
+    const idBare = idLower.startsWith("module:") ? idLower.slice("module:".length) : idLower;
+    if (lowers.some((n) => n.includes(q) || (qBare.length >= 2 && n.includes(qBare)) || (n.length >= 3 && q.includes(n)))) {
+      candidates.push({ id: entry.id, tier: 0, score: Math.abs(idBare.length - qBare.length) });
+      continue;
+    }
+    const dist = Math.min(editDistance(q, idLower), editDistance(qBare, idBare));
+    const maxDist = qBare.length <= 2 ? 1 : Math.max(2, Math.floor(Math.min(qBare.length, idBare.length) / 3));
+    if (dist <= maxDist) {
+      candidates.push({ id: entry.id, tier: 1, score: dist });
+      continue;
+    }
+    if (tokens.some((tok) => lowers.some((n) => n.includes(tok)))) {
+      candidates.push({ id: entry.id, tier: 2, score: dist });
+    }
+  }
+  candidates.sort((a, b) => a.tier - b.tier || a.score - b.score || cmpStr(a.id, b.id));
+  return candidates.slice(0, 5).map((c) => c.id);
+}
+
+function schemComponent(args: Record<string, unknown>): CommandResult {
+  if (args.type === undefined) return fail("type is missing.");
+  if (typeof args.type !== "string" || args.type.trim() === "") return fail("type must be a non-empty string.");
+  const type = args.type.trim();
+  if (Object.hasOwn(BUILTIN, type)) {
+    const symbol = BUILTIN[type]!;
+    return success({
+      id: symbol.id,
+      kind: symbol.kind,
+      refPrefix: symbol.refPrefix,
+      inlinePins: false,
+      pins: symbol.pins.map(componentPin),
+    });
+  }
+  if (Object.hasOwn(MODULE_LIBRARY, type)) {
+    const mod = MODULE_LIBRARY[type]!;
+    const pins = modulePins(mod);
+    const groups = [...new Set(pins.map((p) => p.group).filter((g): g is string => g !== undefined))].sort(cmpStr);
+    const interfaces = [...new Set(pins.flatMap((p) => p.iface ?? []))].sort(cmpStr);
+    return success({
+      id: mod.id,
+      kind: "module",
+      name: mod.name,
+      refPrefix: mod.refPrefix,
+      controller: Boolean(mod.controller),
+      inlinePins: false,
+      doc: mod.doc,
+      ...(groups.length ? { groups } : {}),
+      ...(mod.representatives ? { representatives: mod.representatives } : {}),
+      ...(interfaces.length ? { interfaces } : {}),
+      pins: pins.map(componentPin),
+    });
+  }
+  if (type === "ic" || type === "header") {
+    return success({
+      id: type,
+      kind: type,
+      refPrefix: type === "ic" ? "U" : "J",
+      inlinePins: true,
+      pins: [],
+      note: "Declare pins inline on the part. In .schem use pins: [NUMBER:]NAME[/ROLE][@GROUP]; in JSON set the part's pins array.",
+    });
+  }
+  const suggestions = closeComponentMatches(type);
+  const hint = suggestions.length
+    ? ` Close matches: ${suggestions.join(", ")}.`
+    : " Call schem_components to list available types.";
+  return fail({
+    error: `unknown component type "${type}".${hint}`,
+    ...(suggestions.length ? { suggestions } : {}),
+  });
 }

@@ -63,11 +63,23 @@ describe("protocol", () => {
     handleMessage(s, rpc(4, "initialize", { protocolVersion: "2025-06-18", capabilities: {} }));
     const list = JSON.parse(handleMessage(s, rpc(5, "tools/list", {}))!);
     const names = (list.result.tools as Array<{ name: string }>).map((t) => t.name);
-    expect(names).toEqual(["schem_create", "schem_edit", "schem_check", "schem_preview", "schem_query", "schem_render"]);
+    expect(names).toEqual([
+      "schem_create",
+      "schem_edit",
+      "schem_check",
+      "schem_preview",
+      "schem_query",
+      "schem_render",
+      "schem_undo",
+      "schem_describe",
+      "schem_fmt",
+      "schem_components",
+      "schem_component",
+    ]);
 
-    const undo = JSON.parse(handleMessage(s, rpc(6, "tools/call", { name: "schem_undo", arguments: { path: "x" } }))!);
-    expect(undo.result.isError).toBe(true);
-    expect(undo.result.content[0].text).toContain("not in this server");
+    const unknownTool = JSON.parse(handleMessage(s, rpc(6, "tools/call", { name: "schem_nope", arguments: {} }))!);
+    expect(unknownTool.result.isError).toBe(true);
+    expect(unknownTool.result.content[0].text).toContain("unknown tool");
 
     const ping = JSON.parse(handleMessage(s, rpc(7, "ping", {}))!);
     expect(ping.result).toEqual({});
@@ -127,6 +139,111 @@ describe("stdio", () => {
     expect(msg.result.serverInfo.name).toBe("schem");
     expect(msg.result.protocolVersion).toBe("2025-06-18");
   }, 30000);
+
+  it("serves catalogue, create (DSL), describe, edit, undo and fmt over stdio", async () => {
+    const dir = join(ROOT_DIR, "stdio-full");
+    mkdirSync(dir);
+    const child = spawn(process.execPath, ["--import", "tsx", join(REPO, "src", "mcp", "main.ts"), "--root", dir], {
+      cwd: REPO,
+      stdio: ["pipe", "pipe", "pipe"],
+    });
+    let buffer = "";
+    let err = "";
+    const replies = new Map<number, Record<string, unknown>>();
+    const waiters = new Map<number, () => void>();
+    child.stdout.setEncoding("utf8");
+    child.stderr.setEncoding("utf8");
+    child.stderr.on("data", (s: string) => { err += s; });
+    child.stdout.on("data", (s: string) => {
+      buffer += s;
+      let nl: number;
+      while ((nl = buffer.indexOf("\n")) >= 0) {
+        const line = buffer.slice(0, nl).trim();
+        buffer = buffer.slice(nl + 1);
+        if (!line) continue;
+        const parsed = JSON.parse(line) as Record<string, unknown>;
+        if (typeof parsed.id === "number") {
+          replies.set(parsed.id, parsed);
+          waiters.get(parsed.id)?.();
+        }
+      }
+    });
+    const send = async (id: number, method: string, params: unknown): Promise<Record<string, unknown>> => {
+      const done = new Promise<void>((resolve, reject) => {
+        const timer = setTimeout(() => reject(new Error(`timed out waiting for id=${id}; stderr=${err}`)), 20000);
+        waiters.set(id, () => { clearTimeout(timer); resolve(); });
+      });
+      child.stdin.write(`${rpc(id, method, params)}\n`);
+      await done;
+      return replies.get(id)!;
+    };
+    const dslPath = join(dir, "led.schem");
+    const dslSource = [
+      'circuit "Stdio LED"',
+      "part B1 battery 9V",
+      "part R1 resistor 470",
+      "part D1 led color=red",
+      "net PWR = B1.+ R1.1",
+      "connect R1.2 D1.anode",
+      "net GND = D1.cathode B1.-",
+      "",
+    ].join("\n");
+    try {
+      const init = await send(1, "initialize", { protocolVersion: "2025-06-18", capabilities: {} });
+      const initResult = init.result as { instructions: string };
+      expect(initResult.instructions).toContain(".schem");
+      expect(initResult.instructions).toContain("schem_component");
+      child.stdin.write(`${JSON.stringify({ jsonrpc: "2.0", method: "notifications/initialized" })}\n`);
+
+      const list = await send(2, "tools/list", {});
+      expect(((list.result as { tools: Array<{ name: string }> }).tools).map((t) => t.name)).toHaveLength(11);
+
+      const comps = await send(3, "tools/call", { name: "schem_components", arguments: { query: "esp32" } });
+      const compsBody = JSON.parse(((comps.result as ToolResult).content[0] as { text: string }).text) as { components: Array<{ id: string }> };
+      expect(compsBody.components.some((c) => c.id === "module:esp32-devkitc-v4")).toBe(true);
+
+      const comp = await send(4, "tools/call", { name: "schem_component", arguments: { type: "module:esp32-devkitc-v4" } });
+      const compBody = JSON.parse(((comp.result as ToolResult).content[0] as { text: string }).text) as { id: string; refPrefix: string; doc: { url: string } };
+      expect(compBody.id).toBe("module:esp32-devkitc-v4");
+      expect(compBody.refPrefix).toBe("U");
+      expect(compBody.doc.url).toContain("espressif.com");
+
+      const createdRes = await send(5, "tools/call", { name: "schem_create", arguments: { path: dslPath, source: dslSource, detail: "brief" } });
+      const createdBody = JSON.parse(((createdRes.result as ToolResult).content[0] as { text: string }).text) as { status: string; revision: string };
+      expect(createdBody.status).toBe("valid");
+
+      const descRes = await send(6, "tools/call", { name: "schem_describe", arguments: { path: dslPath, table: true } });
+      const descBody = JSON.parse(((descRes.result as ToolResult).content[0] as { text: string }).text) as { description: string; table: unknown[] };
+      expect(descBody.description).toContain("R1 (resistor)");
+      expect(descBody.table).toHaveLength(3);
+
+      const editRes = await send(7, "tools/call", {
+        name: "schem_edit",
+        arguments: { path: dslPath, ops: [{ op: "setProp", part: "R1", key: "value", value: "1k" }], expectedRevision: createdBody.revision, detail: "brief" },
+      });
+      const editBody = JSON.parse(((editRes.result as ToolResult).content[0] as { text: string }).text) as { saved: boolean; revision: string };
+      expect(editBody.saved).toBe(true);
+      expect(editBody.revision).not.toBe(createdBody.revision);
+
+      const undoRes = await send(8, "tools/call", { name: "schem_undo", arguments: { path: dslPath } });
+      const undoBody = JSON.parse(((undoRes.result as ToolResult).content[0] as { text: string }).text) as { saved: boolean; revision: string };
+      expect(undoBody.saved).toBe(true);
+      expect(undoBody.revision).toBe(createdBody.revision);
+
+      const fmtRes = await send(9, "tools/call", { name: "schem_fmt", arguments: { path: dslPath, to: "json" } });
+      const fmtBody = JSON.parse(((fmtRes.result as ToolResult).content[0] as { text: string }).text) as { saved: boolean; format: string; out: string };
+      expect(fmtBody.saved).toBe(true);
+      expect(fmtBody.format).toBe("json");
+      expect(existsSync(join(dir, "led.schem.json"))).toBe(true);
+    } finally {
+      child.stdin.end();
+      await new Promise<void>((resolve) => {
+        const timer = setTimeout(() => { child.kill(); resolve(); }, 5000);
+        child.on("close", () => { clearTimeout(timer); resolve(); });
+      });
+    }
+    expect(err).toContain("schem mcp:");
+  }, 60000);
 });
 
 describe("file roots and limits", () => {
@@ -159,6 +276,16 @@ describe("file roots and limits", () => {
     expect(created.isError).toBe(true);
     expect(textOf(created).error).toContain("outside");
     expect(existsSync(join(outside, "made.schem.json"))).toBe(false);
+
+    for (const tool of ["schem_undo", "schem_describe", "schem_fmt"] as const) {
+      const outsideRes = callTool(session.roots, tool, { path: join(outside, "secret.schem.json") });
+      expect(outsideRes.isError, `${tool} direct outside`).toBe(true);
+      expect(String(textOf(outsideRes).error)).toContain("outside");
+
+      const jumpRes = callTool(session.roots, tool, { path: join(ROOT_DIR, "jump", "secret.schem.json") });
+      expect(jumpRes.isError, `${tool} junction outside`).toBe(true);
+      expect(String(textOf(jumpRes).error)).toContain("outside");
+    }
   });
 
   it("refuses to replace a file symlink when the operating system allows one", () => {
@@ -366,5 +493,236 @@ describe("tools on a project file", () => {
     });
     expect(taken.isError, JSON.stringify(textOf(taken))).toBe(false);
     expect(existsSync(lock)).toBe(false);
+  }, 120_000);
+});
+
+describe("component catalogue tools", () => {
+  it("lists and paginates components and filters by query", () => {
+    const s = createSession([ROOT_DIR]);
+    const collected: Array<{ id: string }> = [];
+    let cursor: string | undefined;
+    let total = 0;
+    for (let pages = 0; pages < 10; pages++) {
+      const res = callTool(s.roots, "schem_components", { limit: 10, ...(cursor ? { cursor } : {}) });
+      expect(res.isError, JSON.stringify(textOf(res))).toBe(false);
+      const body = textOf(res);
+      total = Number(body.total);
+      collected.push(...(body.components as Array<{ id: string }>));
+      if (body.cursor === null) break;
+      cursor = String(body.cursor);
+    }
+    expect(collected.length).toBe(total);
+    expect(collected.some((c) => c.id === "resistor")).toBe(true);
+    expect(collected.some((c) => c.id === "module:esp32-devkitc-v4")).toBe(true);
+    expect(collected.some((c) => c.id === "ic")).toBe(true);
+    expect(collected.some((c) => c.id === "header")).toBe(true);
+
+    const filtered = callTool(s.roots, "schem_components", { query: "arduino" });
+    expect(filtered.isError).toBe(false);
+    expect((textOf(filtered).components as Array<{ id: string }>).map((c) => c.id)).toEqual(["module:arduino-uno-r3"]);
+
+    const empty = callTool(s.roots, "schem_components", { query: "does-not-exist-xyz" });
+    expect(empty.isError).toBe(false);
+    expect(textOf(empty).components).toEqual([]);
+    expect(textOf(empty).total).toBe(0);
+
+    expect(callTool(s.roots, "schem_components", { query: 42 }).isError).toBe(true);
+    expect(callTool(s.roots, "schem_components", { limit: 0 }).isError).toBe(true);
+    expect(callTool(s.roots, "schem_components", { limit: 1.5 }).isError).toBe(true);
+    expect(callTool(s.roots, "schem_components", { cursor: "bad" }).isError).toBe(true);
+  });
+
+  it("inspects built-in symbols, modules, ic and header with full pin metadata", () => {
+    const s = createSession([ROOT_DIR]);
+
+    const ledRes = callTool(s.roots, "schem_component", { type: "led" });
+    expect(ledRes.isError, JSON.stringify(textOf(ledRes))).toBe(false);
+    expect(textOf(ledRes)).toMatchObject({
+      id: "led",
+      kind: "two-pin",
+      refPrefix: "D",
+      inlinePins: false,
+      pins: [
+        { number: "A", name: "anode", role: "passive", aliases: ["a", "+", "1"], chain: "in" },
+        { number: "K", name: "cathode", role: "passive", aliases: ["k", "-", "2"], chain: "out" },
+      ],
+    });
+
+    const unoRes = callTool(s.roots, "schem_component", { type: "module:arduino-uno-r3" });
+    expect(unoRes.isError, JSON.stringify(textOf(unoRes))).toBe(false);
+    const uno = textOf(unoRes);
+    expect(uno).toMatchObject({
+      id: "module:arduino-uno-r3",
+      kind: "module",
+      name: "Arduino UNO R3",
+      refPrefix: "A",
+      controller: true,
+      inlinePins: false,
+      doc: { url: expect.stringContaining("arduino.cc"), revision: expect.any(String) },
+    });
+    expect(uno.groups).toEqual(expect.arrayContaining(["5V", "GND", "A4_SDA", "A5_SCL"]));
+    expect(uno.interfaces).toEqual(expect.arrayContaining(["i2c.sda", "i2c.scl"]));
+    const unoPins = uno.pins as Array<{ number: string; name: string; role: string; aliases?: string[]; group?: string; iface?: string[] }>;
+    expect(unoPins.some((p) => p.group === "GND" && p.role === "ground")).toBe(true);
+    expect(unoPins.some((p) => p.iface?.includes("i2c.sda"))).toBe(true);
+    expect(unoPins.some((p) => p.aliases && p.aliases.length > 0)).toBe(true);
+
+    const icRes = callTool(s.roots, "schem_component", { type: "ic" });
+    expect(icRes.isError).toBe(false);
+    expect(textOf(icRes)).toMatchObject({ id: "ic", kind: "ic", refPrefix: "U", inlinePins: true, pins: [] });
+
+    const hdrRes = callTool(s.roots, "schem_component", { type: "header" });
+    expect(hdrRes.isError).toBe(false);
+    expect(textOf(hdrRes)).toMatchObject({ id: "header", kind: "header", refPrefix: "J", inlinePins: true, pins: [] });
+  });
+
+  it("reports clear errors and close matches for unknown or invalid component types", () => {
+    const s = createSession([ROOT_DIR]);
+
+    const typo = callTool(s.roots, "schem_component", { type: "resister" });
+    expect(typo.isError).toBe(true);
+    expect(String(textOf(typo).error)).toContain("resistor");
+    expect(textOf(typo).suggestions).toContain("resistor");
+
+    const bareModule = callTool(s.roots, "schem_component", { type: "esp32-devkitc-v4" });
+    expect(bareModule.isError).toBe(true);
+    expect(String(textOf(bareModule).error)).toContain("module:esp32-devkitc-v4");
+    expect(textOf(bareModule).suggestions).toContain("module:esp32-devkitc-v4");
+
+    const hyphenOpamp = callTool(s.roots, "schem_component", { type: "op-amp" });
+    expect(hyphenOpamp.isError).toBe(true);
+    expect(textOf(hyphenOpamp).suggestions).toContain("opamp");
+
+    const nonsense = callTool(s.roots, "schem_component", { type: "xyzzy-not-a-part-999" });
+    expect(nonsense.isError).toBe(true);
+    expect(String(textOf(nonsense).error)).toContain("unknown component type");
+    expect(textOf(nonsense).suggestions).toBeUndefined();
+
+    expect(callTool(s.roots, "schem_component", { type: "toString" }).isError).toBe(true);
+    expect(callTool(s.roots, "schem_component", { type: "constructor" }).isError).toBe(true);
+    expect(callTool(s.roots, "schem_component", {}).isError).toBe(true);
+    expect(callTool(s.roots, "schem_component", { type: "   " }).isError).toBe(true);
+    expect(callTool(s.roots, "schem_component", { type: 123 }).isError).toBe(true);
+  });
+});
+
+describe("undo, describe and fmt tools", () => {
+  it("undoes the latest edit and fails cleanly when no history remains", () => {
+    const dir = join(ROOT_DIR, "undo-case");
+    mkdirSync(dir);
+    const s = createSession([dir]);
+    const file = join(dir, "led.schem.json");
+    const createdRes = callTool(s.roots, "schem_create", { path: file, source: LED, detail: "brief" });
+    expect(createdRes.isError).toBe(false);
+    const originalRev = textOf(createdRes).revision;
+
+    const noHistory = callTool(s.roots, "schem_undo", { path: file });
+    expect(noHistory.isError).toBe(true);
+
+    const edited = callTool(s.roots, "schem_edit", {
+      path: file,
+      ops: [{ op: "setProp", part: "R1", key: "value", value: "2.2k" }],
+      expectedRevision: originalRev,
+      detail: "brief",
+    });
+    expect(edited.isError).toBe(false);
+    expect(loadProject(readFileSync(file, "utf8")).project!.circuit.parts.find((p) => p.id === "R1")!.props!.value).toBe("2.2k");
+
+    const undone = callTool(s.roots, "schem_undo", { path: file });
+    expect(undone.isError, JSON.stringify(textOf(undone))).toBe(false);
+    expect(textOf(undone)).toMatchObject({ saved: true, revision: originalRev, status: "valid" });
+    expect(loadProject(readFileSync(file, "utf8")).project!.circuit.parts.find((p) => p.id === "R1")!.props!.value).toBe("470");
+
+    const again = callTool(s.roots, "schem_undo", { path: file });
+    expect(again.isError).toBe(true);
+
+    expect(callTool(s.roots, "schem_undo", {}).isError).toBe(true);
+  }, 120_000);
+
+  it("describes a verified drawing with and without a net table", () => {
+    const dir = join(ROOT_DIR, "describe-case");
+    mkdirSync(dir);
+    const s = createSession([dir]);
+    const file = join(dir, "led.schem.json");
+    expect(callTool(s.roots, "schem_create", { path: file, source: LED, detail: "brief" }).isError).toBe(false);
+
+    const plain = callTool(s.roots, "schem_describe", { path: file });
+    expect(plain.isError, JSON.stringify(textOf(plain))).toBe(false);
+    const plainBody = textOf(plain);
+    expect(String(plainBody.description)).toContain("grid units.");
+    expect(String(plainBody.description)).toContain("R1 (resistor)");
+    expect(plainBody.table).toBeUndefined();
+
+    const withTable = callTool(s.roots, "schem_describe", { path: file, table: true });
+    expect(withTable.isError, JSON.stringify(textOf(withTable))).toBe(false);
+    const rows = textOf(withTable).table as Array<{ name: string; presentation: string; pins: string[] }>;
+    expect(rows.length).toBe(3);
+    expect(rows.some((r) => r.name === "GND")).toBe(true);
+
+    expect(callTool(s.roots, "schem_describe", { path: file, table: "yes" }).isError).toBe(true);
+    expect(callTool(s.roots, "schem_describe", { path: join(dir, "missing.schem") }).isError).toBe(true);
+    expect(callTool(s.roots, "schem_describe", {}).isError).toBe(true);
+  }, 120_000);
+
+  it("formats in place idempotently, converts formats, and reports lossy JSON fields", () => {
+    const dir = join(ROOT_DIR, "fmt-case");
+    mkdirSync(dir);
+    const s = createSession([dir]);
+    const dslFile = join(dir, "led.schem");
+    const rawDsl = [
+      "# draft header comment",
+      'circuit "LED"',
+      "part B1 battery 9V",
+      "part R1 resistor 470",
+      "part D1 led color=red",
+      "net PWR = B1.+ R1.1",
+      "connect R1.2 D1.anode",
+      "net GND = D1.cathode B1.-",
+      "",
+    ].join("\n");
+    writeFileSync(dslFile, rawDsl, "utf8");
+
+    const formatted = callTool(s.roots, "schem_fmt", { path: dslFile });
+    expect(formatted.isError, JSON.stringify(textOf(formatted))).toBe(false);
+    expect(textOf(formatted)).toMatchObject({ status: "valid", format: "dsl", saved: true });
+    expect(readFileSync(dslFile, "utf8")).not.toContain("# draft header comment");
+
+    const idempotent = callTool(s.roots, "schem_fmt", { path: dslFile });
+    expect(idempotent.isError).toBe(false);
+    expect(textOf(idempotent)).toMatchObject({ status: "valid", format: "dsl", saved: false });
+
+    const toJsonRes = callTool(s.roots, "schem_fmt", { path: dslFile, to: "json" });
+    expect(toJsonRes.isError, JSON.stringify(textOf(toJsonRes))).toBe(false);
+    expect(textOf(toJsonRes)).toMatchObject({ status: "valid", format: "json", saved: true });
+    const jsonSibling = join(dir, "led.schem.json");
+    expect(existsSync(jsonSibling)).toBe(true);
+
+    // Converting again must not overwrite the existing sibling.
+    const toJsonAgain = callTool(s.roots, "schem_fmt", { path: dslFile, to: "json" });
+    expect(toJsonAgain.isError).toBe(true);
+    expect(String(textOf(toJsonAgain).error)).toContain("already exists");
+
+    // Convert a plain JSON netlist (without saved JSON layout cache) to DSL.
+    const jsonOnly = join(dir, "from-json.schem.json");
+    writeFileSync(jsonOnly, LED, "utf8");
+    const toDslRes = callTool(s.roots, "schem_fmt", { path: jsonOnly, to: "dsl" });
+    expect(toDslRes.isError, JSON.stringify(textOf(toDslRes))).toBe(false);
+    expect(textOf(toDslRes)).toMatchObject({ status: "valid", format: "dsl", saved: true });
+    expect(existsSync(join(dir, "from-json.schem"))).toBe(true);
+
+    // Lossy JSON -> DSL conversion fails cleanly.
+    const lossy = join(dir, "lossy.schem.json");
+    writeFileSync(lossy, JSON.stringify({
+      meta: { created: "2026-11-26" },
+      circuit: { parts: [{ id: "R1", type: "resistor" }], nets: [] },
+    }), "utf8");
+    const lossyRes = callTool(s.roots, "schem_fmt", { path: lossy, to: "dsl" });
+    expect(lossyRes.isError).toBe(true);
+    expect(textOf(lossyRes).fields).toEqual(["meta.created"]);
+    expect(existsSync(join(dir, "lossy.schem"))).toBe(false);
+
+    expect(callTool(s.roots, "schem_fmt", { path: dslFile, to: "xml" }).isError).toBe(true);
+    expect(callTool(s.roots, "schem_fmt", { path: join(dir, "missing.schem") }).isError).toBe(true);
+    expect(callTool(s.roots, "schem_fmt", {}).isError).toBe(true);
   }, 120_000);
 });

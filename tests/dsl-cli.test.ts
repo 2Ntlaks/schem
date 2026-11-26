@@ -114,6 +114,12 @@ describe("text schematics at the command line", () => {
     expect(cli("components", "resistor", "--limit", "1")).toMatchObject({
       code: 0, body: { components: [{ id: "resistor", pins: expect.any(Array) }] },
     });
+    expect(cli("component", "led")).toMatchObject({
+      code: 0, body: { id: "led", refPrefix: "D", pins: expect.arrayContaining([expect.objectContaining({ number: "A", aliases: expect.arrayContaining(["anode".slice(0, 1)]) })]) },
+    });
+    expect(cli("component", "resister")).toMatchObject({
+      code: 1, body: { error: expect.stringContaining("resistor"), suggestions: expect.arrayContaining(["resistor"]) },
+    });
   });
 
   it("previews a drawing finding by id", () => {
