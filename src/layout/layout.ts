@@ -1421,7 +1421,10 @@ function icFor(
     }
   }
   const sortKey = (p: PinDef) => { const n = drawnNet.get(`${id}[${p.number}]`); const net = n ? netById.get(n) : undefined; return net?.name ?? `~${p.number}`; };
-  for (const s of Object.values(sides)) s.sort((a, b) => cmpStr(sortKey(a), sortKey(b)) || cmpNatural(a.number, b.number));
+  const topRole = (p: PinDef) => (p.role === "power_in" ? 0 : p.role === "power_out" ? 2 : 1);
+  for (const [name, s] of Object.entries(sides)) {
+    s.sort((a, b) => (name === "top" ? topRole(a) - topRole(b) : 0) || cmpStr(sortKey(a), sortKey(b)) || cmpNatural(a.number, b.number));
+  }
   // Two pins a part bridges (src/layout/bridges.ts) sit next to each other, upper first, on the
   // side their wires go to, at the place of the upper pin. Pins on the top or bottom stay there.
   for (const [u, l] of bridged ?? []) {
