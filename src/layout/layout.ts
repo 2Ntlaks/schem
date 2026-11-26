@@ -891,13 +891,14 @@ export function layout(project: Project, opts: LayoutOptions = {}): LayoutResult
     cons.push({ a: vx(id), b: X0, c: MARGIN - e.x, priority: "structural", why: `margin ${id}` });
     cons.push({ a: vy(id), b: X0, c: MARGIN - e.y, priority: "structural", why: `margin ${id}` });
   }
-  // Incremental mode: two untouched parts whose present outlines would still clear each other (by
-  // 1 G) at their previous positions need no more distance than they had. The channel widths count
-  // crossing nets, so an edit that adds one net would otherwise slide whole columns. Next to an
-  // affected part the full gap stands, so the part the edit changed can make room for itself.
+  // Incremental mode: two parts from the previous layout whose present outlines still clear each
+  // other (by 1 G) at their previous positions need no more distance than they had. The channel
+  // widths count crossing nets, so an edit that adds one net or widens a label that still clears
+  // its neighbour would otherwise slide whole columns. When an edit causes an outline to encroach
+  // on a neighbour, `clear` is false and the full gap stands so the layout makes room.
   const keptGap = (a: string, b: string, axis: 0 | 1, need: number): number => {
     const pa = opts.previous?.parts[a], pb = opts.previous?.parts[b];
-    if (!pa || !pb || affected.has(a) || affected.has(b)) return need;
+    if (!pa || !pb) return need;
     const ea = shift(blockEnv(a), pa.at), eb = shift(blockEnv(b), pb.at);
     const clear = ea.x + ea.w + 1 <= eb.x || eb.x + eb.w + 1 <= ea.x || ea.y + ea.h + 1 <= eb.y || eb.y + eb.h + 1 <= ea.y;
     return clear ? Math.min(need, pb.at[axis] - pa.at[axis]) : need;
@@ -1421,7 +1422,10 @@ function icFor(
     }
   }
   const sortKey = (p: PinDef) => { const n = drawnNet.get(`${id}[${p.number}]`); const net = n ? netById.get(n) : undefined; return net?.name ?? `~${p.number}`; };
-  for (const s of Object.values(sides)) s.sort((a, b) => cmpStr(sortKey(a), sortKey(b)) || cmpNatural(a.number, b.number));
+  const topRole = (p: PinDef) => (p.role === "power_in" ? 0 : p.role === "power_out" ? 2 : 1);
+  for (const [name, s] of Object.entries(sides)) {
+    s.sort((a, b) => (name === "top" ? topRole(a) - topRole(b) : 0) || cmpStr(sortKey(a), sortKey(b)) || cmpNatural(a.number, b.number));
+  }
   // Two pins a part bridges (src/layout/bridges.ts) sit next to each other, upper first, on the
   // side their wires go to, at the place of the upper pin. Pins on the top or bottom stay there.
   for (const [u, l] of bridged ?? []) {

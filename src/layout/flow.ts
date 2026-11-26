@@ -105,6 +105,13 @@ export function inferFlow(g: FlowGraph, fixed: ReadonlyMap<string, number>): Flo
   const wireOf = (b: string) => outside(b)[0]!;
   /** A series part on a supply's way in: its other side reaches a connector, a source or another such part. */
   const feedsRail = (b: string): string | undefined => {
+    // A battery and the fuse or switch standing on it (stacks.ts): a whole supply in one block,
+    // with no wire out, so it feeds the supply its top pin is on.
+    const ms = g.members(b);
+    if (ms.length > 1 && ms.some((m) => BUILTIN[g.type(m)]?.kind === "source") && ms.some((m) => PATH_TYPES.has(g.type(m))) && !outside(b).length) {
+      const rails = [...new Set(pinsOf(b).filter((p) => g.portNet.has(p.net) && kind(p.net) === "power").map((p) => p.net))];
+      return rails.length === 1 ? rails[0] : undefined;
+    }
     if (!single(b) || !isTapShape(b) || !PATH_TYPES.has(g.type(b))) return undefined;
     const rail = pinsOf(b).find((p) => g.portNet.has(p.net))!, wire = pinsOf(b).find((p) => flows(p.net))!;
     if (kind(rail.net) !== "power" || ((g.type(b) === "diode" || g.type(b) === "schottky") && rail.pin !== "K")) return undefined;
