@@ -5,6 +5,7 @@ import { canonical, type PinDef } from "../core/model.js";
 import { validate } from "../core/validate.js";
 import { fromLayoutCache } from "../io/layout-cache.js";
 import { saveProject } from "../io/project.js";
+import { importSpice } from "../io/spice.js";
 import { applyEditScript, parseEditScript, type EditScript } from "../io/edit-script.js";
 import { revision } from "../edit/edit.js";
 import { stabilityBreaks, type ChangeReport } from "../edit/report.js";
@@ -22,6 +23,7 @@ import {
   fitScale,
   focusBox,
   focusPoints,
+  guardProject,
   labelPixels,
   LABEL_MIN_PX,
   MAX_FILE,
@@ -87,6 +89,7 @@ export function executeCommand(roots: Roots, name: string, args: Record<string, 
     case "schem_describe": return schemDescribe(roots, args);
     case "schem_components": return schemComponents(args);
     case "schem_component": return schemComponent(args);
+    case "schem_import": return schemImport(roots, args);
     default: return fail(`unknown tool "${name}".`);
   }
 }
@@ -667,4 +670,63 @@ function schemComponent(args: Record<string, unknown>): CommandResult {
     error: `unknown component type "${type}".${hint}`,
     ...(suggestions.length ? { suggestions } : {}),
   });
+}
+
+function schemImport(roots: Roots, args: Record<string, unknown>): CommandResult {
+  const path = pathOf(args.path, "path");
+  if (!path.ok) return fail(path.message);
+  const detail = readDetail(args.detail, "normal");
+  if (detail === undefined) return fail("detail is brief, normal or full.");
+  if (args.spice === undefined) return fail("spice is missing.");
+  if (typeof args.spice !== "string" || args.spice.trim() === "") return fail("spice must be a non-empty string.");
+  if (Buffer.byteLength(args.spice, "utf8") > MAX_FILE) {
+    return fail(`the SPICE netlist is over 2 MB (${MAX_FILE} bytes). Nothing was written.`);
+  }
+  const opened = resolvePath(roots, path.path, "create");
+  if (!opened.ok) return fail(opened.message);
+  const imported = importSpice(args.spice);
+  if (!imported.ok || imported.project === undefined) {
+    return fail({
+      error: imported.errors[0] ?? "could not import SPICE netlist. Nothing was written.",
+      errors: imported.errors,
+      ...(imported.warnings.length ? { warnings: imported.warnings } : {}),
+    });
+  }
+  const guards = guardProject(imported.project);
+  if (guards.length) return fail(`${guards.join(" ")} Nothing was written.`);
+  const drawn = drawProject(imported.project);
+  if (drawn.result.render === undefined || drawn.result.state === undefined || !drawn.result.status.startsWith("valid")) {
+    return fail({
+      error: `could not draw this circuit (${drawn.result.status}). Nothing was written.`,
+      status: drawn.result.status,
+      verified: false,
+      issues: [...drawn.result.issues, ...drawn.result.notes],
+      ...(imported.warnings.length ? { warnings: imported.warnings } : {}),
+    });
+  }
+  let committed: ReturnType<typeof commitProject>;
+  try {
+    committed = commitProject(imported.project, drawn.result.state, "canonical", formatOf(path.path));
+  } catch (e) {
+    return fail(`${(e as Error).message} Nothing was written.`);
+  }
+  if (Buffer.byteLength(committed.text, "utf8") > MAX_FILE) {
+    return fail(`the saved file would be over 2 MB (${MAX_FILE} bytes). Nothing was written.`);
+  }
+  try {
+    withLock(opened.real, () => exclusiveCreate(opened.real, committed.text));
+  } catch (e) {
+    return writeFailure(e);
+  }
+  const payload = sheetPayload(imported.project, drawn, {
+    detail,
+    revision: committed.revision,
+    layoutToken: committed.layoutToken,
+    warnings: imported.warnings,
+  });
+  if (!payload.ok) return fail(payload.message);
+  payload.body.saved = true;
+  payload.body.path = showPath(opened.real);
+  payload.body.warnings = imported.warnings;
+  return success(payload.body);
 }

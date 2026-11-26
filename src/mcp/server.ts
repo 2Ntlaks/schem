@@ -24,12 +24,12 @@ export interface Session {
 export const INSTRUCTIONS = [
   "schem turns a circuit netlist into a clean, verified schematic. Files are the state. Do not invent coordinates.",
   "1. Call schem_components to search available part types and modules, and schem_component for full pin numbers, names, aliases, roles, groups, interfaces and docs.",
-  "2. Call schem_create to write a new project file and draw it. Pass .schem text DSL (supported and preferred for brevity), JSON text or a JSON object in source.",
+  "2. Call schem_create to write a new project file and draw it. Pass .schem text DSL (supported and preferred for brevity), JSON text or a JSON object in source. Or call schem_import with a SPICE netlist string to convert, lay out and save a new .schem or .schem.json file.",
   "3. Call schem_check to read status, revision, layoutToken and findings. A finding may include a checked fix.",
   "4. Call schem_edit to apply ops from a fix or layout adjustment. Pass expectedLayout from the fix, and expectedRevision when you have it. Use schem_undo to restore the previous saved snapshot if an edit makes things worse.",
   "5. Repeat check and edit until status is valid and the warning count is 0, or two rounds make no progress, or five rounds have passed. Never change the circuit just to improve the drawing.",
-  "6. Call schem_preview to inspect a PNG of the drawing. If labels would be under 9 px, ask again with focus set to the part ids you need (or finding set to a finding id). Use schem_query for exact coordinates, pins and nets, and schem_describe for a plain-text sheet summary and optional net table.",
-  "7. Call schem_render to write an SVG or a PNG into the configured roots. Use schem_fmt to format a file in place or convert between .schem and .schem.json.",
+  "6. Call schem_preview to inspect a PNG of the drawing. If labels would be under 9 px, ask again with focus set to the part ids you need (or finding set to a finding id). Use schem_query for exact coordinates, pins and nets, and schem_describe for a plain-text sheet summary, verified altText and optional net table.",
+  "7. Call schem_render to write an SVG or a PNG into the configured roots (supports theme: clean, dark, blueprint, textbook, mono-print and transparent: true). Use schem_fmt to format a file in place or convert between .schem and .schem.json.",
   "Visual operations are setters: repeating one changes nothing. addPart fails if that part id already exists. A revision or layout mismatch returns status conflict and writes nothing.",
   "This server reads and writes only inside its configured roots.",
 ].join("\n");
@@ -44,18 +44,19 @@ The server reads JSON-RPC from stdin and writes JSON-RPC to stdout, one
 message per line. Logs go to stderr. It reads and writes only inside the
 root folders. The default root is the current folder.
 
-Tools (11):
+Tools (12):
   schem_create      Create a project file from .schem text DSL (preferred) or JSON
   schem_edit        Apply edit operations transactionally with revision/layout checks
   schem_check       Check drawing status, tokens, metrics and findings
   schem_preview     Return a PNG overview or focused crop
   schem_query       Read positions, pins and connections for parts or nets
-  schem_render      Write a verified SVG or PNG inside the configured roots
+  schem_render      Write a verified SVG or PNG inside the configured roots (supports theme and transparent)
   schem_undo        Restore the latest saved snapshot from .schem-history
-  schem_describe    Return a plain-text drawing summary and optional net table
+  schem_describe    Return a plain-text drawing summary, verified altText and optional net table
   schem_fmt         Format in place or convert between .schem and .schem.json
   schem_components  Search built-in symbols and modules
   schem_component   Inspect full pin metadata and docs for one component type
+  schem_import      Import a SPICE netlist into a new .schem or .schem.json project
 `;
 
 export function serverArgs(argv: string[]): { roots: string[]; help: boolean; error?: string } {

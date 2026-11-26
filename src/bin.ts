@@ -12,11 +12,12 @@ import { main as mcpMain } from "./mcp/main.js";
 
 const MCP_LINE = `
 MCP server (for AI agents):
-  schem mcp [--root <folder>]...   serve the 11 schem tools on stdin and stdout
+  schem mcp [--root <folder>]...   serve the 12 schem tools on stdin and stdout
   schem mcp --help                 more about the server
   Tools: schem_create, schem_edit, schem_check, schem_preview, schem_query,
-         schem_render, schem_undo, schem_describe, schem_fmt, schem_components,
-         schem_component`;
+         schem_render (supports theme and transparent), schem_undo,
+         schem_describe (includes verified altText), schem_fmt,
+         schem_components, schem_component, schem_import`;
 
 const argv = process.argv.slice(2);
 const [command, ...rest] = argv;

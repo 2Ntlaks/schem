@@ -85,7 +85,7 @@ export const TOOLS: Array<{ name: string; description: string; inputSchema: Reco
   },
   {
     name: "schem_render",
-    description: "Write an SVG or a PNG of the drawing to out, inside a configured root. format is svg or png. For png, pass scale (pixels per grid unit, default 10) or dpi, not both. overwrite must be true to replace an existing file. A PNG may be at most 8000 px per side and 40 megapixels.",
+    description: "Write an SVG or a PNG of the drawing to out, inside a configured root. format is svg or png. For png, pass scale (pixels per grid unit, default 10) or dpi, not both. Pass theme (clean, dark, blueprint, textbook, mono-print) to pick a palette, and transparent: true to omit the background. overwrite must be true to replace an existing file. A PNG may be at most 8000 px per side and 40 megapixels.",
     inputSchema: {
       type: "object",
       properties: {
@@ -114,7 +114,7 @@ export const TOOLS: Array<{ name: string; description: string; inputSchema: Reco
   },
   {
     name: "schem_describe",
-    description: "Return a plain-text description of a verified drawing: sheet size, crossing count, part positions and orientations, neighbours and net connections. Set table to true to also return structured net rows.",
+    description: "Return a plain-text description and verified altText of a drawing: sheet size, crossing count, part positions and orientations, neighbours and net connections. Set table to true to also return structured net rows.",
     inputSchema: {
       type: "object",
       properties: {
@@ -157,6 +157,19 @@ export const TOOLS: Array<{ name: string; description: string; inputSchema: Reco
         type: { type: "string", description: "Component type id, such as resistor, opamp, ic, header or module:esp32-devkitc-v4." },
       },
       required: ["type"],
+    },
+  },
+  {
+    name: "schem_import",
+    description: "Import a SPICE netlist (.cir, .sp, .net text), validate and lay it out, and save a new .schem or .schem.json project file inside a configured root. The file must not already exist. Returns status, verified, revision, layoutToken, warnings, counts and, unless detail is brief, the first findings.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        path: { type: "string", description: "Project file to create (.schem or .schem.json), inside a configured root." },
+        spice: { type: "string", description: "SPICE netlist text to import." },
+        detail: { type: "string", enum: ["brief", "normal", "full"], description: "brief is counts only. normal adds the first findings. full also adds metrics. Default normal." },
+      },
+      required: ["path", "spice"],
     },
   },
 ];
